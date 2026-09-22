@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d0f10">
+  <title>IMPORTB2B Central</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./assets/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
+</head>
+<body>
+  <div id="loginView" class="auth-shell">
+    <div class="auth-card">
+      <div class="brand-mark">IB</div>
+      <h1>IMPORTB2B Central</h1>
+      <p>Stock · Ventas · Pedidos · Finanzas · Clientes</p>
+      <form id="loginForm">
+        <label>Email<input id="email" type="email" autocomplete="email" required></label>
+        <label>Contraseña<input id="password" type="password" autocomplete="current-password" required></label>
+        <button class="btn primary" type="submit">Ingresar</button>
+        <div id="loginError" class="error"></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="appView" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark small">IB</span><div><b>IMPORTB2B</b><small>CENTRAL</small></div></div>
+      <nav id="nav">
+        <button data-view="dashboard" class="active">Inicio</button>
+        <button data-view="products">Productos / Stock</button>
+        <button data-view="imports">Importar Kyte</button>
+        <button data-view="orders">Pedidos</button>
+        <button data-view="finance">Finanzas</button>
+      </nav>
+      <button id="logoutBtn" class="logout">Cerrar sesión</button>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <h2 id="viewTitle">Inicio</h2>
+          <span id="userLabel" class="muted"></span>
+        </div>
+        <div class="global-search">
+          <input id="globalSearch" placeholder="Buscar producto, SKU, categoría…">
+        </div>
+      </header>
+      <section id="content"></section>
+    </main>
+  </div>
+
+  <script src="./assets/js/config.js"></script>
+  <script src="./assets/js/db.js"></script>
+  <script src="./assets/js/importer.js"></script>
+  <script src="./assets/js/app.js"></script>
+</body>
+</html>

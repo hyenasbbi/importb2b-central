@@ -1,0 +1,15 @@
+create index if not exists importb2b_product_variants_owner_idx on public.importb2b_product_variants(owner_id);
+create index if not exists importb2b_product_images_owner_idx on public.importb2b_product_images(owner_id);
+create index if not exists importb2b_inventory_movements_product_idx on public.importb2b_inventory_movements(product_id);
+create index if not exists importb2b_inventory_movements_created_by_idx on public.importb2b_inventory_movements(created_by);
+create index if not exists importb2b_sales_created_by_idx on public.importb2b_sales(created_by);
+create index if not exists importb2b_sale_items_owner_idx on public.importb2b_sale_items(owner_id);
+create index if not exists importb2b_sale_items_product_idx on public.importb2b_sale_items(product_id);
+create index if not exists importb2b_sale_payments_owner_idx on public.importb2b_sale_payments(owner_id);
+create index if not exists importb2b_sale_payments_method_idx on public.importb2b_sale_payments(payment_method_id);
+create index if not exists importb2b_sale_payments_movement_idx on public.importb2b_sale_payments(movement_id);
+create index if not exists importb2b_sale_payments_settlement_idx on public.importb2b_sale_payments(settlement_id);
+create index if not exists importb2b_import_batches_owner_idx on public.importb2b_import_batches(owner_id);
+create index if not exists importb2b_import_batches_created_by_idx on public.importb2b_import_batches(created_by);
+create index if not exists importb2b_import_rows_owner_idx on public.importb2b_import_rows(owner_id);
+create index if not exists importb2b_order_items_product_idx on public.importb2b_order_items(product_id);
