@@ -42,9 +42,20 @@
   async function renderDashboard(){
     const d=await DB.dashboard();
     const batch=d.importBatch;
+    const v=d.valuation||{};
     content.innerHTML=`<div class="grid">${metric('Productos',number(d.products),'Base central')}${metric('Stock disponible',number(d.stock),'Unidades')}${metric('En tránsito',number(d.transit),'Pendiente de recepción')}${metric('Pedidos registrados',number(d.orders),'App actual')}${metric('A cobrar',money(d.receivable),'Control financiero')}${metric('Ingresos del mes',money(d.income))}${metric('Egresos del mes',money(d.expense))}${metric('Resultado simple',money(d.income-d.expense))}</div>
-    <div class="two-col" style="margin-top:14px"><div class="card"><div class="section-title"><h3>Integraciones</h3></div><div class="list"><div class="row"><span>Pedidos / Vía Cargo</span><span class="pill green">Conectado</span></div><div class="row"><span>Control Financiero</span><span class="pill green">Conectado</span></div><div class="row"><span>Productos / Stock</span><span class="pill blue">Fase 2</span></div><div class="row"><span>Importador Kyte</span><span class="pill purple">Revisión + consolidación</span></div><div class="row"><span>Club</span><span class="pill yellow">Supabase externo</span></div></div></div>
-    <div class="card"><h3 style="margin-top:0">Migración Kyte</h3>${batch?`<p><b>${number(batch.product_ready||0)}</b> listos · <b>${number(batch.product_review||0)}</b> requieren revisión · <b>${number(batch.product_imported||0)}</b> importados.</p><button id="goImports" class="btn primary">Abrir revisión</button>`:'<p class="muted">Todavía no hay un lote de importación.</p>'}<div class="notice" style="margin-top:12px">Stock 0 conserva la variante y no suma unidades. Todo stock positivo entra como movimiento auditable.</div></div></div>`;
+    <details class="card stock-valuation" open style="margin-top:14px">
+      <summary><div><small>Valorización de stock disponible</small><b>${money(v.stock_sale_value_ars)}</b></div><span class="muted">Ver detalle ▾</span></summary>
+      <div class="valuation-grid">
+        <div><small>Costo del stock</small><strong>${money(v.stock_cost_ars)}</strong></div>
+        <div><small>Valor de venta estimado</small><strong>${money(v.stock_sale_value_ars)}</strong></div>
+        <div class="profit-value"><small>Ganancia esperada</small><strong>${money(v.expected_profit_ars)}</strong></div>
+        <div><small>Unidades disponibles</small><strong>${number(v.available_units)}</strong></div>
+      </div>
+      <p class="muted small-text">Ganancia esperada = valor de venta actual menos costo actual de las unidades disponibles. No incluye gastos operativos ni comisiones futuras.</p>
+    </details>
+    <div class="two-col" style="margin-top:14px"><div class="card"><div class="section-title"><h3>Integraciones</h3></div><div class="list"><div class="row"><span>Pedidos / Vía Cargo</span><span class="pill green">Fase 3 activa</span></div><div class="row"><span>Control Financiero</span><span class="pill green">Conectado</span></div><div class="row"><span>Productos / Stock</span><span class="pill blue">Fase 2.1</span></div><div class="row"><span>Importador Kyte</span><span class="pill purple">Revisión + consolidación</span></div><div class="row"><span>Club</span><span class="pill yellow">Supabase externo</span></div></div></div>
+    <div class="card"><h3 style="margin-top:0">Migración Kyte</h3>${batch?`<p><b>${number(batch.product_ready||0)}</b> listos · <b>${number(batch.product_review||0)}</b> requieren revisión · <b>${number(batch.product_imported||0)}</b> importados.</p><button id="goImports" class="btn primary">Abrir revisión</button>`:'<p class="muted">Todavía no hay un lote de importación.</p>'}<div class="notice good-notice" style="margin-top:12px">Los Vapers ahora se agrupan por modelo y cada sabor queda como variante independiente.</div></div></div>`;
     $('#goImports')?.addEventListener('click',()=>{currentView='imports';document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view==='imports'));render();});
   }
 
@@ -62,20 +73,29 @@
   }
 
   async function openProductEditor(productId){
-    const p=await DB.productDetail(productId);
+    const [p,cats]=await Promise.all([DB.productDetail(productId),DB.categories()]);
+    const isVape=String(p.category||'').toLowerCase()==='vapers';
+    const variantTitle=isVape?'Sabores':'Variantes';
+    const variantColumn=isVape?'Sabor':'Variante';
     const rows=p.variants.map(v=>`<tr data-variant="${v.id}"><td><input class="v-name" value="${esc(v.variant_name)}"></td><td><input class="v-sku" value="${esc(v.sku||'')}"></td><td><input class="v-cost" type="number" step="0.01" value="${Number(v.cost_ars||0)}"></td><td><input class="v-price" type="number" step="0.01" value="${Number(v.price_ars||0)}"></td><td><input class="v-min" type="number" step="1" value="${Number(v.stock_min||0)}"></td><td><b>${number(v.stock.on_hand)}</b><br><small class="muted">disp. ${number(v.stock.available)}</small></td><td><button class="btn tiny ghost adjust-stock" data-vid="${v.id}" data-current="${Number(v.stock.on_hand||0)}">Ajustar</button></td></tr>`).join('');
+    const categoryOptions=cats.map(c=>`<option value="${esc(c)}" ${c===p.category?'selected':''}>${esc(c)}</option>`).join('');
     openModal(`<div class="section-title"><div><h3>Editar producto</h3><small class="muted">${esc(p.source==='kyte'?'Migrado desde Kyte':'Producto')}</small></div><button class="modal-close">×</button></div>
-      <div class="form-grid"><label>Nombre<input id="epName" value="${esc(p.name)}"></label><label>Categoría<input id="epCategory" value="${esc(p.category||'')}"></label><label>SKU general<input id="epSku" value="${esc(p.sku||'')}"></label><label class="check"><input id="epCatalog" type="checkbox" ${p.catalog_visible?'checked':''}> Visible en catálogo</label></div>
-      <div class="section-title" style="margin-top:12px"><h3>Variantes</h3><button id="addVariant" class="btn ghost">+ Variante</button></div>
-      <div class="table-wrap"><table class="table compact"><thead><tr><th>Variante</th><th>SKU</th><th>Costo</th><th>Precio</th><th>Mín.</th><th>Stock físico</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">Sin variantes</td></tr>'}</tbody></table></div>
+      <div class="form-grid"><label>Nombre<input id="epName" value="${esc(p.name)}"></label><label>Categoría<select id="epCategory">${categoryOptions}</select></label><label>SKU general<input id="epSku" value="${esc(p.sku||'')}"></label><label class="check"><input id="epCatalog" type="checkbox" ${p.catalog_visible?'checked':''}> Visible en catálogo</label></div>
+      <div class="section-title" style="margin-top:12px"><div><h3>${variantTitle}</h3>${isVape?'<small class="muted">Cada sabor comparte el mismo producto/modelo.</small>':''}</div><button id="addVariant" class="btn ghost">+ ${isVape?'Sabor':'Variante'}</button></div>
+      <div class="table-wrap"><table class="table compact"><thead><tr><th>${variantColumn}</th><th>SKU</th><th>Costo</th><th>Precio</th><th>Mín.</th><th>Stock físico</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">Sin variantes</td></tr>'}</tbody></table></div>
       <div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveProduct" class="btn primary">Guardar cambios</button></div>`);
 
     $('#saveProduct').addEventListener('click',async()=>{
       const btn=$('#saveProduct'); btn.disabled=true;
       try{
-        await DB.saveProduct(productId,{name:$('#epName').value.trim(),category:$('#epCategory').value.trim()||null,sku:$('#epSku').value.trim()||null,catalog_visible:$('#epCatalog').checked});
+        const category=$('#epCategory').value;
+        await DB.saveProduct(productId,{name:$('#epName').value.trim(),category,sku:$('#epSku').value.trim()||null,catalog_visible:$('#epCatalog').checked});
         for(const tr of document.querySelectorAll('[data-variant]')){
-          await DB.saveVariant(tr.dataset.variant,{variant_name:tr.querySelector('.v-name').value.trim()||'Única',sku:tr.querySelector('.v-sku').value.trim()||null,cost_ars:Number(tr.querySelector('.v-cost').value||0),price_ars:Number(tr.querySelector('.v-price').value||0),stock_min:Number(tr.querySelector('.v-min').value||0)});
+          const variantName=tr.querySelector('.v-name').value.trim()||'Única';
+          const attrs=category.toLowerCase()==='vapers'?{sabor:variantName}:undefined;
+          const payload={variant_name:variantName,sku:tr.querySelector('.v-sku').value.trim()||null,cost_ars:Number(tr.querySelector('.v-cost').value||0),price_ars:Number(tr.querySelector('.v-price').value||0),stock_min:Number(tr.querySelector('.v-min').value||0)};
+          if(attrs) payload.attributes=attrs;
+          await DB.saveVariant(tr.dataset.variant,payload);
         }
         closeModal(); await renderProducts($('#globalSearch').value);
       }catch(e){alert(e.message)}finally{btn.disabled=false}
@@ -91,12 +111,16 @@
     }));
 
     $('#addVariant').addEventListener('click',async()=>{
-      const name=prompt('Nombre de variante (ej: XL, Black, Pink Lemonade):',''); if(!name) return;
+      const category=$('#epCategory').value;
+      const vape=category.toLowerCase()==='vapers';
+      const name=prompt(vape?'Nombre del sabor (ej: Pink Lemonade):':'Nombre de variante (ej: XL, Black):',''); if(!name) return;
       const price=Number(prompt('Precio de venta ARS:','0')||0);
       const cost=Number(prompt('Costo ARS:','0')||0);
       const initial=Number(prompt('Stock inicial de esta variante:','0')||0);
       if([price,cost,initial].some(x=>!Number.isFinite(x))||initial<0) return alert('Valores inválidos');
-      try{await DB.createVariant(productId,{variant_name:name.trim(),cost_ars:cost,price_ars:price,stock_min:0,active:true},initial,'Alta manual de nueva variante');closeModal();await openProductEditor(productId);}catch(e){alert(e.message)}
+      const payload={variant_name:name.trim(),cost_ars:cost,price_ars:price,stock_min:0,active:true};
+      if(vape) payload.attributes={sabor:name.trim()};
+      try{await DB.createVariant(productId,payload,initial,vape?'Alta manual de nuevo sabor':'Alta manual de nueva variante');closeModal();await openProductEditor(productId);}catch(e){alert(e.message)}
     });
   }
 
@@ -113,7 +137,7 @@
       if(importStatusFilter!=='all' && r.status!==importStatusFilter) return false;
       if(!query) return true;
       const n=r.normalized_data||{};
-      return [n.name,n.base_name,n.category,n.size,r.row_number,(r.issues||[]).join(' ')].join(' ').toLowerCase().includes(query);
+      return [n.name,n.base_name,n.category,n.size,n.flavor,r.row_number,(r.issues||[]).join(' ')].join(' ').toLowerCase().includes(query);
     });
 
     content.innerHTML=`<div class="card"><div class="section-title"><div><h3>Centro de importación Kyte</h3><p class="muted">Los archivos se analizan primero. Nada modifica el stock hasta tocar Consolidar.</p></div></div><div class="import-grid"><div class="upload-card"><b>Productos</b><input id="productsFile" type="file" accept=".csv,text/csv"></div><div class="upload-card"><b>Clientes</b><input id="customersFile" type="file" accept=".csv,text/csv"></div><div class="upload-card"><b>Ventas</b><input id="salesFile" type="file" accept=".csv,text/csv"></div></div><div class="section-title" style="margin-top:14px"><div class="progress grow"><span id="importProgress"></span></div><button id="stageBtn" class="btn ghost">Analizar nuevo lote</button></div><div id="importResult" class="muted small-text"></div></div>
@@ -121,7 +145,7 @@
       <div class="grid mini-grid">${metric('Filas',number(counts.all))}${metric('Listas',number(counts.ready))}${metric('Revisar',number(counts.needs_review))}${metric('Importadas',number(counts.imported))}</div>
       <div class="toolbar" style="margin-top:14px"><input id="importSearch" value="${esc(importSearch)}" placeholder="Buscar producto, categoría, talle…"><select id="importStatus"><option value="needs_review" ${importStatusFilter==='needs_review'?'selected':''}>Requieren revisión</option><option value="ready" ${importStatusFilter==='ready'?'selected':''}>Listos</option><option value="imported" ${importStatusFilter==='imported'?'selected':''}>Importados</option><option value="skipped" ${importStatusFilter==='skipped'?'selected':''}>Omitidos</option><option value="all" ${importStatusFilter==='all'?'selected':''}>Todos</option></select><button id="refreshIssues" class="btn ghost">Reanalizar</button><button id="commitProducts" class="btn primary" ${counts.ready?'':'disabled'}>Consolidar ${counts.ready} listos</button></div>
       <div class="notice ${counts.needs_review?'':'good-notice'}" style="margin-bottom:14px">${counts.needs_review?`${counts.needs_review} filas necesitan decisión antes de importarse. Podés consolidar las filas listas ahora; las demás quedan intactas.`:'No quedan conflictos en las filas pendientes.'}</div>
-      <div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Producto base</th><th>Categoría</th><th>Variante</th><th>Stock</th><th>Costo</th><th>Precio</th><th>Estado</th><th>Problemas</th><th></th></tr></thead><tbody>${filtered.map(r=>{const n=r.normalized_data||{};return `<tr><td>${r.row_number}</td><td><b>${esc(n.base_name||n.name||'—')}</b><br><small class="muted">${esc(n.name||'')}</small></td><td>${esc(n.category||'—')}</td><td>${esc(n.size||'Única')}</td><td><span class="pill ${Number(n.stock)>0?'green':Number(n.stock)<0?'red':''}">${number(n.stock)}</span></td><td>${money(n.cost_ars)}</td><td>${money(n.price_ars)}</td><td>${statusPill(r.status)}</td><td>${(r.issues||[]).map(i=>`<span class="issue-tag">${esc(issueLabel(i))}</span>`).join(' ')||'—'}</td><td class="actions">${r.status==='imported'?'<span class="muted">✓</span>':r.status==='skipped'?`<button class="btn tiny ghost restore-row" data-id="${r.id}">Restaurar</button>`:`<button class="btn tiny ghost edit-import-row" data-id="${r.id}">Editar</button>${(r.issues||[]).includes('POSIBLE_DUPLICADO')?` <button class="btn tiny ghost merge-row" data-id="${r.id}">Fusionar</button>`:''} <button class="btn tiny danger-btn skip-row" data-id="${r.id}">Omitir</button>`}</td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No hay filas para este filtro.</td></tr>'}</tbody></table></div></div>`:'<div class="card" style="margin-top:14px"><div class="empty">Todavía no hay un lote. Cargá los CSV exportados desde Kyte.</div></div>'}`;
+      <div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Producto base</th><th>Categoría</th><th>Variante</th><th>Stock</th><th>Costo</th><th>Precio</th><th>Estado</th><th>Problemas</th><th></th></tr></thead><tbody>${filtered.map(r=>{const n=r.normalized_data||{};return `<tr><td>${r.row_number}</td><td><b>${esc(n.base_name||n.name||'—')}</b><br><small class="muted">${esc(n.name||'')}</small></td><td>${esc(n.category||'—')}</td><td>${esc(n.flavor||n.size||'Única')}</td><td><span class="pill ${Number(n.stock)>0?'green':Number(n.stock)<0?'red':''}">${number(n.stock)}</span></td><td>${money(n.cost_ars)}</td><td>${money(n.price_ars)}</td><td>${statusPill(r.status)}</td><td>${(r.issues||[]).map(i=>`<span class="issue-tag">${esc(issueLabel(i))}</span>`).join(' ')||'—'}</td><td class="actions">${r.status==='imported'?'<span class="muted">✓</span>':r.status==='skipped'?`<button class="btn tiny ghost restore-row" data-id="${r.id}">Restaurar</button>`:`<button class="btn tiny ghost edit-import-row" data-id="${r.id}">Editar</button>${(r.issues||[]).includes('POSIBLE_DUPLICADO')?` <button class="btn tiny ghost merge-row" data-id="${r.id}">Fusionar</button>`:''} <button class="btn tiny danger-btn skip-row" data-id="${r.id}">Omitir</button>`}</td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No hay filas para este filtro.</td></tr>'}</tbody></table></div></div>`:'<div class="card" style="margin-top:14px"><div class="empty">Todavía no hay un lote. Cargá los CSV exportados desde Kyte.</div></div>'}`;
 
     $('#stageBtn').addEventListener('click',async()=>{
       const files={products:$('#productsFile').files[0],customers:$('#customersFile').files[0],sales:$('#salesFile').files[0]};
@@ -163,22 +187,29 @@
   }
 
   function canonicalImport(r){
-    const n=r.normalized_data||{}; return [n.category||'',n.base_name||n.name||'',n.size||'Única'].map(x=>String(x).trim().toLowerCase()).join('|');
+    const n=r.normalized_data||{}; return [n.category||'',n.base_name||n.name||'',n.flavor||n.size||'Única'].map(x=>String(x).trim().toLowerCase()).join('|');
   }
 
-  function openImportRowEditor(row,batchId){
+  async function openImportRowEditor(row,batchId){
     if(!row) return;
+    const [cats]=await Promise.all([DB.categories()]);
     const n=row.normalized_data||{};
+    const currentCategory=n.category==='SIN CLASIFICAR'?'':(n.category||'');
+    const currentVariant=n.flavor||n.size||'';
+    const categoryOptions=`<option value="">Seleccionar categoría</option>${cats.map(c=>`<option value="${esc(c)}" ${c===currentCategory?'selected':''}>${esc(c)}</option>`).join('')}`;
     openModal(`<div class="section-title"><div><h3>Revisar fila #${row.row_number}</h3><small class="muted">Los cambios afectan solamente la migración hasta que consolides.</small></div><button class="modal-close">×</button></div>
-      <div class="form-grid"><label>Producto base<input id="irBase" value="${esc(n.base_name||n.name||'')}"></label><label>Categoría<input id="irCategory" value="${esc(n.category==='SIN CLASIFICAR'?'':n.category||'')}"></label><label>Variante / talle<input id="irSize" value="${esc(n.size||'')}"></label><label>Stock actual<input id="irStock" type="number" step="1" value="${Number(n.stock||0)}"></label><label>Stock mínimo<input id="irMin" type="number" step="1" value="${Number(n.stock_min||0)}"></label><label>Costo ARS<input id="irCost" type="number" step="0.01" value="${Number(n.cost_ars||0)}"></label><label>Precio venta ARS<input id="irPrice" type="number" step="0.01" value="${Number(n.price_ars||0)}"></label></div>
-      <div class="notice" style="margin-top:10px">Stock 0 es válido y conserva la variante. Stock negativo seguirá marcado para revisión.</div>
+      <div class="form-grid"><label>Producto base<input id="irBase" value="${esc(n.base_name||n.name||'')}"></label><label>Categoría<select id="irCategory">${categoryOptions}</select></label><label>Variante / talle / sabor<input id="irSize" value="${esc(currentVariant)}"></label><label>Stock actual<input id="irStock" type="number" step="1" value="${Number(n.stock||0)}"></label><label>Stock mínimo<input id="irMin" type="number" step="1" value="${Number(n.stock_min||0)}"></label><label>Costo ARS<input id="irCost" type="number" step="0.01" value="${Number(n.cost_ars||0)}"></label><label>Precio venta ARS<input id="irPrice" type="number" step="0.01" value="${Number(n.price_ars||0)}"></label></div>
+      <div class="notice" style="margin-top:10px">Stock 0 es válido y conserva la variante. En Vapers, el tercer campo representa el sabor.</div>
       <div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveImportRow" class="btn primary">Guardar revisión</button></div>`);
     $('#saveImportRow').addEventListener('click',async()=>{
-      const base=$('#irBase').value.trim(),category=$('#irCategory').value.trim(),size=$('#irSize').value.trim().toUpperCase();
+      const base=$('#irBase').value.trim(),category=$('#irCategory').value.trim(),variant=$('#irSize').value.trim();
       const stock=Number($('#irStock').value||0),stockMin=Number($('#irMin').value||0),cost=Number($('#irCost').value||0),price=Number($('#irPrice').value||0);
       if(!base) return alert('El producto necesita nombre');
+      if(!category) return alert('Elegí una categoría');
       if([stock,stockMin,cost,price].some(x=>!Number.isFinite(x))) return alert('Hay números inválidos');
-      const updated={...n,base_name:base,name:size?`${base} - ${size}`:base,category:category||'SIN CLASIFICAR',size:size||null,stock,stock_min:stockMin,cost_ars:cost,price_ars:price,issues:[]};
+      const isVape=category.toLowerCase()==='vapers';
+      const normalizedVariant=isVape?variant:variant.toUpperCase();
+      const updated={...n,base_name:base,name:normalizedVariant?`${base} - ${normalizedVariant}`:base,category,size:isVape?null:(normalizedVariant||null),flavor:isVape?(normalizedVariant||null):null,stock,stock_min:stockMin,cost_ars:cost,price_ars:price,issues:[]};
       try{await DB.saveImportProduct(row.id,batchId,updated);closeModal();await renderImports();}catch(e){alert(e.message)}
     });
   }
@@ -189,9 +220,139 @@
   }
   function closeModal(){document.querySelector('#modalLayer')?.remove();}
 
+  const orderItemStatusLabel=s=>({
+    historical:'Histórico',unlinked:'Sin vincular',partial_allocation:'Distribución parcial',
+    allocated:'Distribuido',partial_received:'Recepción parcial',received:'Recibido'
+  }[s]||s||'Sin vincular');
+
+  function candidateScore(name,target){
+    const clean=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+    const a=clean(name),b=clean(target);
+    if(!a||!b) return 0;
+    if(a===b) return 100;
+    let score=0;
+    if(a.includes(b)||b.includes(a)) score+=50;
+    const aw=new Set(a.split(/\s+/)),bw=new Set(b.split(/\s+/));
+    for(const w of bw) if(aw.has(w)) score+=10;
+    return score;
+  }
+
   async function renderOrders(){
     const rows=await DB.recentOrders();
-    content.innerHTML=`<div class="notice" style="margin-bottom:14px">Lee directamente la tabla de Pedidos existente. Los artículos ya están preparados para enlazar producto, variante y cantidad recibida.</div><div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Fecha</th><th>Unidades</th><th>Inversión USD</th><th>Nota</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${x.order_number??x.id}</td><td>${esc(x.order_date||'')}</td><td>${number(x.total_units)}</td><td>${number(x.investment_usd)}</td><td>${esc(x.note||'—')}</td></tr>`).join('')}</tbody></table></div>`;
+    content.innerHTML=`<div class="notice good-notice" style="margin-bottom:14px"><b>Fase 3 activa:</b> los pedidos nuevos pueden vincularse a productos/variantes y, al recibir mercadería, sumar stock automáticamente. Los pedidos anteriores a la migración quedaron protegidos como <b>Históricos</b> para evitar duplicar el stock que ya vino desde Kyte.</div>
+      <div class="order-stack">${rows.map(o=>{
+        const ship=o.shipment;
+        const shipText=ship?`${esc(ship.carrier_name||'Envío')} · ${esc(ship.normalized_status||ship.latest_checkpoint_description||'Sin estado')}`:'Sin tracking';
+        const items=(o.items||[]).map(i=>{
+          const allocations=i.allocations||[];
+          const allocHtml=allocations.length?`<div class="allocation-list">${allocations.map(a=>{
+            const remaining=Math.max(0,Number(a.ordered_quantity||0)-Number(a.received_quantity||0));
+            return `<div class="allocation-row"><div><b>${esc(a.product?.name||'Producto')}</b> · ${esc(a.variant?.variant_name||'Variante')}<br><small class="muted">Asignado ${number(a.ordered_quantity)} · recibido ${number(a.received_quantity)}</small></div>${remaining>0&&i.stock_link_status!=='historical'?`<button class="btn tiny good receive-allocation" data-aid="${a.id}" data-remaining="${remaining}">Recibir ${number(remaining)}</button>`:''}</div>`;
+          }).join('')}</div>`:'';
+          const historical=i.stock_link_status==='historical';
+          const statusClass=i.stock_link_status==='received'?'green':historical?'':'yellow';
+          return `<div class="order-item" data-item="${i.id}">
+            <div class="order-item-main"><div><b>${esc(i.product)}</b>${i.detail&&i.detail!=='Sin detalle'?` <small class="muted">· ${esc(i.detail)}</small>`:''}<br><small class="muted">${esc(i.category||'')} · pedido ${number(i.quantity)} · recibido ${number(i.received_quantity||0)} · costo ${money(i.cost_ars)}</small></div><span class="pill ${statusClass}">${esc(orderItemStatusLabel(i.stock_link_status))}</span></div>
+            ${allocHtml}
+            <div class="order-item-actions">${i.excluded_from_stock?'<span class="muted">Excluido del stock</span>':historical?`<button class="btn tiny ghost activate-item" data-item="${i.id}">Activar para stock</button><small class="muted">Solo si esta mercadería todavía NO está incluida en el stock migrado.</small>`:`<button class="btn tiny ghost allocate-item" data-order="${o.id}" data-item="${i.id}">${allocations.length?'Editar distribución':'Vincular / distribuir'}</button>`}</div>
+          </div>`;
+        }).join('');
+        return `<section class="card order-card"><div class="section-title"><div><h3>Pedido #${esc(o.order_number??o.id)}</h3><small class="muted">${esc(o.order_date||'')} · ${number(o.total_units)} unidades · USD ${number(o.investment_usd)}</small></div><span class="pill ${ship?.is_received?'green':'blue'}">${shipText}</span></div>${items||'<div class="empty">Sin artículos</div>'}</section>`;
+      }).join('')||'<div class="card empty">No hay pedidos.</div>'}</div>`;
+
+    document.querySelectorAll('.activate-item').forEach(b=>b.addEventListener('click',async()=>{
+      if(!confirm('Este pedido histórico probablemente ya está incluido en el stock migrado desde Kyte. Activarlo permitirá recibirlo nuevamente y SUMAR stock. ¿Confirmás que esta mercadería todavía no fue contabilizada?')) return;
+      try{await DB.setOrderItemStockMode(b.dataset.item,true);await renderOrders();}catch(e){alert(e.message)}
+    }));
+    document.querySelectorAll('.allocate-item').forEach(b=>b.addEventListener('click',async()=>{
+      const order=rows.find(x=>String(x.id)===String(b.dataset.order));
+      const item=order?.items?.find(x=>String(x.id)===String(b.dataset.item));
+      if(item) await openOrderAllocationEditor(order,item);
+    }));
+    document.querySelectorAll('.receive-allocation').forEach(b=>b.addEventListener('click',async()=>{
+      const max=Number(b.dataset.remaining||0);
+      const raw=prompt(`Quedan ${max} unidades por recibir.\n¿Cuántas llegaron ahora?`,String(max));
+      if(raw===null) return;
+      const qty=Number(raw);
+      if(!Number.isFinite(qty)||qty<=0||qty>max) return alert('Cantidad inválida');
+      const note=prompt('Observación de recepción:','Recepción de mercadería')||'Recepción de mercadería';
+      try{await DB.receiveOrderAllocation(b.dataset.aid,qty,note);await renderOrders();}catch(e){alert(e.message)}
+    }));
+  }
+
+  async function openOrderAllocationEditor(order,item){
+    const products=await DB.orderProductOptions();
+    if(!products.length) return alert('No hay productos en la base central.');
+    const existing=item.allocations||[];
+    const lockedProduct=existing.find(x=>Number(x.received_quantity||0)>0)?.product_id||null;
+    const orderedCategory=String(item.category||'').toLowerCase();
+    const ranked=[...products].sort((a,b)=>{
+      const ca=String(a.category||'').toLowerCase()===orderedCategory?25:0;
+      const cb=String(b.category||'').toLowerCase()===orderedCategory?25:0;
+      return (candidateScore(b.name,item.product)+cb)-(candidateScore(a.name,item.product)+ca);
+    });
+    const initialProduct=lockedProduct||item.product_id||ranked[0]?.id;
+    openModal(`<div class="section-title"><div><h3>Vincular pedido a stock</h3><small class="muted">Pedido #${esc(order.order_number??order.id)} · ${esc(item.product)} · ${number(item.quantity)} unidades</small></div><button class="modal-close">×</button></div>
+      <div class="notice" style="margin-bottom:12px">Elegí el producto correcto y distribuí la cantidad del pedido entre sus variantes. En Vapers, cada variante es un sabor.</div>
+      <div class="form-grid"><label>Buscar producto<input id="oaSearch" value="${esc(item.product||'')}" placeholder="Buscar por modelo, nombre o categoría"></label><label>Producto<select id="oaProduct"></select></label></div>
+      <div id="oaVariants" style="margin-top:14px"></div>
+      <div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveAllocations" class="btn primary">Guardar distribución</button></div>`);
+
+    const search=$('#oaSearch'),select=$('#oaProduct'),variantBox=$('#oaVariants');
+    function refillProducts(){
+      const q=search.value.trim().toLowerCase();
+      const filtered=ranked.filter(p=>!q||[p.name,p.category,p.sku].join(' ').toLowerCase().includes(q)).slice(0,100);
+      const list=filtered.length?filtered:ranked.slice(0,100);
+      select.innerHTML=list.map(p=>`<option value="${p.id}" ${p.id===initialProduct?'selected':''}>${esc(p.name)} · ${esc(p.category||'')}</option>`).join('');
+      if(!select.value&&list[0]) select.value=list[0].id;
+      renderVariantAllocation();
+    }
+    function renderVariantAllocation(){
+      const product=products.find(p=>p.id===select.value);
+      if(!product){variantBox.innerHTML='<div class="empty">Elegí un producto.</div>';return}
+      const rows=(product.variants||[]).map((v,idx)=>{
+        const a=existing.find(x=>x.variant_id===v.id);
+        let initial=a?Number(a.ordered_quantity||0):0;
+        if(!existing.length&&product.variants.length===1&&idx===0) initial=Number(item.quantity||0);
+        return `<tr data-alloc-variant="${v.id}" data-existing="${a?.id||''}" data-received="${Number(a?.received_quantity||0)}"><td><b>${esc(v.variant_name)}</b><br><small class="muted">${esc(v.sku||'Sin SKU')}</small></td><td>${number(v.stock.available||0)}</td><td>${number(a?.received_quantity||0)}</td><td><input class="alloc-qty" type="number" min="${Number(a?.received_quantity||0)}" step="1" value="${initial}"></td></tr>`;
+      }).join('');
+      variantBox.innerHTML=`<div class="section-title"><div><h3>${String(product.category).toLowerCase()==='vapers'?'Sabores':'Variantes'}</h3><small class="muted">${esc(product.name)}</small></div><div><b id="allocTotal">0</b> / ${number(item.quantity)} asignadas</div></div><div class="table-wrap"><table class="table compact"><thead><tr><th>${String(product.category).toLowerCase()==='vapers'?'Sabor':'Variante'}</th><th>Stock actual</th><th>Ya recibido</th><th>Unidades del pedido</th></tr></thead><tbody>${rows||'<tr><td colspan="4" class="empty">Este producto no tiene variantes.</td></tr>'}</tbody></table></div>`;
+      const inputs=[...variantBox.querySelectorAll('.alloc-qty')];
+      const updateTotal=()=>{$('#allocTotal').textContent=number(inputs.reduce((a,x)=>a+Number(x.value||0),0));};
+      inputs.forEach(i=>i.addEventListener('input',updateTotal)); updateTotal();
+    }
+    let searchTimer;
+    search.addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(refillProducts,120)});
+    select.addEventListener('change',renderVariantAllocation);
+    refillProducts();
+
+    $('#saveAllocations').addEventListener('click',async()=>{
+      const product=products.find(p=>p.id===select.value);
+      if(!product) return alert('Elegí un producto');
+      if(lockedProduct&&lockedProduct!==product.id) return alert('Ya hay unidades recibidas para otro producto. No se puede cambiar el producto después de una recepción.');
+      const rows=[...document.querySelectorAll('[data-alloc-variant]')];
+      const total=rows.reduce((a,tr)=>a+Number(tr.querySelector('.alloc-qty').value||0),0);
+      if(total>Number(item.quantity)) return alert(`La distribución suma ${total} y el pedido tiene ${item.quantity} unidades.`);
+      const btn=$('#saveAllocations');btn.disabled=true;btn.textContent='Guardando…';
+      try{
+        const chosenVariantIds=new Set(rows.map(tr=>tr.dataset.allocVariant));
+        for(const old of existing){
+          if(old.product_id!==product.id || !chosenVariantIds.has(old.variant_id)){
+            if(Number(old.received_quantity||0)>0) throw new Error('Hay una distribución recibida que no puede eliminarse.');
+            await DB.deleteOrderAllocation(old.id);
+          }
+        }
+        for(const tr of rows){
+          const qty=Number(tr.querySelector('.alloc-qty').value||0);
+          const received=Number(tr.dataset.received||0);
+          const existingId=tr.dataset.existing;
+          if(qty<received) throw new Error('No podés asignar menos unidades que las ya recibidas.');
+          if(qty>0) await DB.saveOrderAllocation(item.id,tr.dataset.allocVariant,qty);
+          else if(existingId&&received===0) await DB.deleteOrderAllocation(existingId);
+        }
+        closeModal();await renderOrders();
+      }catch(e){alert(e.message);btn.disabled=false;btn.textContent='Guardar distribución'}
+    });
   }
 
   async function renderFinance(){

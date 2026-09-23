@@ -13,19 +13,31 @@
 
   function normalizeProduct(r,row){
     const name=text(r['Nombre']);
-    const category=text(r['Categoria'])||'SIN CLASIFICAR';
-    const m=name.match(sizePattern);
+    const rawCategory=text(r['Categoria']);
+    const categoryMap={'CAMISETAS':'Camisetas','CAMPERAS':'Camperas','SHORES IMPORTADOS':'Shores Importados','VAPERS':'Vapers'};
+    const category=categoryMap[rawCategory.toUpperCase()]||rawCategory||'SIN CLASIFICAR';
     const stock=num(r['Stock Actual']);
     const issues=[];
     if(!name) issues.push('SIN_NOMBRE');
-    if(!text(r['Categoria'])) issues.push('SIN_CATEGORIA');
+    if(!rawCategory) issues.push('SIN_CATEGORIA');
     if(stock<0) issues.push('STOCK_NEGATIVO');
+
+    let baseName=name, size=null, flavor=null;
+    if(category.toLowerCase()==='vapers'){
+      const vm=name.match(/^(.*?)\s+-\s+(.+)$/);
+      if(vm){ baseName=vm[1].trim(); flavor=vm[2].trim(); }
+    }else{
+      const sm=name.match(sizePattern);
+      if(sm){ baseName=sm[1].trim(); size=sm[2].toUpperCase(); }
+    }
+
     return {
       row,
       name,
       category,
-      base_name:m?m[1].trim():name,
-      size:m?m[2].toUpperCase():null,
+      base_name:baseName,
+      size,
+      flavor,
       unit:text(r['Unid / Frac.'])||'unidad',
       stock,
       stock_min:num(r['Stock Minimo']),
@@ -77,7 +89,7 @@
 
   async function createBatch(files){
     const u=OWNER(); if(!u) throw new Error('Sesión no válida');
-    const {data,error}=await db.from('importb2b_import_batches').insert({owner_id:u,source:'kyte',status:'uploaded',products_filename:files.products?.name||null,customers_filename:files.customers?.name||null,sales_filename:files.sales?.name||null,metadata:{phase:'phase2',created_from:'import_center'},created_by:u}).select().single();
+    const {data,error}=await db.from('importb2b_import_batches').insert({owner_id:u,source:'kyte',status:'uploaded',products_filename:files.products?.name||null,customers_filename:files.customers?.name||null,sales_filename:files.sales?.name||null,metadata:{phase:'phase3',created_from:'import_center'},created_by:u}).select().single();
     if(error) throw error; return data;
   }
 

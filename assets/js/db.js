@@ -10,15 +10,16 @@
 
     async dashboard(){
       const monthStart=new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
-      const [p,s,o,r,m,b]=await Promise.all([
+      const [p,s,o,r,m,b,v]=await Promise.all([
         db.from('importb2b_products').select('id',{count:'exact',head:true}),
         db.from('importb2b_stock_summary').select('available,in_transit'),
         db.from('importb2b_orders').select('id',{count:'exact',head:true}),
         db.from('receivables').select('pending_amount,status').neq('status','paid'),
         db.from('movements').select('kind,ars_equivalent,amount,currency').gte('occurred_at',monthStart.toISOString()),
-        db.from('importb2b_import_batch_stats').select('product_review,product_ready,product_imported,created_at').order('created_at',{ascending:false}).limit(1)
+        db.from('importb2b_import_batch_stats').select('product_review,product_ready,product_imported,created_at').order('created_at',{ascending:false}).limit(1),
+        db.from('importb2b_stock_valuation').select('*').limit(1)
       ]);
-      [p,s,o,r,m,b].forEach(assert);
+      [p,s,o,r,m,b,v].forEach(assert);
       const stock=(s.data||[]).reduce((a,x)=>a+Number(x.available||0),0);
       const transit=(s.data||[]).reduce((a,x)=>a+Number(x.in_transit||0),0);
       const receivable=(r.data||[]).reduce((a,x)=>a+Number(x.pending_amount||0),0);
@@ -27,7 +28,8 @@
         const val=Number(x.ars_equivalent ?? (x.currency==='ARS'?x.amount:0) ?? 0);
         if(x.kind==='income') income+=val; else if(x.kind==='expense') expense+=val;
       }
-      return {products:p.count||0,stock,transit,orders:o.count||0,receivable,income,expense,importBatch:(b.data||[])[0]||null};
+      const valuation=(v.data||[])[0]||{physical_units:0,available_units:0,reserved_units:0,in_transit_units:0,stock_cost_ars:0,stock_sale_value_ars:0,expected_profit_ars:0};
+      return {products:p.count||0,stock,transit,orders:o.count||0,receivable,income,expense,valuation,importBatch:(b.data||[])[0]||null};
     },
 
     async products(q='',category='',stockFilter='all'){
@@ -100,8 +102,9 @@
     },
 
     async categories(){
-      const {data,error}=await db.from('importb2b_products').select('category'); if(error) throw error;
-      return [...new Set((data||[]).map(x=>x.category).filter(Boolean))].sort();
+      const {data,error}=await db.from('importb2b_categories').select('name').eq('active',true).order('sort_order').order('name');
+      if(error) throw error;
+      return (data||[]).map(x=>x.name);
     },
 
     async importBatches(){
@@ -140,7 +143,90 @@
     },
 
     async recentOrders(){
-      const {data,error}=await db.from('importb2b_orders').select('id,order_number,order_date,total_units,investment_usd,note').order('order_date',{ascending:false}).limit(12); if(error) throw error; return data||[];
+      const {data:orders,error}=await db.from('importb2b_orders')
+        .select('id,order_number,order_date,total_units,investment_usd,note')
+        .order('order_date',{ascending:false}).limit(15);
+      if(error) throw error;
+      const orderIds=(orders||[]).map(x=>x.id);
+      if(!orderIds.length) return [];
+      const {data:items,error:ie}=await db.from('importb2b_order_items')
+        .select('id,order_id,product,detail,category,quantity,cost_ars,cost_usd,excluded_from_stock,product_id,variant_id,received_quantity,stock_link_status')
+        .in('order_id',orderIds).order('id');
+      if(ie) throw ie;
+      const itemIds=(items||[]).map(x=>x.id);
+      let allocations=[];
+      if(itemIds.length){
+        const {data,error:ae}=await db.from('importb2b_order_item_allocations')
+          .select('id,order_item_id,product_id,variant_id,ordered_quantity,received_quantity,unit_cost_ars')
+          .in('order_item_id',itemIds).order('created_at');
+        if(ae) throw ae; allocations=data||[];
+      }
+      const productIds=[...new Set(allocations.map(x=>x.product_id).filter(Boolean))];
+      const variantIds=[...new Set(allocations.map(x=>x.variant_id).filter(Boolean))];
+      let products=[],variants=[];
+      if(productIds.length){
+        const {data,error:pe}=await db.from('importb2b_products').select('id,name,category').in('id',productIds);
+        if(pe) throw pe; products=data||[];
+      }
+      if(variantIds.length){
+        const {data,error:ve}=await db.from('importb2b_product_variants').select('id,product_id,variant_name,sku').in('id',variantIds);
+        if(ve) throw ve; variants=data||[];
+      }
+      const pmap=new Map(products.map(x=>[x.id,x]));
+      const vmap=new Map(variants.map(x=>[x.id,x]));
+      const amap=new Map();
+      for(const a of allocations){
+        const arr=amap.get(a.order_item_id)||[];
+        arr.push({...a,product:pmap.get(a.product_id)||null,variant:vmap.get(a.variant_id)||null});
+        amap.set(a.order_item_id,arr);
+      }
+      const imap=new Map();
+      for(const i of (items||[])){
+        const arr=imap.get(i.order_id)||[];
+        arr.push({...i,allocations:amap.get(i.id)||[]});
+        imap.set(i.order_id,arr);
+      }
+      const {data:shipments,error:se}=await db.from('importb2b_shipments')
+        .select('order_id,carrier_name,tracking_number,normalized_status,latest_checkpoint_description,is_received,received_at')
+        .in('order_id',orderIds);
+      if(se) throw se;
+      const smap=new Map((shipments||[]).map(x=>[x.order_id,x]));
+      return (orders||[]).map(o=>({...o,items:imap.get(o.id)||[],shipment:smap.get(o.id)||null}));
+    },
+
+    async orderProductOptions(){
+      return this.products('','', 'all');
+    },
+
+    async saveOrderAllocation(itemId,variantId,quantity){
+      const {data,error}=await db.rpc('importb2b_save_order_allocation',{
+        p_item_id:Number(itemId),
+        p_variant_id:variantId,
+        p_ordered_quantity:Number(quantity)
+      });
+      if(error) throw error; return data;
+    },
+
+    async deleteOrderAllocation(allocationId){
+      const {error}=await db.rpc('importb2b_delete_order_allocation',{p_allocation_id:allocationId});
+      if(error) throw error;
+    },
+
+    async receiveOrderAllocation(allocationId,quantity,note=''){
+      const {data,error}=await db.rpc('importb2b_receive_order_allocation',{
+        p_allocation_id:allocationId,
+        p_receive_quantity:Number(quantity),
+        p_note:note||null
+      });
+      if(error) throw error; return data;
+    },
+
+    async setOrderItemStockMode(itemId,active){
+      const {data,error}=await db.rpc('importb2b_set_order_item_stock_mode',{
+        p_item_id:Number(itemId),
+        p_active:Boolean(active)
+      });
+      if(error) throw error; return data;
     },
 
     async recentFinance(){
