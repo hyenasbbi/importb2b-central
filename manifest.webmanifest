@@ -1,1 +1,1 @@
-{"name":"IMPORTB2B Central","short_name":"IMPORTB2B","start_url":"./","display":"standalone","background_color":"#0d0f10","theme_color":"#0d0f10"}
+{"name": "IMPORTB2B Central", "short_name": "IMPORTB2B", "start_url": "./", "display": "standalone", "background_color": "#060708", "theme_color": "#060708", "icons": [{"src": "./assets/img/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}, {"src": "./assets/img/app-icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any maskable"}]}
