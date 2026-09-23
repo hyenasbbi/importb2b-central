@@ -105,14 +105,24 @@
     const currentMethod=$('#posPayment')?.value||methods[0]?.id||'';
     const currentShipping=$('#posShipping')?.value||'0',currentDiscount=$('#posDiscount')?.value||'0',currentNotes=$('#posNotes')?.value||'';
     content.innerHTML=`
-      <div class="pos-layout">
-        <section class="pos-catalog card">
-          <div class="section-title"><div><span class="eyebrow">VENTA RÁPIDA</span><h3>Productos</h3></div><span class="pill blue">${products.reduce((a,p)=>a+p.variants.filter(v=>Number(v.stock.available)>0).length,0)} variantes disponibles</span></div>
-          <div class="toolbar"><input id="posSearch" value="${esc(posSearch)}" placeholder="Buscar producto, SKU, modelo o sabor…"><select id="posCategory"><option value="">Todas las categorías</option>${cats.map(c=>`<option value="${esc(c)}" ${c===posCategory?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
-          <div id="posCatalogGrid" class="pos-product-grid"></div>
-        </section>
-        <aside class="pos-cart card">
-          <div class="section-title"><div><span class="eyebrow">CARRITO</span><h3>Venta actual</h3></div><span id="cartCount" class="pill">0</span></div>
+      <section class="pos-catalog card pos-catalog-full">
+        <div class="section-title"><div><span class="eyebrow">VENTA RÁPIDA</span><h3>Productos</h3></div><span class="pill blue">${products.reduce((a,p)=>a+p.variants.filter(v=>Number(v.stock.available)>0).length,0)} variantes disponibles</span></div>
+        <div class="toolbar"><input id="posSearch" value="${esc(posSearch)}" placeholder="Buscar producto, SKU, modelo, color, talle o sabor…"><select id="posCategory"><option value="">Todas las categorías</option>${cats.map(c=>`<option value="${esc(c)}" ${c===posCategory?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+        <div id="posCatalogGrid" class="pos-product-grid pos-product-grid-wide"></div>
+      </section>
+
+      <button id="cartToggle" class="cart-launcher" type="button" aria-label="Abrir carrito">
+        <span class="cart-launcher-count" id="cartLauncherCount">0</span>
+        <span class="cart-launcher-copy"><small>CARRITO</small><b id="cartLauncherLabel">Venta vacía</b></span>
+        <strong id="cartLauncherTotal">${money(0)}</strong>
+      </button>
+      <div id="cartBackdrop" class="cart-backdrop"></div>
+      <aside id="posCartDrawer" class="cart-drawer" aria-hidden="true">
+        <div class="cart-drawer-head">
+          <div><span class="eyebrow">CARRITO</span><h3>Venta actual</h3></div>
+          <div class="cart-drawer-head-actions"><span id="cartCount" class="pill">0</span><button id="cartClose" class="drawer-close" type="button">×</button></div>
+        </div>
+        <div class="cart-drawer-body">
           <div class="pos-customer-row"><label>Cliente<select id="posCustomer"><option value="">Venta sin cliente</option>${customers.map(c=>`<option value="${c.id}" ${c.id===currentCustomer?'selected':''}>${esc(c.full_name)}${c.phone?` · ${esc(c.phone)}`:''}</option>`).join('')}</select></label><button id="quickCustomer" class="btn ghost tiny">+ Cliente</button></div>
           <div id="cartItems" class="cart-items"></div>
           <div class="pos-fields"><label>Envío<input id="posShipping" type="number" min="0" step="100" value="${esc(currentShipping)}"></label><label>Descuento<input id="posDiscount" type="number" min="0" step="100" value="${esc(currentDiscount)}"></label></div>
@@ -120,9 +130,10 @@
           <div id="paymentHint" class="payment-hint"></div>
           <label>Nota<textarea id="posNotes" rows="2" placeholder="Opcional">${esc(currentNotes)}</textarea></label>
           <div id="cartTotals"></div>
-          <button id="finishSale" class="btn primary full">Finalizar venta</button>
-        </aside>
-      </div>
+        </div>
+        <div class="cart-drawer-footer"><button id="finishSale" class="btn primary full">Finalizar venta</button></div>
+      </aside>
+
       <section class="card" style="margin-top:14px"><div class="section-title"><div><span class="eyebrow">HISTORIAL</span><h3>Últimas ventas</h3></div></div><div id="recentSales"></div></section>`;
     renderPosCatalog(); renderCart(); renderRecentSales();
     $('#posSearch').addEventListener('input',e=>{posSearch=e.target.value;$('#globalSearch').value=posSearch;renderPosCatalog()});
@@ -130,6 +141,15 @@
     ['#posShipping','#posDiscount','#posPayment'].forEach(sel=>$(sel).addEventListener('input',renderCartTotals));
     $('#quickCustomer').addEventListener('click',()=>openCustomerEditor(null,true));
     $('#finishSale').addEventListener('click',finishSale);
+    $('#cartToggle').addEventListener('click',openCartDrawer);
+    $('#cartClose').addEventListener('click',closeCartDrawer);
+    $('#cartBackdrop').addEventListener('click',closeCartDrawer);
+  }
+  function openCartDrawer(){
+    $('#posCartDrawer')?.classList.add('open'); $('#cartBackdrop')?.classList.add('open'); $('#posCartDrawer')?.setAttribute('aria-hidden','false'); document.body.classList.add('cart-open');
+  }
+  function closeCartDrawer(){
+    $('#posCartDrawer')?.classList.remove('open'); $('#cartBackdrop')?.classList.remove('open'); $('#posCartDrawer')?.setAttribute('aria-hidden','true'); document.body.classList.remove('cart-open');
   }
   function renderPosCatalog(){
     const el=$('#posCatalogGrid'); if(!el)return;
@@ -148,11 +168,15 @@
     if(old){if(old.qty>=Number(v.stock.available))return alert('No hay más stock disponible');old.qty+=1}
     else saleCart.push({productId:p.id,variantId:v.id,name:p.name,variant:v.variant_name,sku:v.sku,price:Number(v.price_ars||0),cost:Number(v.cost_ars||0),available:Number(v.stock.available||0),qty:1});
     renderCart();
+    const launcher=$('#cartToggle'); if(launcher){launcher.classList.remove('pulse');void launcher.offsetWidth;launcher.classList.add('pulse');setTimeout(()=>launcher.classList.remove('pulse'),420)}
   }
   function renderCart(){
     const el=$('#cartItems'); if(!el)return;
-    $('#cartCount').textContent=saleCart.reduce((a,x)=>a+x.qty,0);
-    el.innerHTML=saleCart.length?saleCart.map(x=>`<div class="cart-line" data-cart="${x.variantId}"><div class="cart-line-info"><b>${esc(x.name)}</b><small>${esc(x.variant||'Única')} · ${esc(x.sku||'')}</small></div><div class="cart-controls"><button class="cart-minus">−</button><input class="cart-qty" type="number" min="1" max="${x.available}" value="${x.qty}"><button class="cart-plus">+</button></div><div class="cart-price"><input class="cart-unit-price" type="number" min="0" step="100" value="${x.price}"><b>${money(x.price*x.qty)}</b></div><button class="cart-remove">×</button></div>`).join(''):'<div class="empty compact-empty">Agregá productos para comenzar.</div>';
+    const itemCount=saleCart.reduce((a,x)=>a+x.qty,0);
+    if($('#cartCount')) $('#cartCount').textContent=itemCount;
+    if($('#cartLauncherCount')) $('#cartLauncherCount').textContent=itemCount;
+    if($('#cartLauncherLabel')) $('#cartLauncherLabel').textContent=itemCount?`${itemCount} ${itemCount===1?'unidad':'unidades'}`:'Venta vacía';
+    el.innerHTML=saleCart.length?saleCart.map(x=>`<div class="cart-line" data-cart="${x.variantId}"><div class="cart-line-top"><div class="cart-line-info"><b>${esc(x.name)}</b><small>${esc(x.variant||'Única')} · ${esc(x.sku||'')}</small></div><button class="cart-remove" type="button">×</button></div><div class="cart-line-bottom"><div class="cart-controls"><button class="cart-minus" type="button">−</button><input class="cart-qty" type="number" min="1" max="${x.available}" value="${x.qty}"><button class="cart-plus" type="button">+</button></div><div class="cart-price"><label>Precio unitario<input class="cart-unit-price" type="number" min="0" step="100" value="${x.price}"></label><b>${money(x.price*x.qty)}</b></div></div></div>`).join(''):'<div class="empty compact-empty">Agregá productos y abrí el carrito cuando quieras finalizar.</div>';
     el.querySelectorAll('[data-cart]').forEach(row=>{
       const item=saleCart.find(x=>x.variantId===row.dataset.cart);
       row.querySelector('.cart-minus').addEventListener('click',()=>{if(item.qty>1)item.qty--;else saleCart=saleCart.filter(x=>x!==item);renderCart()});
@@ -168,6 +192,7 @@
     $('#paymentHint').innerHTML=m?`${m.finance_mode==='settlement'?'Se registra como <b>dinero a liquidar</b>.':m.finance_mode==='receivable'?'Se registra como <b>cuenta por cobrar</b>.':'Se registra automáticamente como <b>ingreso</b> en Finanzas.'}`:'';
     box.innerHTML=`<div class="totals-list"><div><span>Subtotal</span><b>${money(t.subtotal)}</b></div><div><span>Descuento</span><b>-${money(t.discount)}</b></div><div><span>Envío</span><b>${money(t.shipping)}</b></div>${t.adjustment?`<div><span>${t.adjustment>0?'Recargo':'Descuento'} ${esc(m?.name||'')}</span><b>${t.adjustment>0?'+':''}${money(t.adjustment)}</b></div>`:''}<div class="grand-total"><span>Total</span><strong>${money(t.total)}</strong></div></div>`;
     const btn=$('#finishSale');if(btn){btn.disabled=!saleCart.length||!m;btn.textContent=`Finalizar ${money(t.total)}`}
+    if($('#cartLauncherTotal')) $('#cartLauncherTotal').textContent=money(t.total);
   }
   async function finishSale(){
     if(!saleCart.length)return; const t=calcTotals(); if(!t.method)return alert('Elegí una forma de pago');
@@ -204,12 +229,54 @@
     document.querySelectorAll('.edit-product').forEach(b=>b.addEventListener('click',()=>openProductEditor(b.dataset.id)));
   }
   async function openProductEditor(productId){
-    const [p,cats]=await Promise.all([DB.productDetail(productId),DB.categories()]); const vape=String(p.category).toLowerCase()==='vapers';
-    const rows=p.variants.map(v=>`<tr data-variant="${v.id}"><td><input class="v-name" value="${esc(v.variant_name)}"></td><td><input class="v-sku" value="${esc(v.sku||'')}"></td><td><input class="v-cost" type="number" value="${Number(v.cost_ars||0)}"></td><td><input class="v-price" type="number" value="${Number(v.price_ars||0)}"></td><td><input class="v-min" type="number" value="${Number(v.stock_min||0)}"></td><td><b>${number(v.stock.on_hand)}</b><br><small class="muted">disp. ${number(v.stock.available)}</small></td><td><button class="btn tiny ghost adjust-stock" data-vid="${v.id}" data-current="${Number(v.stock.on_hand||0)}">Ajustar</button></td></tr>`).join('');
-    openModal(`<div class="section-title"><div><span class="eyebrow">PRODUCTO</span><h3>Editar producto</h3></div><button class="modal-close">×</button></div><div class="form-grid"><label>Nombre<input id="epName" value="${esc(p.name)}"></label><label>Categoría<select id="epCategory">${cats.map(c=>`<option value="${esc(c)}" ${c===p.category?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label>SKU general<input id="epSku" value="${esc(p.sku||'')}"></label><label class="check"><input id="epCatalog" type="checkbox" ${p.catalog_visible?'checked':''}> Visible en catálogo</label></div><div class="section-title" style="margin-top:18px"><div><h3>${vape?'Sabores':'Variantes'}</h3><small class="muted">${vape?'Cada sabor comparte el mismo modelo de Vaper.':'Stock y precio independiente por variante.'}</small></div><button id="addVariant" class="btn ghost">+ ${vape?'Sabor':'Variante'}</button></div><div class="table-wrap"><table class="table compact"><thead><tr><th>${vape?'Sabor':'Variante'}</th><th>SKU</th><th>Costo</th><th>Precio</th><th>Mín.</th><th>Stock físico</th><th></th></tr></thead><tbody>${rows}</tbody></table></div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveProduct" class="btn primary">Guardar cambios</button></div>`);
-    $('#saveProduct').addEventListener('click',async()=>{try{const category=$('#epCategory').value;await DB.saveProduct(productId,{name:$('#epName').value.trim(),category,sku:$('#epSku').value.trim()||null,catalog_visible:$('#epCatalog').checked});for(const tr of document.querySelectorAll('[data-variant]')){const variant_name=tr.querySelector('.v-name').value.trim()||'Única';const payload={variant_name,sku:tr.querySelector('.v-sku').value.trim()||null,cost_ars:Number(tr.querySelector('.v-cost').value||0),price_ars:Number(tr.querySelector('.v-price').value||0),stock_min:Number(tr.querySelector('.v-min').value||0)};if(category.toLowerCase()==='vapers')payload.attributes={sabor:variant_name};await DB.saveVariant(tr.dataset.variant,payload)}closeModal();await renderProducts($('#globalSearch').value)}catch(e){alert(e.message)}});
-    document.querySelectorAll('.adjust-stock').forEach(b=>b.addEventListener('click',async()=>{const current=Number(b.dataset.current),val=prompt(`Stock físico actual: ${current}\nNueva cantidad física:`,String(current));if(val===null)return;const next=Number(val);if(!Number.isFinite(next)||next<0)return alert('Cantidad inválida');const note=prompt('Motivo:','Conteo físico / corrección manual')||'Ajuste manual';try{await DB.adjustStock(productId,b.dataset.vid,current,next,note);closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}}));
-    $('#addVariant').addEventListener('click',async()=>{const name=prompt(vape?'Nombre del sabor:':'Nombre de variante:','');if(!name)return;const price=Number(prompt('Precio venta ARS:','0')||0),cost=Number(prompt('Costo ARS:','0')||0),initial=Number(prompt('Stock inicial:','0')||0);if([price,cost,initial].some(x=>!Number.isFinite(x))||initial<0)return alert('Valores inválidos');try{await DB.createVariant(productId,{variant_name:name.trim(),cost_ars:cost,price_ars:price,stock_min:0,active:true,attributes:vape?{sabor:name.trim()}:{}},initial,'Alta manual de variante');closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}});
+    const [p,cats]=await Promise.all([DB.productDetail(productId),DB.categories()]);
+    const vape=String(p.category||'').toLowerCase()==='vapers';
+    const totalAvailable=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0);
+    const rows=p.variants.map(v=>`<tr data-variant="${v.id}"><td><input class="v-name" value="${esc(v.variant_name)}"></td><td><input class="v-sku" value="${esc(v.sku||'')}"></td><td><input class="v-cost" type="number" step="0.01" value="${Number(v.cost_ars||0)}"></td><td><input class="v-price" type="number" step="0.01" value="${Number(v.price_ars||0)}"></td><td><input class="v-min" type="number" step="1" value="${Number(v.stock_min||0)}"></td><td><b>${number(v.stock.on_hand)}</b><br><small class="muted">disp. ${number(v.stock.available)}</small></td><td><button class="btn tiny ghost adjust-stock" data-vid="${v.id}" data-current="${Number(v.stock.on_hand||0)}">Ajustar</button></td></tr>`).join('');
+    openModal(`<div class="section-title"><div><span class="eyebrow">PRODUCTO</span><h3>Editar producto</h3><small class="muted">${number(totalAvailable)} unidades disponibles</small></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Nombre<input id="epName" value="${esc(p.name)}"></label><label>Categoría<select id="epCategory">${cats.map(c=>`<option value="${esc(c)}" ${c===p.category?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label>SKU general<input id="epSku" value="${esc(p.sku||'')}"></label><label class="check"><input id="epCatalog" type="checkbox" ${p.catalog_visible?'checked':''}> Visible en catálogo</label></div><div class="section-title product-variant-title" style="margin-top:18px"><div><h3>${vape?'Sabores':'Variantes'}</h3><small class="muted">${vape?'Cada sabor comparte el mismo modelo de Vaper.':'Color, talle, modelo o número deben vivir como variantes del mismo producto.'}</small></div><div class="product-editor-actions"><button id="mergeProduct" class="btn ghost">Unificar otro producto</button><button id="addVariant" class="btn ghost">+ ${vape?'Sabor':'Variante'}</button></div></div><div class="table-wrap"><table class="table compact"><thead><tr><th>${vape?'Sabor':'Variante'}</th><th>SKU</th><th>Costo</th><th>Precio</th><th>Mín.</th><th>Stock físico</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">Sin variantes.</td></tr>'}</tbody></table></div><div class="modal-actions product-modal-actions"><button id="deleteProduct" class="btn danger-btn">Eliminar producto</button><div class="modal-action-main"><button class="btn ghost modal-close">Cancelar</button><button id="saveProduct" class="btn primary">Guardar cambios</button></div></div>`);
+
+    $('#saveProduct').addEventListener('click',async()=>{const btn=$('#saveProduct');btn.disabled=true;try{const cat=$('#epCategory').value;await DB.saveProduct(productId,{name:$('#epName').value.trim(),category:cat,sku:$('#epSku').value.trim()||null,catalog_visible:$('#epCatalog').checked});for(const tr of document.querySelectorAll('[data-variant]')){const variant=tr.querySelector('.v-name').value.trim()||'Única';const payload={variant_name:variant,sku:tr.querySelector('.v-sku').value.trim()||null,cost_ars:Number(tr.querySelector('.v-cost').value||0),price_ars:Number(tr.querySelector('.v-price').value||0),stock_min:Number(tr.querySelector('.v-min').value||0)};if(cat.toLowerCase()==='vapers')payload.attributes={sabor:variant};await DB.saveVariant(tr.dataset.variant,payload)}closeModal();await renderProducts($('#globalSearch').value)}catch(e){alert(e.message)}finally{btn.disabled=false}});
+    document.querySelectorAll('.adjust-stock').forEach(b=>b.addEventListener('click',async()=>{const current=Number(b.dataset.current),val=prompt(`Stock físico actual: ${current}
+Nueva cantidad física:`,String(current));if(val===null)return;const next=Number(val);if(!Number.isFinite(next)||next<0)return alert('Cantidad inválida');const note=prompt('Motivo:','Conteo físico / corrección manual')||'Ajuste manual';try{await DB.adjustStock(productId,b.dataset.vid,current,next,note);closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}}));
+    $('#addVariant').addEventListener('click',async()=>{const name=prompt(vape?'Nombre del sabor:':'Nombre de variante (color, talle, número, modelo):','');if(!name)return;const price=Number(prompt('Precio venta ARS:','0')||0),cost=Number(prompt('Costo ARS:','0')||0),initial=Number(prompt('Stock inicial:','0')||0);if([price,cost,initial].some(x=>!Number.isFinite(x))||initial<0)return alert('Valores inválidos');try{await DB.createVariant(productId,{variant_name:name.trim(),cost_ars:cost,price_ars:price,stock_min:0,active:true,attributes:vape?{sabor:name.trim()}:{opcion:name.trim()}},initial,'Alta manual de variante');closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}});
+    $('#mergeProduct').addEventListener('click',()=>openMergeProduct(productId,p));
+    $('#deleteProduct').addEventListener('click',async()=>{
+      const stock=totalAvailable>0?`
+
+ATENCIÓN: hoy tiene ${number(totalAvailable)} unidades disponibles. Al eliminarlo dejarán de aparecer como stock vendible.`:'';
+      if(!confirm(`¿Eliminar ${p.name}?${stock}
+
+No se borra el historial: el producto queda archivado y sale del catálogo/stock operativo.`))return;
+      const reason=prompt('Motivo (opcional):','Producto discontinuado / duplicado')||'';
+      try{await DB.archiveProduct(productId,reason);closeModal();await renderProducts($('#globalSearch').value)}catch(e){alert(e.message)}
+    });
+  }
+
+  function guessVariantLabel(targetName,sourceName){
+    const t=String(targetName||'').trim(),s=String(sourceName||'').trim();
+    if(s.toLowerCase().startsWith((t+' - ').toLowerCase())) return s.slice(t.length+3).trim();
+    const m=s.match(/ - ([^-]+)$/); if(m)return m[1].trim();
+    if(s.toLowerCase().startsWith((t+' ').toLowerCase())) return s.slice(t.length).trim();
+    return '';
+  }
+  async function openMergeProduct(targetId,target){
+    const products=(await DB.products('',target.category||'','all')).filter(x=>x.id!==targetId);
+    openModal(`<div class="section-title"><div><span class="eyebrow">UNIFICAR</span><h3>Convertir productos duplicados en variantes</h3><small class="muted">Destino: ${esc(target.name)}</small></div><button class="modal-close modal-x">×</button></div><div class="notice good-notice">Elegí otro producto de la misma categoría. Sus variantes, stock e historial pasarán a <b>${esc(target.name)}</b> y el registro duplicado quedará archivado.</div><div class="toolbar" style="margin-top:14px"><input id="mergeSearch" placeholder="Buscar producto a unificar…"></div><div id="mergeResults" class="merge-results"></div><div class="modal-actions"><button class="btn ghost modal-close">Volver</button></div>`);
+    const renderMerge=()=>{
+      const q=$('#mergeSearch').value.trim().toLowerCase();
+      const rows=products.filter(x=>!q||[x.name,x.sku,x.category,...x.variants.flatMap(v=>[v.variant_name,v.sku])].join(' ').toLowerCase().includes(q)).slice(0,80);
+      $('#mergeResults').innerHTML=rows.map(x=>{const av=x.variants.reduce((a,v)=>a+Number(v.stock.available||0),0);return`<button class="merge-candidate" data-id="${x.id}"><span><b>${esc(x.name)}</b><small>${x.variants.length} variante${x.variants.length===1?'':'s'} · stock ${number(av)}</small></span><strong>Unificar →</strong></button>`}).join('')||'<div class="empty">No hay coincidencias.</div>';
+      document.querySelectorAll('.merge-candidate').forEach(b=>b.addEventListener('click',async()=>{
+        const source=products.find(x=>x.id===b.dataset.id);if(!source)return;
+        let label='';
+        if(source.variants.length===1){label=guessVariantLabel(target.name,source.name)||source.variants[0].variant_name||'';const entered=prompt(`¿Cómo querés llamar a esta variante dentro de ${target.name}?`,label);if(entered===null)return;label=entered.trim()||label;}
+        if(!confirm(`Unificar “${source.name}” dentro de “${target.name}”?
+
+El stock y el historial se conservan.`))return;
+        try{await DB.mergeProduct(targetId,source.id,label);closeModal();await openProductEditor(targetId)}catch(e){alert(e.message)}
+      }));
+    };
+    $('#mergeSearch').addEventListener('input',renderMerge);renderMerge();
   }
 
   /* -------------------- CUSTOMERS -------------------- */

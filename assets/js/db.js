@@ -18,7 +18,7 @@
       const monthStart=new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
       const todayStart=new Date(); todayStart.setHours(0,0,0,0);
       const [p,s,o,r,m,b,v,sales]=await Promise.all([
-        db.from('importb2b_products').select('id',{count:'exact',head:true}),
+        db.from('importb2b_products').select('id',{count:'exact',head:true}).eq('active',true),
         db.from('importb2b_stock_summary').select('available,in_transit'),
         db.from('importb2b_orders').select('id',{count:'exact',head:true}),
         db.from('receivables').select('pending_amount,status').neq('status','paid').neq('status','cancelled'),
@@ -28,8 +28,6 @@
         db.from('importb2b_sales').select('id,total_ars,sold_at,status').eq('status','completed').gte('sold_at',monthStart.toISOString())
       ]);
       [p,s,o,r,m,b,v,sales].forEach(assert);
-      const stock=(s.data||[]).reduce((a,x)=>a+Number(x.available||0),0);
-      const transit=(s.data||[]).reduce((a,x)=>a+Number(x.in_transit||0),0);
       const receivable=(r.data||[]).reduce((a,x)=>a+Number(x.pending_amount||0),0);
       let income=0,expense=0;
       for(const x of (m.data||[])){
@@ -40,6 +38,7 @@
       const todaySales=(sales.data||[]).filter(x=>new Date(x.sold_at)>=todayStart).reduce((a,x)=>a+Number(x.total_ars||0),0);
       const todayCount=(sales.data||[]).filter(x=>new Date(x.sold_at)>=todayStart).length;
       const valuation=(v.data||[])[0]||{physical_units:0,available_units:0,reserved_units:0,in_transit_units:0,stock_cost_ars:0,stock_sale_value_ars:0,expected_profit_ars:0};
+      const stock=Number(valuation.available_units||0), transit=Number(valuation.in_transit_units||0);
       return {products:p.count||0,stock,transit,orders:o.count||0,receivable,income,expense,monthSales,todaySales,todayCount,valuation,importBatch:(b.data||[])[0]||null};
     },
 
@@ -50,7 +49,6 @@
 
     async products(q='',category='',stockFilter='all'){
       let req=db.from('importb2b_products').select('id,sku,name,category,active,catalog_visible,primary_image_url,created_at').eq('active',true).order('name');
-      if(q) req=req.ilike('search_text',`%${String(q).toLowerCase()}%`);
       if(category) req=req.eq('category',category);
       const pr=await req.limit(1200); assert(pr);
       const products=pr.data||[], ids=products.map(x=>x.id); if(!ids.length) return [];
@@ -65,6 +63,11 @@
         a.push({...v,stock:sm.get(v.id)||{on_hand:0,reserved:0,in_transit:0,available:0}}); vm.set(v.product_id,a);
       }
       let out=products.map(p=>({...p,variants:vm.get(p.id)||[]}));
+      const term=String(q||'').trim().toLowerCase();
+      if(term) out=out.filter(p=>[
+        p.name,p.sku,p.category,
+        ...p.variants.flatMap(v=>[v.variant_name,v.sku,Object.values(v.attributes||{}).join(' ')])
+      ].join(' ').toLowerCase().includes(term));
       if(stockFilter!=='all') out=out.filter(p=>{
         const av=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0);
         const tr=p.variants.reduce((a,v)=>a+Number(v.stock.in_transit||0),0);
@@ -80,7 +83,7 @@
     async productDetail(id){
       const [p,v,s]=await Promise.all([
         db.from('importb2b_products').select('*').eq('id',id).single(),
-        db.from('importb2b_product_variants').select('*').eq('product_id',id).order('variant_name'),
+        db.from('importb2b_product_variants').select('*').eq('product_id',id).eq('active',true).order('variant_name'),
         db.from('importb2b_stock_summary').select('*').eq('product_id',id)
       ]); [p,v,s].forEach(assert);
       const sm=new Map((s.data||[]).map(x=>[x.variant_id,x]));
@@ -101,6 +104,13 @@
       const u=await authUser(); const delta=Number(newOnHand)-Number(currentOnHand);
       if(!Number.isFinite(delta)) throw new Error('Cantidad inválida'); if(delta===0) return {delta:0};
       const r=await db.from('importb2b_inventory_movements').insert({owner_id:u.id,product_id:productId,variant_id:variantId,bucket:'on_hand',movement_type:'adjustment',quantity_delta:delta,reference_type:'manual_stock_adjustment',reference_id:variantId,note:note||'Ajuste manual de stock',created_by:u.id}); assert(r); return {delta};
+    },
+
+    async archiveProduct(productId,reason=''){
+      const r=await db.rpc('importb2b_archive_product',{p_product_id:productId,p_reason:reason||null}); assert(r); return r.data;
+    },
+    async mergeProduct(targetProductId,sourceProductId,variantLabel=''){
+      const r=await db.rpc('importb2b_merge_product_into',{p_target_product_id:targetProductId,p_source_product_id:sourceProductId,p_variant_label:variantLabel||null}); assert(r); return r.data;
     },
 
     async importBatches(){ const r=await db.from('importb2b_import_batch_stats').select('*').order('created_at',{ascending:false}).limit(20); assert(r); return r.data||[]; },
