@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#060708">
+  <title>IMPORTB2B · Catálogo</title>
+  <link rel="icon" href="./assets/img/app-icon-512.png">
+  <link rel="stylesheet" href="./assets/css/catalog.css">
+</head>
+<body>
+  <header class="store-header">
+    <a class="store-brand" href="./catalogo.html"><img src="./assets/img/logo-importb2b.png" alt="IMPORTB2B"><div><b id="storeTitle">IMPORTB2B</b><small id="storeSubtitle">Catálogo online</small></div></a>
+    <button id="catalogCartButton" class="store-cart-btn"><span id="catalogCartCount">0</span><b>Carrito</b><strong id="catalogCartTotal">$ 0</strong></button>
+  </header>
+  <main class="store-main">
+    <section class="store-hero">
+      <span>CATÁLOGO ACTIVO</span>
+      <h1>Encontrá lo que buscás.</h1>
+      <p>Stock y variantes actualizadas directamente desde IMPORTB2B.</p>
+    </section>
+    <section class="store-tools">
+      <input id="catalogSearch" placeholder="Buscar producto, modelo, talle, color o sabor…">
+      <select id="catalogCategory"><option value="">Todas las categorías</option></select>
+    </section>
+    <section id="catalogGrid" class="store-grid"><div class="store-loading">Cargando catálogo…</div></section>
+  </main>
+
+  <div id="catalogBackdrop" class="store-backdrop"></div>
+  <aside id="catalogCartDrawer" class="store-drawer" aria-hidden="true">
+    <div class="store-drawer-head"><div><span>CARRITO</span><h2>Tu pedido</h2></div><button id="catalogCartClose">×</button></div>
+    <div id="catalogCartItems" class="store-cart-items"></div>
+    <div class="store-summary" id="catalogSummary"></div>
+    <button id="checkoutButton" class="store-primary">Continuar pedido</button>
+  </aside>
+
+  <div id="checkoutModal" class="store-modal hidden">
+    <div class="store-modal-card">
+      <div class="store-drawer-head"><div><span>FINALIZAR</span><h2>Datos del pedido</h2></div><button id="checkoutClose">×</button></div>
+      <div class="checkout-grid">
+        <label>Nombre<input id="checkoutName" autocomplete="name"></label>
+        <label>WhatsApp<input id="checkoutPhone" inputmode="tel" autocomplete="tel"></label>
+        <label>Email (opcional)<input id="checkoutEmail" type="email" autocomplete="email"></label>
+        <label>Forma de entrega<select id="checkoutDelivery"></select></label>
+        <label id="addressLabel" class="wide hidden">Dirección<input id="checkoutAddress" autocomplete="street-address"></label>
+        <label>Forma de pago<select id="checkoutPayment"></select></label>
+        <label class="wide">Observaciones<textarea id="checkoutNotes" rows="3"></textarea></label>
+      </div>
+      <div id="checkoutTotals" class="store-summary checkout-summary"></div>
+      <div id="checkoutError" class="store-error"></div>
+      <button id="placeOrderButton" class="store-primary">Realizar pedido</button>
+    </div>
+  </div>
+  <script src="./assets/js/catalog.js"></script>
+</body>
+</html>
