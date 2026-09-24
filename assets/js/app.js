@@ -14,13 +14,14 @@
   let posRecentSales=[];
   let posSearch='';
   let posCategory='';
+  let webOrderStatusFilter='pending';
 
   const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n||0));
   const number=n=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(Number(n||0));
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const metric=(label,value,sub='')=>`<div class="card metric"><small>${esc(label)}</small><b>${value}</b>${sub?`<small>${esc(sub)}</small>`:''}</div>`;
   const issueLabel=i=>({SIN_NOMBRE:'Sin nombre',SIN_CATEGORIA:'Sin categoría',STOCK_NEGATIVO:'Stock negativo',POSIBLE_DUPLICADO:'Posible duplicado',FUSIONADO:'Fusionado'}[i]||i);
-  const statusPill=s=>({ready:'<span class="pill green">Listo</span>',needs_review:'<span class="pill yellow">Revisar</span>',imported:'<span class="pill blue">Importado</span>',skipped:'<span class="pill">Omitido</span>',error:'<span class="pill red">Error</span>',completed:'<span class="pill green">Completada</span>',cancelled:'<span class="pill red">Anulada</span>'}[s]||`<span class="pill">${esc(s)}</span>`);
+  const statusPill=s=>({ready:'<span class="pill green">Listo</span>',needs_review:'<span class="pill yellow">Revisar</span>',imported:'<span class="pill blue">Importado</span>',skipped:'<span class="pill">Omitido</span>',error:'<span class="pill red">Error</span>',completed:'<span class="pill green">Completada</span>',confirmed:'<span class="pill green">Confirmado</span>',pending:'<span class="pill yellow">Pendiente</span>',cancelled:'<span class="pill red">Anulada</span>'}[s]||`<span class="pill">${esc(s)}</span>`);
   const safeDate=x=>x?new Date(x).toLocaleString('es-AR'):'—';
 
   async function start(){
@@ -41,7 +42,7 @@
   function setView(v){currentView=v;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));render();}
 
   async function render(){
-    const titles={dashboard:'Inicio',sell:'Vender',products:'Productos / Stock',orders:'Pedidos',customers:'Clientes',finance:'Finanzas',imports:'Importar Kyte'};
+    const titles={dashboard:'Inicio',sell:'Vender',products:'Productos / Stock',orders:'Pedidos',customers:'Clientes',finance:'Finanzas',catalog:'Catálogo / Web',imports:'Importar Kyte'};
     $('#viewTitle').textContent=titles[currentView]||'IMPORTB2B'; content.innerHTML='<div class="empty">Cargando…</div>';
     try{
       if(currentView==='dashboard') await renderDashboard();
@@ -50,6 +51,7 @@
       else if(currentView==='orders') await renderOrders();
       else if(currentView==='customers') await renderCustomers($('#globalSearch').value);
       else if(currentView==='finance') await renderFinance();
+      else if(currentView==='catalog') await renderCatalogAdmin();
       else if(currentView==='imports') await renderImports();
     }catch(e){console.error(e);content.innerHTML=`<div class="notice danger">Error: ${esc(e.message)}</div>`}
   }
@@ -77,9 +79,9 @@
         </div>
       </details>
       <div class="two-col" style="margin-top:14px">
-        <div class="card"><div class="section-title"><div><span class="eyebrow">FASE 4</span><h3>Flujo conectado</h3></div></div>
+        <div class="card"><div class="section-title"><div><span class="eyebrow">FASE 5</span><h3>Flujo conectado</h3></div></div>
           <div class="flow-strip"><span>Venta</span><b>→</b><span>Stock</span><b>→</b><span>Cliente</span><b>→</b><span>Finanzas</span></div>
-          <div class="list" style="margin-top:14px"><div class="row"><span>POS / Ventas</span><span class="pill green">Activo</span></div><div class="row"><span>Pedidos → Stock</span><span class="pill green">Activo</span></div><div class="row"><span>Control Financiero</span><span class="pill green">Conectado</span></div><div class="row"><span>Clientes Kyte</span><span class="pill blue">161 migrados</span></div></div>
+          <div class="list" style="margin-top:14px"><div class="row"><span>POS / Ventas</span><span class="pill green">Activo</span></div><div class="row"><span>Pedidos → Stock</span><span class="pill green">Activo</span></div><div class="row"><span>Control Financiero</span><span class="pill green">Conectado</span></div><div class="row"><span>Clientes Kyte</span><span class="pill blue">161 migrados</span></div><div class="row"><span>Catálogo público</span><span class="pill green">Activo</span></div></div>
         </div>
         <div class="card"><h3 style="margin-top:0">Migración Kyte</h3>${b?`<p><b>${number(b.product_imported||0)}</b> importados · <b>${number(b.product_review||0)}</b> en revisión.</p><button id="goImports" class="btn ghost">Abrir importador</button>`:'<p class="muted">Sin lote activo.</p>'}<button id="goSell" class="btn primary" style="margin-top:10px">Registrar una venta</button></div>
       </div>`;
@@ -232,13 +234,17 @@
     const [p,cats]=await Promise.all([DB.productDetail(productId),DB.categories()]);
     const vape=String(p.category||'').toLowerCase()==='vapers';
     const totalAvailable=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0);
+    const imageCards=(p.images||[]).map(img=>`<div class="product-image-card ${img.is_primary?'primary':''}"><img src="${esc(img.image_url)}" alt="${esc(img.alt_text||p.name)}"><div class="product-image-actions">${img.is_primary?'<span class="pill green">Principal</span>':`<button class="btn tiny ghost set-primary-image" data-img="${img.id}">Principal</button>`}<button class="btn tiny danger-btn delete-product-image" data-img="${img.id}">Eliminar</button></div></div>`).join('');
     const rows=p.variants.map(v=>`<tr data-variant="${v.id}"><td><input class="v-name" value="${esc(v.variant_name)}"></td><td><input class="v-sku" value="${esc(v.sku||'')}"></td><td><input class="v-cost" type="number" step="0.01" value="${Number(v.cost_ars||0)}"></td><td><input class="v-price" type="number" step="0.01" value="${Number(v.price_ars||0)}"></td><td><input class="v-min" type="number" step="1" value="${Number(v.stock_min||0)}"></td><td><b>${number(v.stock.on_hand)}</b><br><small class="muted">disp. ${number(v.stock.available)}</small></td><td><button class="btn tiny ghost adjust-stock" data-vid="${v.id}" data-current="${Number(v.stock.on_hand||0)}">Ajustar</button></td></tr>`).join('');
-    openModal(`<div class="section-title"><div><span class="eyebrow">PRODUCTO</span><h3>Editar producto</h3><small class="muted">${number(totalAvailable)} unidades disponibles</small></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Nombre<input id="epName" value="${esc(p.name)}"></label><label>Categoría<select id="epCategory">${cats.map(c=>`<option value="${esc(c)}" ${c===p.category?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label>SKU general<input id="epSku" value="${esc(p.sku||'')}"></label><label class="check"><input id="epCatalog" type="checkbox" ${p.catalog_visible?'checked':''}> Visible en catálogo</label></div><div class="section-title product-variant-title" style="margin-top:18px"><div><h3>${vape?'Sabores':'Variantes'}</h3><small class="muted">${vape?'Cada sabor comparte el mismo modelo de Vaper.':'Color, talle, modelo o número deben vivir como variantes del mismo producto.'}</small></div><div class="product-editor-actions"><button id="mergeProduct" class="btn ghost">Unificar otro producto</button><button id="addVariant" class="btn ghost">+ ${vape?'Sabor':'Variante'}</button></div></div><div class="table-wrap"><table class="table compact"><thead><tr><th>${vape?'Sabor':'Variante'}</th><th>SKU</th><th>Costo</th><th>Precio</th><th>Mín.</th><th>Stock físico</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">Sin variantes.</td></tr>'}</tbody></table></div><div class="modal-actions product-modal-actions"><button id="deleteProduct" class="btn danger-btn">Eliminar producto</button><div class="modal-action-main"><button class="btn ghost modal-close">Cancelar</button><button id="saveProduct" class="btn primary">Guardar cambios</button></div></div>`);
+    openModal(`<div class="section-title"><div><span class="eyebrow">PRODUCTO</span><h3>Editar producto</h3><small class="muted">${number(totalAvailable)} unidades disponibles</small></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Nombre<input id="epName" value="${esc(p.name)}"></label><label>Categoría<select id="epCategory">${cats.map(c=>`<option value="${esc(c)}" ${c===p.category?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label>SKU general<input id="epSku" value="${esc(p.sku||'')}"></label><label class="check"><input id="epCatalog" type="checkbox" ${p.catalog_visible?'checked':''}> Visible en catálogo</label></div><div class="section-title product-variant-title" style="margin-top:18px"><div><h3>${vape?'Sabores':'Variantes'}</h3><small class="muted">${vape?'Cada sabor comparte el mismo modelo de Vaper.':'Color, talle, modelo o número deben vivir como variantes del mismo producto.'}</small></div><div class="product-editor-actions"><button id="mergeProduct" class="btn ghost">Unificar otro producto</button><button id="addVariant" class="btn ghost">+ ${vape?'Sabor':'Variante'}</button></div></div><div class="table-wrap"><table class="table compact"><thead><tr><th>${vape?'Sabor':'Variante'}</th><th>SKU</th><th>Costo</th><th>Precio</th><th>Mín.</th><th>Stock físico</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">Sin variantes.</td></tr>'}</tbody></table></div><div class="product-images-section"><div class="section-title"><div><h3>Fotos del catálogo</h3><small class="muted">Se usan automáticamente en el catálogo público.</small></div><label class="btn ghost upload-image-label">+ Subir fotos<input id="productImageUpload" type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple hidden></label></div><div class="product-image-grid">${imageCards||'<div class="empty">Todavía no hay fotos cargadas.</div>'}</div></div><div class="modal-actions product-modal-actions"><button id="deleteProduct" class="btn danger-btn">Eliminar producto</button><div class="modal-action-main"><button class="btn ghost modal-close">Cancelar</button><button id="saveProduct" class="btn primary">Guardar cambios</button></div></div>`);
 
     $('#saveProduct').addEventListener('click',async()=>{const btn=$('#saveProduct');btn.disabled=true;try{const cat=$('#epCategory').value;await DB.saveProduct(productId,{name:$('#epName').value.trim(),category:cat,sku:$('#epSku').value.trim()||null,catalog_visible:$('#epCatalog').checked});for(const tr of document.querySelectorAll('[data-variant]')){const variant=tr.querySelector('.v-name').value.trim()||'Única';const payload={variant_name:variant,sku:tr.querySelector('.v-sku').value.trim()||null,cost_ars:Number(tr.querySelector('.v-cost').value||0),price_ars:Number(tr.querySelector('.v-price').value||0),stock_min:Number(tr.querySelector('.v-min').value||0)};if(cat.toLowerCase()==='vapers')payload.attributes={sabor:variant};await DB.saveVariant(tr.dataset.variant,payload)}closeModal();await renderProducts($('#globalSearch').value)}catch(e){alert(e.message)}finally{btn.disabled=false}});
     document.querySelectorAll('.adjust-stock').forEach(b=>b.addEventListener('click',async()=>{const current=Number(b.dataset.current),val=prompt(`Stock físico actual: ${current}
 Nueva cantidad física:`,String(current));if(val===null)return;const next=Number(val);if(!Number.isFinite(next)||next<0)return alert('Cantidad inválida');const note=prompt('Motivo:','Conteo físico / corrección manual')||'Ajuste manual';try{await DB.adjustStock(productId,b.dataset.vid,current,next,note);closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}}));
     $('#addVariant').addEventListener('click',async()=>{const name=prompt(vape?'Nombre del sabor:':'Nombre de variante (color, talle, número, modelo):','');if(!name)return;const price=Number(prompt('Precio venta ARS:','0')||0),cost=Number(prompt('Costo ARS:','0')||0),initial=Number(prompt('Stock inicial:','0')||0);if([price,cost,initial].some(x=>!Number.isFinite(x))||initial<0)return alert('Valores inválidos');try{await DB.createVariant(productId,{variant_name:name.trim(),cost_ars:cost,price_ars:price,stock_min:0,active:true,attributes:vape?{sabor:name.trim()}:{opcion:name.trim()}},initial,'Alta manual de variante');closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}});
+    $('#productImageUpload')?.addEventListener('change',async e=>{const files=[...(e.target.files||[])];if(!files.length)return;const hadPrimary=(p.images||[]).some(x=>x.is_primary);try{for(let i=0;i<files.length;i++)await DB.uploadProductImage(productId,files[i],!hadPrimary&&i===0);closeModal();await openProductEditor(productId)}catch(err){alert(err.message)}});
+    document.querySelectorAll('.set-primary-image').forEach(b=>b.addEventListener('click',async()=>{try{await DB.setPrimaryImage(productId,b.dataset.img);closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}}));
+    document.querySelectorAll('.delete-product-image').forEach(b=>b.addEventListener('click',async()=>{const img=(p.images||[]).find(x=>String(x.id)===String(b.dataset.img));if(!img||!confirm('¿Eliminar esta foto?'))return;try{await DB.deleteProductImage(productId,img);closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}}));
     $('#mergeProduct').addEventListener('click',()=>openMergeProduct(productId,p));
     $('#deleteProduct').addEventListener('click',async()=>{
       const stock=totalAvailable>0?`
@@ -317,6 +323,55 @@ El stock y el historial se conservan.`))return;
   async function renderFinance(){
     const f=await DB.recentFinance();
     content.innerHTML=`<div class="grid mini-grid">${metric('Movimientos recientes',number(f.movements.length))}${metric('A liquidar',money(f.settlements.reduce((a,x)=>a+Number(x.net_amount||x.gross_amount||0),0)))}${metric('A cobrar',money(f.receivables.reduce((a,x)=>a+Number(x.pending_amount||0),0)))}</div><div class="two-col" style="margin-top:14px"><section class="card"><div class="section-title"><div><span class="eyebrow">CAJA</span><h3>Movimientos</h3></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Método</th><th>Categoría</th><th>Detalle</th></tr></thead><tbody>${f.movements.map(x=>`<tr><td>${safeDate(x.occurred_at)}</td><td><span class="pill ${x.kind==='income'?'green':'red'}">${x.kind==='income'?'Ingreso':'Egreso'}</span></td><td>${esc(x.currency)} ${number(x.amount)}</td><td>${esc(x.payment_method)}</td><td>${esc(x.category)}</td><td>${esc(x.description||'—')}</td></tr>`).join('')}</tbody></table></div></section><div class="finance-side"><section class="card"><div class="section-title"><h3>Dinero a liquidar</h3></div>${f.settlements.map(x=>`<div class="row"><span><b>${esc(x.provider)}</b><br><small class="muted">${esc(x.description||'')} · ${esc(x.expected_at||'')}</small></span><strong>${money(x.net_amount||x.gross_amount)}</strong></div>`).join('')||'<div class="empty">Sin liquidaciones pendientes.</div>'}</section><section class="card"><div class="section-title"><h3>Cuentas por cobrar</h3></div>${f.receivables.map(x=>`<div class="row"><span><b>${esc(x.client_name)}</b><br><small class="muted">${esc(x.description||'')}</small></span><strong>${money(x.pending_amount)}</strong></div>`).join('')||'<div class="empty">Sin cuentas pendientes.</div>'}</section></div></div>`;
+  }
+
+  /* -------------------- PUBLIC CATALOG / WEB ORDERS -------------------- */
+  async function renderCatalogAdmin(){
+    const [cfg,orders]=await Promise.all([DB.catalogSettings(),DB.webOrders(webOrderStatusFilter)]);
+    const publicUrl=`${location.origin}/catalogo`;
+    content.innerHTML=`
+      <div class="two-col catalog-admin-layout">
+        <section class="card">
+          <div class="section-title"><div><span class="eyebrow">CATÁLOGO PÚBLICO</span><h3>Configuración</h3></div><a class="btn primary" href="${publicUrl}" target="_blank" rel="noopener">Abrir catálogo</a></div>
+          <div class="catalog-url-box"><small>URL pública</small><code>${esc(publicUrl)}</code></div>
+          <div class="form-grid" style="margin-top:14px">
+            <label>Título<input id="catTitle" value="${esc(cfg.catalog_title||'IMPORTB2B')}"></label>
+            <label>Subtítulo<input id="catSubtitle" value="${esc(cfg.catalog_subtitle||'')}"></label>
+            <label>WhatsApp<input id="catWhatsapp" value="${esc(cfg.whatsapp_number||'')}" placeholder="549342..."></label>
+            <label>Pedido mínimo<input id="catMin" type="number" min="0" value="${Number(cfg.min_order_ars||0)}"></label>
+            <label>Costo de envío<input id="catShippingFee" type="number" min="0" value="${Number(cfg.shipping_fee_ars||0)}"></label>
+            <label>Nota de envío<input id="catShippingNote" value="${esc(cfg.shipping_note||'')}"></label>
+          </div>
+          <div class="catalog-toggle-grid">
+            <label class="check"><input id="catPublic" type="checkbox" ${cfg.is_public?'checked':''}> Catálogo activo</label>
+            <label class="check"><input id="catExact" type="checkbox" ${cfg.show_exact_stock?'checked':''}> Mostrar cantidad exacta</label>
+            <label class="check"><input id="catOut" type="checkbox" ${cfg.show_out_of_stock?'checked':''}> Mostrar agotados</label>
+            <label class="check"><input id="catPickup" type="checkbox" ${cfg.allow_pickup?'checked':''}> Permitir retiro</label>
+            <label class="check"><input id="catShipping" type="checkbox" ${cfg.allow_shipping?'checked':''}> Permitir envío</label>
+            <label class="check"><input id="catPayLater" type="checkbox" ${cfg.allow_pay_later_public?'checked':''}> Cuenta corriente pública</label>
+          </div>
+          <div class="modal-actions"><button id="saveCatalogSettings" class="btn primary">Guardar catálogo</button></div>
+        </section>
+        <section class="card">
+          <div class="section-title"><div><span class="eyebrow">PEDIDOS WEB</span><h3>Entradas del catálogo</h3></div><select id="webOrderStatus"><option value="pending" ${webOrderStatusFilter==='pending'?'selected':''}>Pendientes</option><option value="confirmed" ${webOrderStatusFilter==='confirmed'?'selected':''}>Confirmados</option><option value="cancelled" ${webOrderStatusFilter==='cancelled'?'selected':''}>Cancelados</option><option value="all" ${webOrderStatusFilter==='all'?'selected':''}>Todos</option></select></div>
+          <div class="web-order-list">${orders.map(o=>`<button class="web-order-card" data-id="${o.id}"><span><b>${esc(o.order_code)}</b><small>${esc(o.customer_name)} · ${safeDate(o.created_at)}</small></span><span><strong>${money(o.total_ars)}</strong>${statusPill(o.status)}</span></button>`).join('')||'<div class="empty">No hay pedidos en este estado.</div>'}</div>
+        </section>
+      </div>`;
+    $('#saveCatalogSettings').addEventListener('click',async()=>{const b=$('#saveCatalogSettings');b.disabled=true;try{await DB.saveCatalogSettings({public_slug:cfg.public_slug||'importb2b',catalog_title:$('#catTitle').value.trim()||'IMPORTB2B',catalog_subtitle:$('#catSubtitle').value.trim()||null,whatsapp_number:$('#catWhatsapp').value.trim()||null,min_order_ars:Number($('#catMin').value||0),shipping_fee_ars:Number($('#catShippingFee').value||0),shipping_note:$('#catShippingNote').value.trim()||null,is_public:$('#catPublic').checked,show_exact_stock:$('#catExact').checked,show_out_of_stock:$('#catOut').checked,allow_pickup:$('#catPickup').checked,allow_shipping:$('#catShipping').checked,allow_pay_later_public:$('#catPayLater').checked,pickup_label:'Retiro',shipping_label:'Envío'});alert('Catálogo actualizado');await renderCatalogAdmin()}catch(e){alert(e.message)}finally{b.disabled=false}});
+    $('#webOrderStatus').addEventListener('change',e=>{webOrderStatusFilter=e.target.value;renderCatalogAdmin()});
+    document.querySelectorAll('.web-order-card').forEach(b=>b.addEventListener('click',()=>openWebOrder(b.dataset.id)));
+  }
+  async function openWebOrder(id){
+    const o=await DB.webOrderDetail(id);
+    openModal(`<div class="section-title"><div><span class="eyebrow">${esc(o.order_code)}</span><h3>${esc(o.customer_name)}</h3><small class="muted">${safeDate(o.created_at)} · ${esc(o.customer_phone)}</small></div><button class="modal-close modal-x">×</button></div>
+      <div class="grid mini-grid"><div class="card metric"><small>Estado</small><b style="font-size:18px">${statusPill(o.status)}</b></div><div class="card metric"><small>Total</small><b style="font-size:24px">${money(o.total_ars)}</b></div><div class="card metric"><small>Pago</small><b style="font-size:18px">${esc(o.payment_method?.name||'—')}</b></div><div class="card metric"><small>Entrega</small><b style="font-size:18px">${o.delivery_type==='shipping'?'Envío':'Retiro'}</b></div></div>
+      ${o.delivery_address?`<div class="notice" style="margin-top:12px">Dirección: ${esc(o.delivery_address)}</div>`:''}
+      <div class="table-wrap" style="margin-top:14px"><table class="table"><thead><tr><th>Producto</th><th>Variante</th><th>Cant.</th><th>Precio</th><th>Total</th></tr></thead><tbody>${o.items.map(i=>`<tr><td><b>${esc(i.product_name)}</b></td><td>${esc(i.variant_name)}</td><td>${number(i.quantity)}</td><td>${money(i.unit_price_ars)}</td><td>${money(i.line_total_ars)}</td></tr>`).join('')}</tbody></table></div>
+      <div class="order-total-lines"><div><span>Subtotal</span><b>${money(o.subtotal_ars)}</b></div><div><span>Envío</span><b>${money(o.shipping_ars)}</b></div>${Number(o.adjustment_ars)?`<div><span>Ajuste de pago</span><b>${money(o.adjustment_ars)}</b></div>`:''}<div class="grand"><span>Total</span><b>${money(o.total_ars)}</b></div></div>
+      ${o.notes?`<div class="notice" style="margin-top:12px">${esc(o.notes)}</div>`:''}
+      <div class="modal-actions">${o.status==='pending'?`<button id="cancelWebOrder" class="btn danger-btn">Cancelar pedido</button><button id="confirmWebOrder" class="btn primary">Confirmar → Venta</button>`:`<button class="btn ghost modal-close">Cerrar</button>`}</div>`);
+    $('#confirmWebOrder')?.addEventListener('click',async()=>{if(!confirm('¿Confirmar este pedido y convertirlo en venta real? Se descontará stock y se registrará en Finanzas.'))return;const b=$('#confirmWebOrder');b.disabled=true;try{const r=await DB.webOrderAction(o.id,'confirm');alert(`Venta ${r.sale?.sale_code||''} confirmada`);closeModal();await renderCatalogAdmin()}catch(e){alert(e.message);b.disabled=false}});
+    $('#cancelWebOrder')?.addEventListener('click',async()=>{const reason=prompt('Motivo de cancelación:','Cliente canceló')||'';if(!confirm('¿Cancelar y liberar el stock reservado?'))return;try{await DB.webOrderAction(o.id,'cancel',reason);closeModal();await renderCatalogAdmin()}catch(e){alert(e.message)}});
   }
 
   /* -------------------- KYTE IMPORT -------------------- */

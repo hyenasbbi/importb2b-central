@@ -81,13 +81,14 @@
     },
 
     async productDetail(id){
-      const [p,v,s]=await Promise.all([
+      const [p,v,s,img]=await Promise.all([
         db.from('importb2b_products').select('*').eq('id',id).single(),
         db.from('importb2b_product_variants').select('*').eq('product_id',id).eq('active',true).order('variant_name'),
-        db.from('importb2b_stock_summary').select('*').eq('product_id',id)
-      ]); [p,v,s].forEach(assert);
+        db.from('importb2b_stock_summary').select('*').eq('product_id',id),
+        db.from('importb2b_product_images').select('*').eq('product_id',id).order('is_primary',{ascending:false}).order('sort_order')
+      ]); [p,v,s,img].forEach(assert);
       const sm=new Map((s.data||[]).map(x=>[x.variant_id,x]));
-      return {...p.data,variants:(v.data||[]).map(x=>({...x,stock:sm.get(x.id)||{on_hand:0,reserved:0,in_transit:0,available:0}}))};
+      return {...p.data,images:img.data||[],variants:(v.data||[]).map(x=>({...x,stock:sm.get(x.id)||{on_hand:0,reserved:0,in_transit:0,available:0}}))};
     },
     async saveProduct(id,payload){ const r=await db.from('importb2b_products').update(payload).eq('id',id); assert(r); },
     async saveVariant(id,payload){ const r=await db.from('importb2b_product_variants').update(payload).eq('id',id); assert(r); },
@@ -180,6 +181,54 @@
       ]); assert(s); assert(i); return {...s.data,items:i.data||[]};
     },
     async cancelSale(id,reason=''){ const r=await db.rpc('importb2b_cancel_sale',{p_sale_id:id,p_reason:reason||null}); assert(r); return r.data; },
+
+    async uploadProductImage(productId,file,isPrimary=false){
+      const u=await authUser();
+      const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+      const path=`${u.id}/${productId}/${crypto.randomUUID()}.${ext}`;
+      const up=await db.storage.from('importb2b-catalog').upload(path,file,{cacheControl:'3600',upsert:false,contentType:file.type||undefined});
+      if(up.error) throw up.error;
+      const pub=db.storage.from('importb2b-catalog').getPublicUrl(path).data.publicUrl;
+      if(isPrimary){ await db.from('importb2b_product_images').update({is_primary:false}).eq('product_id',productId); }
+      const ins=await db.from('importb2b_product_images').insert({owner_id:u.id,product_id:productId,image_url:pub,storage_path:path,alt_text:file.name,is_primary:isPrimary,sort_order:0}).select().single();assert(ins);
+      if(isPrimary){ const r=await db.from('importb2b_products').update({primary_image_url:pub}).eq('id',productId);assert(r); }
+      return ins.data;
+    },
+    async setPrimaryImage(productId,imageId){
+      const u=await authUser();
+      const r=await db.from('importb2b_product_images').select('*').eq('id',imageId).eq('product_id',productId).single();assert(r);
+      let x=await db.from('importb2b_product_images').update({is_primary:false}).eq('product_id',productId);assert(x);
+      x=await db.from('importb2b_product_images').update({is_primary:true}).eq('id',imageId);assert(x);
+      x=await db.from('importb2b_products').update({primary_image_url:r.data.image_url}).eq('id',productId);assert(x);
+      return r.data;
+    },
+    async deleteProductImage(productId,image){
+      if(image.storage_path){ const r=await db.storage.from('importb2b-catalog').remove([image.storage_path]); if(r.error) throw r.error; }
+      const d=await db.from('importb2b_product_images').delete().eq('id',image.id);assert(d);
+      if(image.is_primary){
+        const n=await db.from('importb2b_product_images').select('*').eq('product_id',productId).order('created_at').limit(1);assert(n);
+        const next=(n.data||[])[0];
+        if(next) await this.setPrimaryImage(productId,next.id); else { const r=await db.from('importb2b_products').update({primary_image_url:null}).eq('id',productId);assert(r); }
+      }
+    },
+
+    async catalogSettings(){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').select('*').eq('owner_id',u.id).single();assert(r);return r.data; },
+    async saveCatalogSettings(payload){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').upsert({owner_id:u.id,...payload},{onConflict:'owner_id'}).select().single();assert(r);return r.data; },
+    async webOrders(status='all'){
+      let q=db.from('importb2b_web_orders').select('*').order('created_at',{ascending:false}).limit(150);if(status!=='all')q=q.eq('status',status);const r=await q;assert(r);return r.data||[];
+    },
+    async webOrderDetail(id){
+      const [o,i,m]=await Promise.all([
+        db.from('importb2b_web_orders').select('*').eq('id',id).single(),
+        db.from('importb2b_web_order_items').select('*').eq('order_id',id).order('created_at'),
+        db.from('importb2b_payment_methods').select('id,name,code').eq('active',true)
+      ]);[o,i,m].forEach(assert);const mm=new Map((m.data||[]).map(x=>[x.id,x]));return {...o.data,items:i.data||[],payment_method:mm.get(o.data.payment_method_id)||null};
+    },
+    async webOrderAction(id,action,reason=''){
+      const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Sesión no válida');
+      const r=await fetch('/api/web-order-admin',{method:'POST',headers:{'content-type':'application/json','authorization':`Bearer ${session.access_token}`},body:JSON.stringify({order_id:id,action,reason})});
+      const j=await r.json();if(!r.ok)throw new Error(j.error||'Error procesando pedido');return j;
+    },
 
     async recentFinance(){
       const [m,s,r]=await Promise.all([
