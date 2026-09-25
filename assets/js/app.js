@@ -15,6 +15,10 @@
   let posSearch='';
   let posCategory='';
   let webOrderStatusFilter='pending';
+  let operationsTab='purchases';
+  let financeSearch='';
+  let financeKind='all';
+  let financeMethod='all';
 
   const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n||0));
   const number=n=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(Number(n||0));
@@ -42,7 +46,7 @@
   function setView(v){currentView=v;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));render();}
 
   async function render(){
-    const titles={dashboard:'Inicio',sell:'Vender',products:'Productos / Stock',orders:'Pedidos',customers:'Clientes',finance:'Finanzas',catalog:'Catálogo / Web',imports:'Importar Kyte'};
+    const titles={dashboard:'Inicio',sell:'Vender',products:'Productos / Stock',orders:'Operaciones',customers:'Clientes',finance:'Finanzas',catalog:'Catálogo / Web',imports:'Importar Kyte'};
     $('#viewTitle').textContent=titles[currentView]||'IMPORTB2B'; content.innerHTML='<div class="empty">Cargando…</div>';
     try{
       if(currentView==='dashboard') await renderDashboard();
@@ -298,15 +302,49 @@ El stock y el historial se conservan.`))return;
 
   /* -------------------- ORDERS -> STOCK -------------------- */
   async function renderOrders(){
-    const rows=await DB.recentOrders();
-    content.innerHTML=`<div class="notice good-notice" style="margin-bottom:14px">Los pedidos históricos están protegidos para no duplicar el stock ya migrado desde Kyte. Los nuevos pueden distribuirse por variante y recibirse parcial o totalmente.</div><div class="order-stack">${rows.map(o=>`<article class="card order-card"><div class="section-title"><div><span class="eyebrow">PEDIDO #${esc(o.order_number??o.id)}</span><h3>${esc(o.order_date||'')}</h3><small class="muted">${number(o.total_units)} unidades · USD ${number(o.investment_usd)}</small></div>${o.shipment?`<span class="pill ${o.shipment.is_received?'green':'blue'}">${esc(o.shipment.latest_checkpoint_description||o.shipment.normalized_status||o.shipment.carrier_name)}</span>`:''}</div>${o.items.map(i=>renderOrderItem(i)).join('')}</article>`).join('')||'<div class="empty">Sin pedidos.</div>'}</div>`;
-    document.querySelectorAll('.activate-stock-item').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Este pedido es histórico. Activarlo puede sumar unidades al stock actual. ¿Confirmás que estas unidades NO están incluidas en el stock migrado?'))return;try{await DB.setOrderItemStockMode(b.dataset.id,true);await renderOrders()}catch(e){alert(e.message)}}));
+    const [rows,webAll]=await Promise.all([DB.recentOrders(),DB.webOrders('all')]);
+    const webFiltered=webOrderStatusFilter==='all'?webAll:webAll.filter(x=>x.status===webOrderStatusFilter);
+    const webPending=webAll.filter(x=>x.status==='pending').length;
+    const purchaseHistorical=rows.filter(o=>o.items.length&&o.items.every(i=>i.stock_link_status==='historical')).length;
+    const purchaseActive=rows.length-purchaseHistorical;
+
+    content.innerHTML=`
+      <div class="operations-head card">
+        <div class="section-title"><div><span class="eyebrow">OPERACIONES</span><h3>Compras y pedidos del catálogo</h3><p class="muted">Los registros históricos ya están incluidos en el stock migrado: se muestran como referencia y no requieren activación.</p></div></div>
+        <div class="operation-stats"><span class="pill blue">${purchaseActive} compras activas</span><span class="pill">${purchaseHistorical} históricas</span><span class="pill yellow">${webPending} web pendientes</span></div>
+        <div class="operation-tabs"><button class="${operationsTab==='purchases'?'active':''}" data-operation-tab="purchases">Compras / Mercadería</button><button class="${operationsTab==='web'?'active':''}" data-operation-tab="web">Pedidos del catálogo ${webPending?`<b>${webPending}</b>`:''}</button></div>
+      </div>
+      <div id="operationsBody" style="margin-top:14px">${operationsTab==='purchases'?renderPurchaseAccordions(rows):renderWebOrderAccordions(webFiltered)}</div>`;
+
+    document.querySelectorAll('[data-operation-tab]').forEach(b=>b.addEventListener('click',()=>{operationsTab=b.dataset.operationTab;renderOrders()}));
+    bindOperationAccordions();
     document.querySelectorAll('.edit-allocation').forEach(b=>b.addEventListener('click',()=>openOrderAllocation(b.dataset.id,rows)));
     document.querySelectorAll('.receive-allocation').forEach(b=>b.addEventListener('click',async()=>{const remaining=Number(b.dataset.remaining);const q=prompt(`Quedan ${remaining} unidades por recibir. ¿Cuántas llegaron?`,String(remaining));if(q===null)return;const n=Number(q);if(!Number.isFinite(n)||n<=0||n>remaining)return alert('Cantidad inválida');const note=prompt('Nota de recepción:','Recepción de mercadería')||'';try{await DB.receiveOrderAllocation(b.dataset.id,n,note);await renderOrders()}catch(e){alert(e.message)}}));
+    document.querySelectorAll('.open-web-order').forEach(b=>b.addEventListener('click',()=>openWebOrder(b.dataset.id)));
+    $('#webOpsStatus')?.addEventListener('change',e=>{webOrderStatusFilter=e.target.value;renderOrders()});
+  }
+  function bindOperationAccordions(){
+    document.querySelectorAll('.operation-accordion').forEach(d=>d.addEventListener('toggle',()=>{if(!d.open)return;document.querySelectorAll('.operation-accordion[open]').forEach(other=>{if(other!==d)other.open=false})}));
+  }
+  function renderPurchaseAccordions(rows){
+    if(!rows.length)return'<div class="card empty">Sin compras registradas.</div>';
+    return `<div class="order-stack">${rows.map(o=>{
+      const historical=o.items.length&&o.items.every(i=>i.stock_link_status==='historical');
+      const totalQty=o.items.reduce((a,i)=>a+Number(i.quantity||0),0);
+      const received=o.items.reduce((a,i)=>a+Number(i.received_quantity||0),0);
+      const shipText=o.shipment?.latest_checkpoint_description||o.shipment?.normalized_status||o.shipment?.carrier_name||'';
+      const status=historical?'<span class="pill yellow">Histórico · stock incluido</span>':o.shipment?.is_received?'<span class="pill green">Entregado</span>':shipText?`<span class="pill blue">${esc(shipText)}</span>`:'<span class="pill">En gestión</span>';
+      return `<details class="card order-card operation-accordion"><summary class="operation-summary"><div class="operation-summary-main"><span class="eyebrow">COMPRA #${esc(o.order_number??o.id)}</span><h3>${esc(o.order_date||'Sin fecha')}</h3><small>${number(o.total_units||totalQty)} unidades · USD ${number(o.investment_usd)}</small></div><div class="operation-summary-side">${status}<span class="accordion-chevron">⌄</span></div></summary><div class="operation-body">${historical?`<div class="notice good-notice historical-note">Esta compra es histórica y sus unidades ya forman parte del stock actual. Se conserva para trazabilidad.</div>`:`<div class="operation-progress"><span>Recibido ${number(received)} / ${number(totalQty)}</span><div><i style="width:${totalQty?Math.min(100,received/totalQty*100):0}%"></i></div></div>`}${o.items.map(i=>renderOrderItem(i)).join('')}</div></details>`
+    }).join('')}</div>`;
+  }
+  function renderWebOrderAccordions(rows){
+    const filter=`<div class="toolbar operations-filter"><select id="webOpsStatus"><option value="pending" ${webOrderStatusFilter==='pending'?'selected':''}>Pendientes</option><option value="confirmed" ${webOrderStatusFilter==='confirmed'?'selected':''}>Confirmados</option><option value="cancelled" ${webOrderStatusFilter==='cancelled'?'selected':''}>Cancelados</option><option value="all" ${webOrderStatusFilter==='all'?'selected':''}>Todos</option></select></div>`;
+    if(!rows.length)return `${filter}<div class="card empty">No hay pedidos del catálogo en este estado.</div>`;
+    return `${filter}<div class="order-stack">${rows.map(o=>`<details class="card order-card operation-accordion web-operation"><summary class="operation-summary"><div class="operation-summary-main"><span class="eyebrow">${esc(o.order_code)}</span><h3>${esc(o.customer_name)}</h3><small>${safeDate(o.created_at)} · ${esc(o.customer_phone||'')}</small></div><div class="operation-summary-side"><strong>${money(o.total_ars)}</strong>${statusPill(o.status)}<span class="accordion-chevron">⌄</span></div></summary><div class="operation-body web-operation-body"><div class="operation-kv"><div><small>Entrega</small><b>${o.delivery_type==='shipping'?'Envío':'Retiro'}</b></div><div><small>Total</small><b>${money(o.total_ars)}</b></div><div><small>Estado</small>${statusPill(o.status)}</div>${o.delivery_address?`<div><small>Dirección</small><b>${esc(o.delivery_address)}</b></div>`:''}</div><div class="modal-actions"><button class="btn ${o.status==='pending'?'primary':'ghost'} open-web-order" data-id="${o.id}">${o.status==='pending'?'Gestionar pedido':'Ver detalle'}</button></div></div></details>`).join('')}</div>`;
   }
   function renderOrderItem(i){
     const hist=i.stock_link_status==='historical',alloc=i.allocations||[],rec=Number(i.received_quantity||0);
-    return `<div class="order-item"><div class="order-item-main"><div><b>${esc(i.product)}</b><br><small class="muted">${esc(i.category||'')} · ${number(i.quantity)} un. · costo ${money(i.cost_ars)}</small></div><span class="pill ${hist?'yellow':rec>=Number(i.quantity)?'green':alloc.length?'blue':''}">${hist?'Histórico':rec>=Number(i.quantity)?'Recibido':alloc.length?'Vinculado':'Pendiente'}</span></div>${alloc.length?`<div class="allocation-list">${alloc.map(a=>{const rem=Number(a.ordered_quantity)-Number(a.received_quantity);return`<div class="allocation-row"><span><b>${esc(a.product?.name||'Producto')}</b> · ${esc(a.variant?.variant_name||'Única')}<br><small class="muted">${number(a.received_quantity)} / ${number(a.ordered_quantity)} recibidas</small></span>${rem>0?`<button class="btn tiny good receive-allocation" data-id="${a.id}" data-remaining="${rem}">Recibir ${number(rem)}</button>`:'<span class="pill green">Completo</span>'}</div>`}).join('')}</div>`:''}<div class="order-item-actions">${hist?`<button class="btn tiny danger-btn activate-stock-item" data-id="${i.id}">Activar para stock</button>`:`<button class="btn tiny ghost edit-allocation" data-id="${i.id}">${alloc.length?'Editar distribución':'Vincular / distribuir'}</button>`}</div></div>`;
+    return `<div class="order-item"><div class="order-item-main"><div><b>${esc(i.product)}</b><br><small class="muted">${esc(i.category||'')} · ${number(i.quantity)} un. · costo ${money(i.cost_ars)}</small></div><span class="pill ${hist?'yellow':rec>=Number(i.quantity)?'green':alloc.length?'blue':''}">${hist?'Histórico · incluido':rec>=Number(i.quantity)?'Recibido':alloc.length?'Vinculado':'Pendiente'}</span></div>${alloc.length?`<div class="allocation-list">${alloc.map(a=>{const rem=Number(a.ordered_quantity)-Number(a.received_quantity);return`<div class="allocation-row"><span><b>${esc(a.product?.name||'Producto')}</b> · ${esc(a.variant?.variant_name||'Única')}<br><small class="muted">${number(a.received_quantity)} / ${number(a.ordered_quantity)} recibidas</small></span>${rem>0?`<button class="btn tiny good receive-allocation" data-id="${a.id}" data-remaining="${rem}">Recibir ${number(rem)}</button>`:'<span class="pill green">Completo</span>'}</div>`}).join('')}</div>`:''}<div class="order-item-actions">${hist?`<small class="historical-inline">✓ Ya incluido en el stock actual</small>`:`<button class="btn tiny ghost edit-allocation" data-id="${i.id}">${alloc.length?'Editar distribución':'Vincular / distribuir'}</button>`}</div></div>`;
   }
   async function openOrderAllocation(itemId,orders){
     const item=orders.flatMap(o=>o.items).find(i=>String(i.id)===String(itemId));if(!item)return;
@@ -321,45 +359,31 @@ El stock y el historial se conservan.`))return;
 
   /* -------------------- FINANCE -------------------- */
   async function renderFinance(){
-    const f=await DB.recentFinance();
-    content.innerHTML=`<div class="grid mini-grid">${metric('Movimientos recientes',number(f.movements.length))}${metric('A liquidar',money(f.settlements.reduce((a,x)=>a+Number(x.net_amount||x.gross_amount||0),0)))}${metric('A cobrar',money(f.receivables.reduce((a,x)=>a+Number(x.pending_amount||0),0)))}</div><div class="two-col" style="margin-top:14px"><section class="card"><div class="section-title"><div><span class="eyebrow">CAJA</span><h3>Movimientos</h3></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Método</th><th>Categoría</th><th>Detalle</th></tr></thead><tbody>${f.movements.map(x=>`<tr><td>${safeDate(x.occurred_at)}</td><td><span class="pill ${x.kind==='income'?'green':'red'}">${x.kind==='income'?'Ingreso':'Egreso'}</span></td><td>${esc(x.currency)} ${number(x.amount)}</td><td>${esc(x.payment_method)}</td><td>${esc(x.category)}</td><td>${esc(x.description||'—')}</td></tr>`).join('')}</tbody></table></div></section><div class="finance-side"><section class="card"><div class="section-title"><h3>Dinero a liquidar</h3></div>${f.settlements.map(x=>`<div class="row"><span><b>${esc(x.provider)}</b><br><small class="muted">${esc(x.description||'')} · ${esc(x.expected_at||'')}</small></span><strong>${money(x.net_amount||x.gross_amount)}</strong></div>`).join('')||'<div class="empty">Sin liquidaciones pendientes.</div>'}</section><section class="card"><div class="section-title"><h3>Cuentas por cobrar</h3></div>${f.receivables.map(x=>`<div class="row"><span><b>${esc(x.client_name)}</b><br><small class="muted">${esc(x.description||'')}</small></span><strong>${money(x.pending_amount)}</strong></div>`).join('')||'<div class="empty">Sin cuentas pendientes.</div>'}</section></div></div>`;
+    const f=await DB.recentFinance(250);
+    const methods=[...new Set(f.movements.map(x=>x.payment_method).filter(Boolean))].sort();
+    const q=financeSearch.trim().toLowerCase();
+    const rows=f.movements.filter(x=>(financeKind==='all'||x.kind===financeKind)&&(financeMethod==='all'||x.payment_method===financeMethod)&&(!q||[x.description,x.category,x.payment_method,x.source_type,x.amount].join(' ').toLowerCase().includes(q)));
+    content.innerHTML=`<div class="grid mini-grid">${metric('Transacciones',number(f.movements.length))}${metric('A liquidar',money(f.settlements.reduce((a,x)=>a+Number(x.net_amount||x.gross_amount||0),0)))}${metric('A cobrar',money(f.receivables.reduce((a,x)=>a+Number(x.pending_amount||0),0)))}</div><section class="card" style="margin-top:14px"><div class="section-title"><div><span class="eyebrow">HISTORIAL</span><h3>Transacciones</h3><p class="muted">Ingresos, egresos y movimientos originados por ventas.</p></div></div><div class="toolbar"><input id="financeSearch" value="${esc(financeSearch)}" placeholder="Buscar detalle, categoría o monto…"><select id="financeKind"><option value="all">Ingresos y egresos</option><option value="income" ${financeKind==='income'?'selected':''}>Ingresos</option><option value="expense" ${financeKind==='expense'?'selected':''}>Egresos</option></select><select id="financeMethod"><option value="all">Todos los métodos</option>${methods.map(m=>`<option value="${esc(m)}" ${financeMethod===m?'selected':''}>${esc(m)}</option>`).join('')}</select></div><div class="finance-history-list">${rows.map(x=>`<details class="finance-movement operation-accordion"><summary><span><b>${x.kind==='income'?'+':'−'} ${money(x.amount)}</b><small>${safeDate(x.occurred_at)} · ${esc(x.payment_method)}</small></span><span>${x.kind==='income'?'<span class="pill green">Ingreso</span>':'<span class="pill red">Egreso</span>'}<i>⌄</i></span></summary><div class="finance-movement-body"><div class="operation-kv"><div><small>Categoría</small><b>${esc(x.category||'—')}</b></div><div><small>Detalle</small><b>${esc(x.description||'—')}</b></div><div><small>Origen</small><b>${esc(x.source_type||'manual')}</b></div><div><small>Método</small><b>${esc(x.payment_method)}</b></div></div><div class="modal-actions"><button class="btn ghost tiny edit-finance" data-id="${x.id}">Editar</button></div></div></details>`).join('')||'<div class="empty">No hay transacciones con estos filtros.</div>'}</div></section><div class="two-col" style="margin-top:14px"><section class="card"><div class="section-title"><h3>Dinero a liquidar</h3></div>${f.settlements.map(x=>`<div class="row"><span><b>${esc(x.provider)}</b><br><small class="muted">${esc(x.description||'')} · ${esc(x.expected_at||'')}</small></span><strong>${money(x.net_amount||x.gross_amount)}</strong></div>`).join('')||'<div class="empty">Sin liquidaciones pendientes.</div>'}</section><section class="card"><div class="section-title"><h3>Cuentas por cobrar</h3></div>${f.receivables.map(x=>`<div class="row"><span><b>${esc(x.client_name)}</b><br><small class="muted">${esc(x.description||'')}</small></span><strong>${money(x.pending_amount)}</strong></div>`).join('')||'<div class="empty">Sin cuentas pendientes.</div>'}</section></div>`;
+    $('#financeSearch').addEventListener('input',e=>{financeSearch=e.target.value;clearTimeout(timer);timer=setTimeout(renderFinance,130)});
+    $('#financeKind').addEventListener('change',e=>{financeKind=e.target.value;renderFinance()});
+    $('#financeMethod').addEventListener('change',e=>{financeMethod=e.target.value;renderFinance()});
+    bindOperationAccordions();
+    document.querySelectorAll('.edit-finance').forEach(b=>b.addEventListener('click',()=>openFinanceEditor(f.movements.find(x=>x.id===b.dataset.id))));
+  }
+  function localDateTimeValue(v){if(!v)return'';const d=new Date(v),z=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`}
+  function openFinanceEditor(m){
+    const manual=!m.source_type||m.source_type==='manual';
+    openModal(`<div class="section-title"><div><span class="eyebrow">TRANSACCIÓN</span><h3>Editar movimiento</h3><small class="muted">${manual?'Movimiento manual: edición completa.':'Movimiento automático: monto y tipo protegidos.'}</small></div><button class="modal-close">×</button></div><div class="form-grid"><label>Monto<input id="fmAmount" type="number" min="0" value="${Number(m.amount||0)}" ${manual?'':'disabled'}></label><label>Tipo<select id="fmKind" ${manual?'':'disabled'}><option value="income" ${m.kind==='income'?'selected':''}>Ingreso</option><option value="expense" ${m.kind==='expense'?'selected':''}>Egreso</option></select></label><label>Método<select id="fmMethod" ${manual?'':'disabled'}><option value="efectivo" ${m.payment_method==='efectivo'?'selected':''}>Efectivo</option><option value="transferencia" ${m.payment_method==='transferencia'?'selected':''}>Transferencia</option><option value="usdt" ${m.payment_method==='usdt'?'selected':''}>USDT</option></select></label><label>Categoría<input id="fmCategory" value="${esc(m.category||'')}"></label><label>Fecha<input id="fmDate" type="datetime-local" value="${localDateTimeValue(m.occurred_at)}"></label><label>Origen<input value="${esc(m.source_type||'manual')}" disabled></label></div><label style="margin-top:12px">Detalle<textarea id="fmDescription" rows="3">${esc(m.description||'')}</textarea></label><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveFinanceMovement" class="btn primary">Guardar cambios</button></div>`);
+    $('#saveFinanceMovement').addEventListener('click',async()=>{try{await DB.updateFinanceMovement(m.id,{amount:manual?Number($('#fmAmount').value||0):null,kind:manual?$('#fmKind').value:null,payment_method:manual?$('#fmMethod').value:null,category:$('#fmCategory').value.trim()||null,description:$('#fmDescription').value.trim()||null,occurred_at:$('#fmDate').value?new Date($('#fmDate').value).toISOString():null});closeModal();await renderFinance()}catch(e){alert(e.message)}});
   }
 
   /* -------------------- PUBLIC CATALOG / WEB ORDERS -------------------- */
   async function renderCatalogAdmin(){
-    const [cfg,orders]=await Promise.all([DB.catalogSettings(),DB.webOrders(webOrderStatusFilter)]);
+    const cfg=await DB.catalogSettings();
     const publicUrl=`${location.origin}/catalogo`;
-    content.innerHTML=`
-      <div class="two-col catalog-admin-layout">
-        <section class="card">
-          <div class="section-title"><div><span class="eyebrow">CATÁLOGO PÚBLICO</span><h3>Configuración</h3></div><a class="btn primary" href="${publicUrl}" target="_blank" rel="noopener">Abrir catálogo</a></div>
-          <div class="catalog-url-box"><small>URL pública</small><code>${esc(publicUrl)}</code></div>
-          <div class="form-grid" style="margin-top:14px">
-            <label>Título<input id="catTitle" value="${esc(cfg.catalog_title||'IMPORTB2B')}"></label>
-            <label>Subtítulo<input id="catSubtitle" value="${esc(cfg.catalog_subtitle||'')}"></label>
-            <label>WhatsApp<input id="catWhatsapp" value="${esc(cfg.whatsapp_number||'')}" placeholder="549342..."></label>
-            <label>Pedido mínimo<input id="catMin" type="number" min="0" value="${Number(cfg.min_order_ars||0)}"></label>
-            <label>Costo de envío<input id="catShippingFee" type="number" min="0" value="${Number(cfg.shipping_fee_ars||0)}"></label>
-            <label>Nota de envío<input id="catShippingNote" value="${esc(cfg.shipping_note||'')}"></label>
-          </div>
-          <div class="catalog-toggle-grid">
-            <label class="check"><input id="catPublic" type="checkbox" ${cfg.is_public?'checked':''}> Catálogo activo</label>
-            <label class="check"><input id="catExact" type="checkbox" ${cfg.show_exact_stock?'checked':''}> Mostrar cantidad exacta</label>
-            <label class="check"><input id="catOut" type="checkbox" ${cfg.show_out_of_stock?'checked':''}> Mostrar agotados</label>
-            <label class="check"><input id="catPickup" type="checkbox" ${cfg.allow_pickup?'checked':''}> Permitir retiro</label>
-            <label class="check"><input id="catShipping" type="checkbox" ${cfg.allow_shipping?'checked':''}> Permitir envío</label>
-            <label class="check"><input id="catPayLater" type="checkbox" ${cfg.allow_pay_later_public?'checked':''}> Cuenta corriente pública</label>
-          </div>
-          <div class="modal-actions"><button id="saveCatalogSettings" class="btn primary">Guardar catálogo</button></div>
-        </section>
-        <section class="card">
-          <div class="section-title"><div><span class="eyebrow">PEDIDOS WEB</span><h3>Entradas del catálogo</h3></div><select id="webOrderStatus"><option value="pending" ${webOrderStatusFilter==='pending'?'selected':''}>Pendientes</option><option value="confirmed" ${webOrderStatusFilter==='confirmed'?'selected':''}>Confirmados</option><option value="cancelled" ${webOrderStatusFilter==='cancelled'?'selected':''}>Cancelados</option><option value="all" ${webOrderStatusFilter==='all'?'selected':''}>Todos</option></select></div>
-          <div class="web-order-list">${orders.map(o=>`<button class="web-order-card" data-id="${o.id}"><span><b>${esc(o.order_code)}</b><small>${esc(o.customer_name)} · ${safeDate(o.created_at)}</small></span><span><strong>${money(o.total_ars)}</strong>${statusPill(o.status)}</span></button>`).join('')||'<div class="empty">No hay pedidos en este estado.</div>'}</div>
-        </section>
-      </div>`;
+    content.innerHTML=`<section class="card catalog-settings-single"><div class="section-title"><div><span class="eyebrow">CATÁLOGO PÚBLICO</span><h3>Configuración</h3><p class="muted">Los pedidos que entren desde el catálogo se administran en <b>Operaciones → Pedidos del catálogo</b>.</p></div><a class="btn primary" href="${publicUrl}" target="_blank" rel="noopener">Abrir catálogo</a></div><div class="catalog-url-box"><small>URL pública</small><code>${esc(publicUrl)}</code></div><div class="form-grid" style="margin-top:14px"><label>Título<input id="catTitle" value="${esc(cfg.catalog_title||'IMPORTB2B')}"></label><label>Subtítulo<input id="catSubtitle" value="${esc(cfg.catalog_subtitle||'')}"></label><label>WhatsApp<input id="catWhatsapp" value="${esc(cfg.whatsapp_number||'')}" placeholder="549342..."></label><label>Pedido mínimo<input id="catMin" type="number" min="0" value="${Number(cfg.min_order_ars||0)}"></label><label>Costo de envío<input id="catShippingFee" type="number" min="0" value="${Number(cfg.shipping_fee_ars||0)}"></label><label>Nota de envío<input id="catShippingNote" value="${esc(cfg.shipping_note||'')}"></label></div><div class="catalog-toggle-grid"><label class="check"><input id="catPublic" type="checkbox" ${cfg.is_public?'checked':''}> Catálogo activo</label><label class="check"><input id="catExact" type="checkbox" ${cfg.show_exact_stock?'checked':''}> Mostrar cantidad exacta</label><label class="check"><input id="catOut" type="checkbox" ${cfg.show_out_of_stock?'checked':''}> Mostrar agotados</label><label class="check"><input id="catPickup" type="checkbox" ${cfg.allow_pickup?'checked':''}> Permitir retiro</label><label class="check"><input id="catShipping" type="checkbox" ${cfg.allow_shipping?'checked':''}> Permitir envío</label><label class="check"><input id="catPayLater" type="checkbox" ${cfg.allow_pay_later_public?'checked':''}> Cuenta corriente pública</label></div><div class="modal-actions"><button id="goWebOperations" class="btn ghost">Ver pedidos del catálogo</button><button id="saveCatalogSettings" class="btn primary">Guardar catálogo</button></div></section>`;
     $('#saveCatalogSettings').addEventListener('click',async()=>{const b=$('#saveCatalogSettings');b.disabled=true;try{await DB.saveCatalogSettings({public_slug:cfg.public_slug||'importb2b',catalog_title:$('#catTitle').value.trim()||'IMPORTB2B',catalog_subtitle:$('#catSubtitle').value.trim()||null,whatsapp_number:$('#catWhatsapp').value.trim()||null,min_order_ars:Number($('#catMin').value||0),shipping_fee_ars:Number($('#catShippingFee').value||0),shipping_note:$('#catShippingNote').value.trim()||null,is_public:$('#catPublic').checked,show_exact_stock:$('#catExact').checked,show_out_of_stock:$('#catOut').checked,allow_pickup:$('#catPickup').checked,allow_shipping:$('#catShipping').checked,allow_pay_later_public:$('#catPayLater').checked,pickup_label:'Retiro',shipping_label:'Envío'});alert('Catálogo actualizado');await renderCatalogAdmin()}catch(e){alert(e.message)}finally{b.disabled=false}});
-    $('#webOrderStatus').addEventListener('change',e=>{webOrderStatusFilter=e.target.value;renderCatalogAdmin()});
-    document.querySelectorAll('.web-order-card').forEach(b=>b.addEventListener('click',()=>openWebOrder(b.dataset.id)));
+    $('#goWebOperations').addEventListener('click',()=>{operationsTab='web';webOrderStatusFilter='pending';setView('orders')});
   }
   async function openWebOrder(id){
     const o=await DB.webOrderDetail(id);
@@ -370,8 +394,8 @@ El stock y el historial se conservan.`))return;
       <div class="order-total-lines"><div><span>Subtotal</span><b>${money(o.subtotal_ars)}</b></div><div><span>Envío</span><b>${money(o.shipping_ars)}</b></div>${Number(o.adjustment_ars)?`<div><span>Ajuste de pago</span><b>${money(o.adjustment_ars)}</b></div>`:''}<div class="grand"><span>Total</span><b>${money(o.total_ars)}</b></div></div>
       ${o.notes?`<div class="notice" style="margin-top:12px">${esc(o.notes)}</div>`:''}
       <div class="modal-actions">${o.status==='pending'?`<button id="cancelWebOrder" class="btn danger-btn">Cancelar pedido</button><button id="confirmWebOrder" class="btn primary">Confirmar → Venta</button>`:`<button class="btn ghost modal-close">Cerrar</button>`}</div>`);
-    $('#confirmWebOrder')?.addEventListener('click',async()=>{if(!confirm('¿Confirmar este pedido y convertirlo en venta real? Se descontará stock y se registrará en Finanzas.'))return;const b=$('#confirmWebOrder');b.disabled=true;try{const r=await DB.webOrderAction(o.id,'confirm');alert(`Venta ${r.sale?.sale_code||''} confirmada`);closeModal();await renderCatalogAdmin()}catch(e){alert(e.message);b.disabled=false}});
-    $('#cancelWebOrder')?.addEventListener('click',async()=>{const reason=prompt('Motivo de cancelación:','Cliente canceló')||'';if(!confirm('¿Cancelar y liberar el stock reservado?'))return;try{await DB.webOrderAction(o.id,'cancel',reason);closeModal();await renderCatalogAdmin()}catch(e){alert(e.message)}});
+    $('#confirmWebOrder')?.addEventListener('click',async()=>{if(!confirm('¿Confirmar este pedido y convertirlo en venta real? Se descontará stock y se registrará en Finanzas.'))return;const b=$('#confirmWebOrder');b.disabled=true;try{const r=await DB.webOrderAction(o.id,'confirm');alert(`Venta ${r.sale?.sale_code||''} confirmada`);closeModal();if(currentView==='orders')await renderOrders();else await renderCatalogAdmin()}catch(e){alert(e.message);b.disabled=false}});
+    $('#cancelWebOrder')?.addEventListener('click',async()=>{const reason=prompt('Motivo de cancelación:','Cliente canceló')||'';if(!confirm('¿Cancelar y liberar el stock reservado?'))return;try{await DB.webOrderAction(o.id,'cancel',reason);closeModal();if(currentView==='orders')await renderOrders();else await renderCatalogAdmin()}catch(e){alert(e.message)}});
   }
 
   /* -------------------- KYTE IMPORT -------------------- */

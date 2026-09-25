@@ -225,14 +225,27 @@
       ]);[o,i,m].forEach(assert);const mm=new Map((m.data||[]).map(x=>[x.id,x]));return {...o.data,items:i.data||[],payment_method:mm.get(o.data.payment_method_id)||null};
     },
     async webOrderAction(id,action,reason=''){
-      const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Sesión no válida');
-      const r=await fetch('/api/web-order-admin',{method:'POST',headers:{'content-type':'application/json','authorization':`Bearer ${session.access_token}`},body:JSON.stringify({order_id:id,action,reason})});
-      const j=await r.json();if(!r.ok)throw new Error(j.error||'Error procesando pedido');return j;
+      const fn=action==='confirm'?'importb2b_confirm_web_order':action==='cancel'?'importb2b_cancel_web_order':null;
+      if(!fn) throw new Error('Acción inválida');
+      const params=action==='confirm'?{p_order_id:id}:{p_order_id:id,p_reason:reason||null};
+      const r=await db.rpc(fn,params);assert(r);return r.data;
     },
 
-    async recentFinance(){
+    async updateFinanceMovement(id,payload){
+      const r=await db.rpc('importb2b_update_finance_movement',{
+        p_movement_id:id,
+        p_amount:payload.amount??null,
+        p_kind:payload.kind??null,
+        p_payment_method:payload.payment_method??null,
+        p_category:payload.category??null,
+        p_description:payload.description??null,
+        p_occurred_at:payload.occurred_at??null
+      });assert(r);return r.data;
+    },
+
+    async recentFinance(limit=250){
       const [m,s,r]=await Promise.all([
-        db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id').order('occurred_at',{ascending:false}).limit(25),
+        db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id').order('occurred_at',{ascending:false}).limit(limit),
         db.from('settlements').select('id,provider,description,gross_amount,fees_amount,net_amount,expected_at,status,source_type,source_id').eq('status','pending').order('expected_at').limit(20),
         db.from('receivables').select('id,client_name,client_phone,description,total_amount,paid_amount,pending_amount,due_at,status,source_type,source_id').neq('status','paid').neq('status','cancelled').order('created_at',{ascending:false}).limit(20)
       ]); [m,s,r].forEach(assert); return {movements:m.data||[],settlements:s.data||[],receivables:r.data||[]};

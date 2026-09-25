@@ -1,8 +1,30 @@
 (()=>{
   const $=s=>document.querySelector(s),money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n||0)),esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   let data=null,cart=[],q='',cat='';
+  const cfg=window.IMPORTB2B_CONFIG||{};
+  const publicDb=window.supabase?.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
   const slug=new URLSearchParams(location.search).get('slug')||'importb2b';
-  async function load(){const r=await fetch(`/api/catalog?slug=${encodeURIComponent(slug)}`);const j=await r.json();if(!r.ok)throw new Error(j.error||'No se pudo cargar el catálogo');data=j;$('#storeTitle').textContent=j.settings.title||'IMPORTB2B';$('#storeSubtitle').textContent=j.settings.subtitle||'Catálogo online';document.title=`${j.settings.title||'IMPORTB2B'} · Catálogo`;const cats=[...new Set(j.products.map(p=>p.category).filter(Boolean))].sort();$('#catalogCategory').innerHTML='<option value="">Todas las categorías</option>'+cats.map(x=>`<option>${esc(x)}</option>`).join('');renderProducts();renderCart();}
+  async function load(){
+    let j=null, directError=null;
+    if(publicDb){
+      const r=await publicDb.rpc('importb2b_public_catalog_safe',{p_slug:slug});
+      if(!r.error && r.data && !r.data.error) j=r.data;
+      else directError=r.error?.message||r.data?.error||null;
+    }
+    if(!j){
+      const r=await fetch(`/api/catalog?slug=${encodeURIComponent(slug)}`);
+      const fallback=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(fallback.error||directError||'No se pudo cargar el catálogo');
+      j=fallback;
+    }
+    data=j;
+    $('#storeTitle').textContent=j.settings.title||'IMPORTB2B';
+    $('#storeSubtitle').textContent=j.settings.subtitle||'Catálogo online';
+    document.title=`${j.settings.title||'IMPORTB2B'} · Catálogo`;
+    const cats=[...new Set(j.products.map(p=>p.category).filter(Boolean))].sort();
+    $('#catalogCategory').innerHTML='<option value="">Todas las categorías</option>'+cats.map(x=>`<option>${esc(x)}</option>`).join('');
+    renderProducts();renderCart();
+  }
   function renderProducts(){if(!data)return;const term=q.trim().toLowerCase();const products=data.products.filter(p=>(!cat||p.category===cat)&&(!term||[p.name,p.category,...p.variants.flatMap(v=>[v.name,v.sku,Object.values(v.attributes||{}).join(' ')])].join(' ').toLowerCase().includes(term)));$('#catalogGrid').innerHTML=products.map(p=>`<article class="store-card"><div class="store-card-image">${p.image_url?`<img src="${esc(p.image_url)}" alt="${esc(p.name)}">`:`<div class="store-card-placeholder">IB</div>`}</div><div class="store-card-body"><div><h3>${esc(p.name)}</h3><small>${esc(p.category||'')}</small></div>${p.description?`<small>${esc(p.description)}</small>`:''}<div class="variant-list">${p.variants.map(v=>`<div class="variant-row ${v.in_stock?'':'out'}"><span>${esc(v.name)}</span><strong>${money(v.price_ars)}</strong><button data-p="${p.id}" data-v="${v.id}" ${v.in_stock?'':'disabled'}>${v.in_stock?'+':'Agotado'}</button></div>`).join('')}</div></div></article>`).join('')||'<div class="store-loading">No encontramos productos con esos filtros.</div>';document.querySelectorAll('.variant-row button[data-v]').forEach(b=>b.addEventListener('click',()=>add(b.dataset.p,b.dataset.v)))}
   function add(pid,vid){const p=data.products.find(x=>x.id===pid),v=p?.variants.find(x=>x.id===vid);if(!v||!v.in_stock)return;const x=cart.find(i=>i.variant_id===vid);const max=data.settings.show_exact_stock?Number(v.available||0):20;if(x){if(x.quantity>=max)return alert('No hay más unidades disponibles');x.quantity++}else cart.push({product_id:pid,variant_id:vid,product_name:p.name,variant_name:v.name,price:Number(v.price_ars||0),quantity:1,max});renderCart()}
   function totals(paymentCode=null,delivery='pickup'){const subtotal=cart.reduce((a,x)=>a+x.price*x.quantity,0),shipping=delivery==='shipping'?Number(data?.settings.shipping_fee_ars||0):0,method=(data?.payment_methods||[]).find(m=>m.code===paymentCode);let adj=0,base=subtotal+shipping;if(method?.adjustment_kind==='percent')adj=base*Number(method.adjustment_value||0)/100;else if(method?.adjustment_kind==='fixed')adj=Number(method.adjustment_value||0);if(method?.adjustment_direction==='discount')adj=-Math.abs(adj);else adj=Math.abs(adj);return{subtotal,shipping,adj,total:base+adj}}
@@ -10,6 +32,34 @@
   function openCart(open=true){$('#catalogCartDrawer').classList.toggle('open',open);$('#catalogBackdrop').classList.toggle('open',open);$('#catalogCartDrawer').setAttribute('aria-hidden',String(!open))}
   function openCheckout(){if(!cart.length)return;openCart(false);const d=$('#checkoutDelivery');d.innerHTML='';if(data.settings.allow_pickup)d.innerHTML+=`<option value="pickup">${esc(data.settings.pickup_label||'Retiro')}</option>`;if(data.settings.allow_shipping)d.innerHTML+=`<option value="shipping">${esc(data.settings.shipping_label||'Envío')}</option>`;$('#checkoutPayment').innerHTML=data.payment_methods.map(m=>`<option value="${m.code}">${esc(m.name)}${Number(m.adjustment_value)?` · ${m.adjustment_direction==='discount'?'-':'+'}${m.adjustment_value}${m.adjustment_kind==='percent'?'%':''}`:''}</option>`).join('');$('#checkoutModal').classList.remove('hidden');updateCheckout()}
   function updateCheckout(){const delivery=$('#checkoutDelivery').value,pay=$('#checkoutPayment').value,t=totals(pay,delivery);$('#addressLabel').classList.toggle('hidden',delivery!=='shipping');$('#checkoutTotals').innerHTML=`<div><span>Productos</span><b>${money(t.subtotal)}</b></div><div><span>Envío</span><b>${money(t.shipping)}</b></div>${t.adj?`<div><span>Ajuste de pago</span><b>${money(t.adj)}</b></div>`:''}<div class="grand"><span>Total</span><b>${money(t.total)}</b></div>`}
-  async function placeOrder(){const btn=$('#placeOrderButton');btn.disabled=true;$('#checkoutError').textContent='';try{const body={slug,customer_name:$('#checkoutName').value,customer_phone:$('#checkoutPhone').value,customer_email:$('#checkoutEmail').value,delivery_type:$('#checkoutDelivery').value,delivery_address:$('#checkoutAddress').value,payment_code:$('#checkoutPayment').value,notes:$('#checkoutNotes').value,items:cart.map(x=>({variant_id:x.variant_id,quantity:x.quantity}))};const r=await fetch('/api/web-order',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw new Error(j.error||'No se pudo crear el pedido');const msg=`Hola! Acabo de generar el pedido ${j.order_code} por ${money(j.total_ars)}.`;const wa=String(j.whatsapp_number||'').replace(/\D/g,'');cart=[];renderCart();$('#checkoutModal').querySelector('.store-modal-card').innerHTML=`<div class="order-success"><span>✓</span><b>${esc(j.order_code)}</b><h2>Pedido recibido</h2><p>Reservamos tu stock. IMPORTB2B debe confirmar el pedido para convertirlo en venta.</p>${wa?`<a class="store-primary" style="display:block;text-decoration:none" target="_blank" href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}">Continuar por WhatsApp</a>`:''}<button class="store-primary" onclick="location.reload()">Volver al catálogo</button></div>`}catch(e){$('#checkoutError').textContent=e.message;btn.disabled=false}}
+  async function placeOrder(){
+    const btn=$('#placeOrderButton');btn.disabled=true;$('#checkoutError').textContent='';
+    try{
+      const args={
+        p_slug:slug,
+        p_customer_name:$('#checkoutName').value,
+        p_customer_phone:$('#checkoutPhone').value,
+        p_customer_email:$('#checkoutEmail').value,
+        p_delivery_type:$('#checkoutDelivery').value,
+        p_delivery_address:$('#checkoutAddress').value,
+        p_payment_code:$('#checkoutPayment').value,
+        p_items:cart.map(x=>({variant_id:x.variant_id,quantity:x.quantity})),
+        p_notes:$('#checkoutNotes').value||null
+      };
+      let j=null;
+      if(publicDb){
+        const r=await publicDb.rpc('importb2b_create_web_order_safe',args);
+        if(r.error) throw r.error;
+        j=r.data;
+      }else{
+        const r=await fetch('/api/web-order',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({slug,customer_name:args.p_customer_name,customer_phone:args.p_customer_phone,customer_email:args.p_customer_email,delivery_type:args.p_delivery_type,delivery_address:args.p_delivery_address,payment_code:args.p_payment_code,notes:args.p_notes,items:args.p_items})});
+        j=await r.json();if(!r.ok)throw new Error(j.error||'No se pudo crear el pedido');
+      }
+      const msg=`Hola! Acabo de generar el pedido ${j.order_code} por ${money(j.total_ars)}.`;
+      const wa=String(j.whatsapp_number||'').replace(/\D/g,'');
+      cart=[];renderCart();
+      $('#checkoutModal').querySelector('.store-modal-card').innerHTML=`<div class="order-success"><span>✓</span><b>${esc(j.order_code)}</b><h2>Pedido recibido</h2><p>Reservamos tu stock. IMPORTB2B debe confirmar la operación para convertirla en venta.</p>${wa?`<a class="store-primary" style="display:block;text-decoration:none" target="_blank" href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}">Continuar por WhatsApp</a>`:''}<button class="store-primary" onclick="location.reload()">Volver al catálogo</button></div>`;
+    }catch(e){$('#checkoutError').textContent=e.message;btn.disabled=false}
+  }
   $('#catalogSearch').addEventListener('input',e=>{q=e.target.value;renderProducts()});$('#catalogCategory').addEventListener('change',e=>{cat=e.target.value;renderProducts()});$('#catalogCartButton').addEventListener('click',()=>openCart(true));$('#catalogCartClose').addEventListener('click',()=>openCart(false));$('#catalogBackdrop').addEventListener('click',()=>openCart(false));$('#checkoutButton').addEventListener('click',openCheckout);$('#checkoutClose').addEventListener('click',()=>$('#checkoutModal').classList.add('hidden'));$('#checkoutDelivery').addEventListener('change',updateCheckout);$('#checkoutPayment').addEventListener('change',updateCheckout);$('#placeOrderButton').addEventListener('click',placeOrder);load().catch(e=>$('#catalogGrid').innerHTML=`<div class="store-loading">${esc(e.message)}</div>`);
 })();
