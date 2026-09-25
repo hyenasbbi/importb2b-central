@@ -161,7 +161,7 @@ main{min-width:0}
   nav button[data-view="dashboard"]::before{content:"Inicio"}
   nav button[data-view="products"]::before{content:"Stock"}
   nav button[data-view="imports"]::before{content:"Kyte"}
-  nav button[data-view="orders"]::before{content:"Pedidos"}
+  nav button[data-view="orders"]::before{content:"Operaciones"}
   nav button[data-view="finance"]::before{content:"Caja"}
   .topbar{padding:16px 18px}
   #content{padding:18px}
@@ -172,8 +172,9 @@ main{min-width:0}
   .app{display:block}
   .sidebar{position:fixed;z-index:60;inset:auto 0 0 0;height:74px;border-right:0;border-top:1px solid var(--line-soft);padding:8px 8px 10px;display:block}
   .brand{display:none}
-  nav{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-  nav button{font-size:10px!important;text-align:center;padding:10px 4px;min-height:54px;border-radius:16px}
+  nav{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  nav::-webkit-scrollbar{display:none}
+  nav button{font-size:10px!important;text-align:center;padding:10px 8px;min-height:54px;min-width:78px;border-radius:16px;flex:0 0 auto}
   .logout{display:none}
   .topbar{position:sticky;top:0;padding:14px 14px 12px;display:grid;gap:12px}
   .global-search{width:100%}
@@ -301,3 +302,9 @@ main{min-width:0}
   .product-image-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .web-order-card{align-items:flex-start}
 }
+
+
+/* ==================== PHASE 5.2: OPERATIONS ACCORDIONS ==================== */
+.operations-head{padding-bottom:0}.operation-stats{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.operation-tabs{display:flex;gap:8px;border-top:1px solid var(--line);padding:12px 0}.operation-tabs button{border:1px solid #242a30;background:#0b0e11;color:#aeb7c2;border-radius:13px;padding:10px 14px;font-weight:900;cursor:pointer}.operation-tabs button.active{background:#2b0e11;color:#fff;border-color:#682027}.operation-tabs button b{margin-left:6px;display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:999px;background:var(--red);font-size:11px}.operation-accordion{padding:0!important;overflow:hidden}.operation-accordion>summary{list-style:none;cursor:pointer}.operation-accordion>summary::-webkit-details-marker{display:none}.operation-summary{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 20px}.operation-summary-main h3{margin:5px 0 4px;font-size:23px}.operation-summary-main small{color:#a7b2bf}.operation-summary-side{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.operation-summary-side>strong{font-size:18px}.accordion-chevron{font-size:22px;color:#8e99a5;transition:.2s transform}.operation-accordion[open] .accordion-chevron{transform:rotate(180deg)}.operation-body{border-top:1px solid var(--line);background:#080a0c}.historical-note{margin:14px 18px 0}.historical-inline{color:#79d99c;font-weight:800}.operation-progress{padding:14px 18px 2px;color:#b8c1ca;font-size:12px}.operation-progress>div{height:7px;background:#1d2227;border-radius:999px;overflow:hidden;margin-top:7px}.operation-progress i{display:block;height:100%;background:var(--green);border-radius:999px}.operations-filter{padding:0 0 10px}.web-operation-body{padding:16px 18px}.operation-kv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.operation-kv>div{background:#0d1013;border:1px solid #22282e;border-radius:14px;padding:12px;display:grid;gap:5px}.operation-kv small{color:var(--muted)}.operation-kv b{font-size:13px;word-break:break-word}.finance-history-list{display:grid;gap:9px}.finance-movement{border:1px solid var(--line);border-radius:16px;background:#090b0d}.finance-movement>summary{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}.finance-movement>summary>span{display:flex;align-items:center;gap:8px}.finance-movement>summary>span:first-child{display:grid;gap:4px}.finance-movement summary small{color:var(--muted)}.finance-movement summary i{font-style:normal;color:var(--muted)}.finance-movement-body{border-top:1px solid var(--line);padding:12px}.catalog-settings-single{max-width:1040px;margin:0 auto}
+@media(max-width:760px){.operation-summary{padding:14px;align-items:flex-start}.operation-summary-main h3{font-size:19px}.operation-summary-side{max-width:46%;align-items:flex-end}.operation-kv{grid-template-columns:1fr 1fr}.operation-tabs{overflow-x:auto}.operation-tabs button{white-space:nowrap}.historical-note{margin:12px 12px 0}.operation-progress{padding:12px 12px 2px}.order-item{padding:13px 12px}.finance-movement>summary{align-items:flex-start}.finance-movement>summary>span:last-child{justify-content:flex-end;flex-wrap:wrap}.operations-head{padding:14px}}
+@media(max-width:480px){.operation-kv{grid-template-columns:1fr}.operation-summary{display:grid}.operation-summary-side{max-width:none;justify-content:space-between;align-items:center}.operation-tabs{margin-inline:-4px}.operation-tabs button{min-width:max-content}}
