@@ -1,6 +1,8 @@
 {
-  "name":"importb2b-central",
-  "private":true,
-  "version":"5.0.0",
-  "dependencies":{"@supabase/supabase-js":"2.57.4"}
+  "name": "importb2b-central",
+  "private": true,
+  "version": "5.2.0",
+  "dependencies": {
+    "@supabase/supabase-js": "2.57.4"
+  }
 }
