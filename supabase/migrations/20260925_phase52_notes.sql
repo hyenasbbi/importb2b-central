@@ -1,0 +1,7 @@
+-- Fase 5.2 aplicada en producción.
+-- Funciones relevantes:
+-- importb2b_public_catalog_safe
+-- importb2b_create_web_order_safe
+-- importb2b_confirm_web_order
+-- importb2b_cancel_web_order
+-- importb2b_update_finance_movement
