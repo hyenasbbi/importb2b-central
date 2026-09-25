@@ -25,7 +25,6 @@
   let pdfCategory='';
   let pdfOnlyStock=true;
   let pdfSelected=new Set();
-  let pdfSelectionInitialized=false;
 
   const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n||0));
   const number=n=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(Number(n||0));
@@ -440,7 +439,7 @@ El stock y el historial se conservan.`))return;
     },error:reject}));
   }
 
-  /* -------------------- PHASE 6.1 · PDF AUTOMÁTICO -------------------- */
+  /* -------------------- PHASE 6.2 · PDF SELECTIVO + BRANDING -------------------- */
   async function renderPdfBuilder(){
     const [cats,all]=await Promise.all([DB.categories(),DB.pdfCatalogProducts()]);
     let rows=all.filter(p=>p.catalog_visible!==false);
@@ -448,16 +447,85 @@ El stock y el historial se conservan.`))return;
     if(pdfOnlyStock)rows=rows.filter(p=>p.variants.some(v=>Number(v.stock?.available||0)>0));
     const term=String(pdfSearch||'').trim().toLowerCase();
     if(term)rows=rows.filter(p=>[p.name,p.sku,p.category,...p.variants.flatMap(v=>[v.variant_name,v.sku])].join(' ').toLowerCase().includes(term));
-    if(!pdfSelectionInitialized){rows.forEach(p=>pdfSelected.add(p.id));pdfSelectionInitialized=true;}
-    const visibleIds=new Set(rows.map(x=>x.id));
-    const selectedVisible=rows.filter(x=>pdfSelected.has(x.id));
-    content.innerHTML=`<div class="pdf-builder-head card"><div><span class="eyebrow">GENERADOR AUTOMÁTICO</span><h3>PDF desde Stock Central</h3><p class="muted">Usa nombres, variantes, fotos, stock y precios actuales. No hay que volver a cargar productos.</p></div><div class="pdf-head-actions"><button id="pdfClient" class="btn primary">PDF Clientes</button><button id="pdfReseller" class="btn ghost">PDF Revendedores</button></div></div><div class="pdf-builder-grid"><aside class="card pdf-controls"><label>Buscar<input id="pdfSearch" value="${esc(pdfSearch)}" placeholder="Producto, talle, sabor…"></label><label>Categoría<select id="pdfCategory"><option value="">Todas</option>${cats.map(c=>`<option value="${esc(c)}" ${pdfCategory===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label class="check"><input id="pdfOnlyStock" type="checkbox" ${pdfOnlyStock?'checked':''}> Solo productos con stock</label><label class="check"><input id="pdfExactStock" type="checkbox"> Mostrar cantidad exacta</label><label>Título<input id="pdfTitle" value="CATÁLOGO IMPORTB2B"></label><label>Subtítulo<input id="pdfSubtitle" value="Stock disponible"></label><div class="pdf-selection-summary"><small>Seleccionados</small><b>${selectedVisible.length}</b><span>de ${rows.length} visibles</span></div><button id="pdfSelectAll" class="btn ghost full">Seleccionar visibles</button><button id="pdfClear" class="btn ghost full">Quitar selección</button></aside><section class="card"><div class="section-title"><div><span class="eyebrow">PRODUCTOS</span><h3>Elegí qué incluir</h3></div></div><div class="pdf-product-list">${rows.map(p=>{const av=p.variants.reduce((a,v)=>a+Number(v.stock?.available||0),0);const prices=p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean);return`<label class="pdf-product-row"><input class="pdf-product-check" data-id="${p.id}" type="checkbox" ${pdfSelected.has(p.id)?'checked':''}><span class="pdf-product-thumb">${p.pdf_image_url?`<img src="${esc(p.pdf_image_url)}" alt="">`:'<i>IB</i>'}</span><span class="grow"><b>${esc(p.name)}</b><small>${esc(p.category||'Sin categoría')} · ${number(av)} disponibles · ${p.variants.length} variantes</small></span><strong>${prices.length?money(Math.min(...prices)):'—'}</strong></label>`}).join('')||'<div class="empty">No hay productos con estos filtros.</div>'}</div></section></div>`;
+
+    const selectedTotal=all.filter(x=>pdfSelected.has(x.id)).length;
+    const selectedVisible=rows.filter(x=>pdfSelected.has(x.id)).length;
+
+    content.innerHTML=`
+      <div class="pdf-builder-head card">
+        <div>
+          <span class="eyebrow">GENERADOR AUTOMÁTICO · 6.2</span>
+          <h3>PDF desde Stock Central</h3>
+          <p class="muted">El PDF incluye solamente los productos que marques. Podés filtrar, seleccionar por categoría y exportar sin tocar el stock real.</p>
+        </div>
+        <div class="pdf-head-actions">
+          <button id="pdfClient" class="btn primary" ${selectedTotal?'':'disabled'}>PDF Clientes · ${selectedTotal}</button>
+          <button id="pdfReseller" class="btn ghost" ${selectedTotal?'':'disabled'}>PDF Revendedores · ${selectedTotal}</button>
+        </div>
+      </div>
+      <div class="pdf-builder-grid">
+        <aside class="card pdf-controls">
+          <label>Buscar<input id="pdfSearch" value="${esc(pdfSearch)}" placeholder="Producto, talle, sabor…"></label>
+          <label>Categoría<select id="pdfCategory"><option value="">Todas</option>${cats.map(c=>`<option value="${esc(c)}" ${pdfCategory===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+          <label class="check"><input id="pdfOnlyStock" type="checkbox" ${pdfOnlyStock?'checked':''}> Solo productos con stock</label>
+          <label class="check"><input id="pdfExactStock" type="checkbox"> Mostrar cantidad exacta</label>
+          <label>Título<input id="pdfTitle" value="CATÁLOGO IMPORTB2B"></label>
+          <label>Subtítulo<input id="pdfSubtitle" value="Stock disponible"></label>
+
+          <div class="pdf-selection-summary">
+            <small>Seleccionados</small>
+            <b id="pdfSelectedCount">${selectedTotal}</b>
+            <span id="pdfSelectedMeta">${selectedVisible} visibles de ${rows.length} · ${selectedTotal} total</span>
+          </div>
+          <div class="pdf-selection-actions">
+            <button id="pdfSelectAll" class="btn ghost full">Seleccionar visibles</button>
+            <button id="pdfClear" class="btn ghost full">Limpiar selección</button>
+          </div>
+          <div class="pdf-selection-note">Solo se exportan los productos tildados. Los filtros no agregan productos automáticamente.</div>
+        </aside>
+
+        <section class="card">
+          <div class="section-title">
+            <div><span class="eyebrow">PRODUCTOS</span><h3>Elegí qué incluir</h3></div>
+            <span class="pill blue">${rows.length} visibles</span>
+          </div>
+          <div class="pdf-product-list">
+            ${rows.map(p=>{
+              const av=p.variants.reduce((a,v)=>a+Number(v.stock?.available||0),0);
+              const prices=p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean);
+              const checked=pdfSelected.has(p.id);
+              return `<label class="pdf-product-row ${checked?'selected':''}">
+                <input class="pdf-product-check" data-id="${p.id}" type="checkbox" ${checked?'checked':''}>
+                <span class="pdf-product-thumb">${p.pdf_image_url?`<img src="${esc(p.pdf_image_url)}" alt="">`:'<i>IB</i>'}</span>
+                <span class="grow"><b>${esc(p.name)}</b><small>${esc(p.category||'Sin categoría')} · ${number(av)} disponibles · ${p.variants.length} variantes</small></span>
+                <strong>${prices.length?money(Math.min(...prices)):'—'}</strong>
+              </label>`
+            }).join('')||'<div class="empty">No hay productos con estos filtros.</div>'}
+          </div>
+        </section>
+      </div>`;
+
+    const syncSelectionUi=()=>{
+      const total=all.filter(x=>pdfSelected.has(x.id)).length;
+      const visible=rows.filter(x=>pdfSelected.has(x.id)).length;
+      $('#pdfSelectedCount').textContent=String(total);
+      $('#pdfSelectedMeta').textContent=`${visible} visibles de ${rows.length} · ${total} total`;
+      $('#pdfClient').disabled=!total;
+      $('#pdfReseller').disabled=!total;
+      $('#pdfClient').textContent=`PDF Clientes · ${total}`;
+      $('#pdfReseller').textContent=`PDF Revendedores · ${total}`;
+    };
+
     $('#pdfSearch').addEventListener('input',e=>{pdfSearch=e.target.value;$('#globalSearch').value=pdfSearch;clearTimeout(timer);timer=setTimeout(renderPdfBuilder,160)});
     $('#pdfCategory').addEventListener('change',e=>{pdfCategory=e.target.value;renderPdfBuilder()});
     $('#pdfOnlyStock').addEventListener('change',e=>{pdfOnlyStock=e.target.checked;renderPdfBuilder()});
-    document.querySelectorAll('.pdf-product-check').forEach(x=>x.addEventListener('change',()=>{x.checked?pdfSelected.add(x.dataset.id):pdfSelected.delete(x.dataset.id)}));
+    document.querySelectorAll('.pdf-product-check').forEach(x=>x.addEventListener('change',()=>{
+      x.checked?pdfSelected.add(x.dataset.id):pdfSelected.delete(x.dataset.id);
+      x.closest('.pdf-product-row')?.classList.toggle('selected',x.checked);
+      syncSelectionUi();
+    }));
     $('#pdfSelectAll').addEventListener('click',()=>{rows.forEach(x=>pdfSelected.add(x.id));renderPdfBuilder()});
-    $('#pdfClear').addEventListener('click',()=>{for(const id of visibleIds)pdfSelected.delete(id);renderPdfBuilder()});
+    $('#pdfClear').addEventListener('click',()=>{pdfSelected.clear();renderPdfBuilder()});
     $('#pdfClient').addEventListener('click',()=>generateStockPdf(all.filter(x=>pdfSelected.has(x.id)),{mode:'client',exactStock:$('#pdfExactStock').checked,title:$('#pdfTitle').value.trim()||'CATÁLOGO IMPORTB2B',subtitle:$('#pdfSubtitle').value.trim()}));
     $('#pdfReseller').addEventListener('click',()=>generateStockPdf(all.filter(x=>pdfSelected.has(x.id)),{mode:'reseller',exactStock:$('#pdfExactStock').checked,title:'CATÁLOGO MAYORISTA',subtitle:$('#pdfSubtitle').value.trim()}));
   }
@@ -468,45 +536,132 @@ El stock y el historial se conservan.`))return;
     const onlyStock=pdfOnlyStock;
     const usable=products.map(p=>({...p,variants:p.variants.filter(v=>!onlyStock||Number(v.stock?.available||0)>0)})).filter(p=>p.variants.length);
     if(!usable.length)return alert('No hay variantes disponibles para exportar.');
-    const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const W=210,H=297,margin=16;let logo=null;
-    if(opts.mode==='client')logo=await imageToData('./assets/img/logo-importb2b.png','#0c0d0f').catch(()=>null);
+
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    let logo=null;
+    if(opts.mode==='client')logo=await loadPdfLogo('./assets/img/logo-importb2b-transparent.png').catch(()=>null);
+
     drawPdfCover(doc,opts,usable.length,logo);
     for(let i=0;i<usable.length;i++){
-      const p=usable[i];doc.addPage();
-      await drawPdfProduct(doc,p,opts,i+1,usable.length,logo);
+      doc.addPage();
+      await drawPdfProduct(doc,usable[i],opts,i+1,usable.length,logo);
     }
-    const date=new Date().toISOString().slice(0,10);doc.save(`${opts.mode==='client'?'IMPORTB2B':'Catalogo-Mayorista'}-${date}.pdf`);
+    const date=new Date().toISOString().slice(0,10);
+    doc.save(`${opts.mode==='client'?'IMPORTB2B':'Catalogo-Mayorista'}-${date}.pdf`);
   }
 
-  function pdfText(doc,text,x,y,size=10,style='normal',maxWidth=178){doc.setFont('helvetica',style);doc.setFontSize(size);return doc.splitTextToSize(String(text??''),maxWidth).map((line,i)=>doc.text(line,x,y+i*(size*.38)))}
+  function pdfText(doc,text,x,y,size=10,style='normal',maxWidth=178){
+    doc.setFont('helvetica',style);doc.setFontSize(size);
+    return doc.splitTextToSize(String(text??''),maxWidth).map((line,i)=>doc.text(line,x,y+i*(size*.38)));
+  }
+
+  function addPdfLogo(doc,logo,x,y,maxW,maxH,{center=false}={}){
+    if(!logo?.data||!logo.width||!logo.height)return;
+    const ratio=logo.width/logo.height;
+    let w=maxW,h=w/ratio;
+    if(h>maxH){h=maxH;w=h*ratio;}
+    const drawX=center?x-w/2:x;
+    try{doc.addImage(logo.data,'PNG',drawX,y,w,h,undefined,'FAST')}catch(e){console.warn('No se pudo dibujar el logo PDF',e)}
+  }
+
   function drawPdfCover(doc,opts,count,logo){
-    doc.setFillColor(12,13,15);doc.rect(0,0,210,297,'F');
-    if(logo&&opts.mode==='client')try{doc.addImage(logo,'JPEG',65,34,80,35,undefined,'FAST')}catch{}
-    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(28);doc.text(opts.title||'CATÁLOGO',105,125,{align:'center'});
-    doc.setDrawColor(237,28,36);doc.setLineWidth(1.2);doc.line(78,135,132,135);
-    doc.setFont('helvetica','normal');doc.setFontSize(12);doc.setTextColor(190,194,198);doc.text(opts.subtitle||'',105,148,{align:'center'});
-    doc.setFontSize(10);doc.text(`${count} productos · ${new Date().toLocaleDateString('es-AR')}`,105,164,{align:'center'});
-    if(opts.mode==='client'){doc.setTextColor(237,28,36);doc.setFont('helvetica','bold');doc.text('IMPORTB2B',105,270,{align:'center'})}
-  }
-  async function drawPdfProduct(doc,p,opts,index,total,logo){
-    doc.setFillColor(19,21,23);doc.rect(0,0,210,297,'F');
-    doc.setTextColor(237,28,36);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text((p.category||'PRODUCTO').toUpperCase(),16,18);
-    doc.setTextColor(255,255,255);doc.setFontSize(20);const title=doc.splitTextToSize(p.name,178);doc.text(title,16,30);
-    if(opts.mode==='client'&&logo)try{doc.addImage(logo,'JPEG',169,12,25,11,undefined,'FAST')}catch{}
-    let imageY=48;
-    if(p.pdf_image_url){const img=await imageToData(p.pdf_image_url).catch(()=>null);if(img){try{doc.setFillColor(10,11,12);doc.roundedRect(16,imageY,178,103,2,2,'F');doc.addImage(img,'JPEG',21,imageY+5,168,93,undefined,'FAST')}catch{}}}
-    else{doc.setDrawColor(55,58,61);doc.rect(16,imageY,178,103);doc.setTextColor(100,103,106);doc.setFontSize(14);doc.text('SIN FOTO',105,imageY+53,{align:'center'})}
-    let y=164;doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');doc.text('VARIANTE',16,y);doc.text('STOCK',125,y);doc.text('PRECIO',194,y,{align:'right'});y+=4;doc.setDrawColor(65,68,72);doc.line(16,y,194,y);y+=8;
-    for(const v of p.variants.slice(0,12)){
-      const price=opts.mode==='reseller'?Number(v.wholesale_price_ars||v.price_ars||0):Number(v.price_ars||0);const av=Number(v.stock?.available||0);
-      doc.setTextColor(235,237,239);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text(String(v.variant_name||'Única').slice(0,46),16,y);
-      doc.setTextColor(av>0?120:170,av>0?220:170,av>0?155:170);doc.text(opts.exactStock?`${number(av)} u.`:(av>0?'Disponible':'Sin stock'),125,y);
-      doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.text(price?money(price):'Consultar',194,y,{align:'right'});y+=9;
+    doc.setFillColor(9,10,12);doc.rect(0,0,210,297,'F');
+    if(logo&&opts.mode==='client')addPdfLogo(doc,logo,105,30,82,42,{center:true});
+
+    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(29);
+    doc.text(opts.title||'CATÁLOGO IMPORTB2B',105,136,{align:'center'});
+    doc.setDrawColor(237,28,36);doc.setLineWidth(1.4);doc.line(76,148,134,148);
+    doc.setFont('helvetica','normal');doc.setFontSize(12);doc.setTextColor(205,209,214);
+    doc.text(opts.subtitle||'Stock disponible',105,164,{align:'center'});
+    doc.setFontSize(9);doc.setTextColor(130,137,144);doc.text(`${count} productos seleccionados · ${new Date().toLocaleDateString('es-AR')}`,105,178,{align:'center'});
+    if(opts.mode==='client'){
+      doc.setDrawColor(55,60,66);doc.line(62,265,148,265);
+      doc.setTextColor(245,245,245);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text('IMPORTB2B · STOCK ACTUALIZADO',105,275,{align:'center'});
     }
-    if(p.variants.length>12){doc.setFont('helvetica','normal');doc.setTextColor(160,164,168);doc.text(`+ ${p.variants.length-12} variantes adicionales`,16,y)}
-    doc.setDrawColor(237,28,36);doc.line(16,276,194,276);doc.setFontSize(7.5);doc.setTextColor(160,164,168);doc.text(`${index} / ${total}`,194,284,{align:'right'});if(opts.mode==='client'){doc.setTextColor(235,235,235);doc.setFont('helvetica','bold');doc.text('IMPORTB2B',16,284)}
   }
+
+  async function drawPdfProduct(doc,p,opts,index,total,logo){
+    doc.setFillColor(15,17,19);doc.rect(0,0,210,297,'F');
+
+    if(opts.mode==='client'&&logo)addPdfLogo(doc,logo,16,10,38,14);
+    doc.setTextColor(237,28,36);doc.setFontSize(8);doc.setFont('helvetica','bold');
+    doc.text((p.category||'PRODUCTO').toUpperCase(),194,18,{align:'right'});
+
+    doc.setTextColor(255,255,255);doc.setFontSize(21);doc.setFont('helvetica','bold');
+    const title=doc.splitTextToSize(p.name,178);doc.text(title,16,38);
+
+    const imageY=56;
+    if(p.pdf_image_url){
+      const img=await imageToData(p.pdf_image_url).catch(()=>null);
+      if(img){
+        try{
+          doc.setFillColor(8,9,10);doc.roundedRect(16,imageY,178,98,2,2,'F');
+          doc.addImage(img,'JPEG',21,imageY+5,168,88,undefined,'FAST');
+        }catch{}
+      }
+    }else{
+      doc.setDrawColor(55,58,61);doc.rect(16,imageY,178,98);
+      doc.setTextColor(100,103,106);doc.setFontSize(14);doc.text('SIN FOTO',105,imageY+51,{align:'center'});
+    }
+
+    let y=170;
+    doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
+    doc.text('VARIANTE',16,y);doc.text('STOCK',125,y);doc.text(opts.mode==='reseller'?'MAYORISTA':'PRECIO',194,y,{align:'right'});
+    y+=4;doc.setDrawColor(65,68,72);doc.line(16,y,194,y);y+=8;
+
+    for(const v of p.variants.slice(0,11)){
+      const price=opts.mode==='reseller'?Number(v.wholesale_price_ars||v.price_ars||0):Number(v.price_ars||0);
+      const av=Number(v.stock?.available||0);
+      doc.setTextColor(235,237,239);doc.setFont('helvetica','normal');doc.setFontSize(8.5);
+      doc.text(String(v.variant_name||'Única').slice(0,46),16,y);
+      doc.setTextColor(av>0?120:170,av>0?220:170,av>0?155:170);
+      doc.text(opts.exactStock?`${number(av)} u.`:(av>0?'Disponible':'Sin stock'),125,y);
+      doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');
+      doc.text(price?money(price):'Consultar',194,y,{align:'right'});y+=9;
+    }
+    if(p.variants.length>11){doc.setFont('helvetica','normal');doc.setTextColor(160,164,168);doc.text(`+ ${p.variants.length-11} variantes adicionales`,16,y)}
+
+    doc.setDrawColor(237,28,36);doc.line(16,276,194,276);
+    doc.setFontSize(7.5);doc.setTextColor(160,164,168);doc.text(`${index} / ${total}`,194,284,{align:'right'});
+    if(opts.mode==='client'){
+      doc.setTextColor(235,235,235);doc.setFont('helvetica','bold');doc.text('IMPORTB2B',16,284);
+    }
+  }
+
+  async function loadPdfLogo(url){
+    const res=await fetch(url,{mode:'cors'});if(!res.ok)throw new Error('Logo no disponible');
+    const blob=await res.blob();
+    const bmp=await createImageBitmap(blob);
+    const source=document.createElement('canvas');source.width=bmp.width;source.height=bmp.height;
+    const sctx=source.getContext('2d',{willReadFrequently:true});sctx.clearRect(0,0,source.width,source.height);sctx.drawImage(bmp,0,0);bmp.close?.();
+    const img=sctx.getImageData(0,0,source.width,source.height);const d=img.data;
+
+    // Si el archivo viniera sin transparencia, elimina únicamente el fondo negro.
+    let hasTransparent=false;
+    for(let i=3;i<d.length;i+=4){if(d[i]<250){hasTransparent=true;break}}
+    if(!hasTransparent){
+      for(let i=0;i<d.length;i+=4){
+        if(d[i]<36&&d[i+1]<36&&d[i+2]<36)d[i+3]=0;
+      }
+      sctx.putImageData(img,0,0);
+    }
+
+    const data=sctx.getImageData(0,0,source.width,source.height).data;
+    let minX=source.width,minY=source.height,maxX=-1,maxY=-1;
+    for(let y=0;y<source.height;y++)for(let x=0;x<source.width;x++){
+      const a=data[(y*source.width+x)*4+3];
+      if(a>18){if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y;}
+    }
+    if(maxX<minX||maxY<minY)throw new Error('Logo vacío');
+    const pad=Math.max(4,Math.round(Math.max(source.width,source.height)*.012));
+    minX=Math.max(0,minX-pad);minY=Math.max(0,minY-pad);maxX=Math.min(source.width-1,maxX+pad);maxY=Math.min(source.height-1,maxY+pad);
+    const w=maxX-minX+1,h=maxY-minY+1;
+    const out=document.createElement('canvas');out.width=w;out.height=h;
+    out.getContext('2d').drawImage(source,minX,minY,w,h,0,0,w,h);
+    return {data:out.toDataURL('image/png'),width:w,height:h};
+  }
+
   async function imageToData(url,bg='#ffffff'){
     const res=await fetch(url,{mode:'cors'});if(!res.ok)throw new Error('Imagen no disponible');const blob=await res.blob();
     const bmp=await createImageBitmap(blob);const max=1200,scale=Math.min(1,max/Math.max(bmp.width,bmp.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bmp.width*scale));canvas.height=Math.max(1,Math.round(bmp.height*scale));const ctx=canvas.getContext('2d');ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bmp,0,0,canvas.width,canvas.height);bmp.close?.();return canvas.toDataURL('image/jpeg',.9);
