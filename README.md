@@ -1,13 +1,13 @@
-# IMPORTB2B Central — Fase 5.2
+# IMPORTB2B Central · Fase 5.4
 
-Incluye:
-- Operaciones en acordeón.
-- Compras históricas marcadas como `Histórico · stock incluido`, sin botón de activación.
-- Compras / Mercadería y Pedidos del catálogo en el mismo módulo Operaciones.
-- Pedidos web desplegables y gestionables desde Operaciones.
-- Catálogo público reparado: lectura y creación de pedidos usan RPC seguras de Supabase; Netlify Functions quedan como respaldo.
-- Historial de Finanzas desplegable y editable.
-- Navegación móvil horizontal para acceder a todos los módulos.
-- Responsive reforzado para Operaciones y Finanzas.
+Versión acumulativa para el repositorio `hyenasbbi/importb2b-central`.
 
-Las funciones SQL de Fase 5.2 ya están aplicadas al Supabase de producción.
+Incluye las fases anteriores y cierra dos frentes principales:
+
+1. **Inicio 5.4**: menos ruido, ventas de hoy como protagonista, gráfico horario, resumen mensual integrado, alertas accionables, stock compacto y actividad reciente.
+2. **Finanzas 5.3**: estructura del Control Financiero original dentro de Central, con Movimientos, USDT/ARS, Dinero a liquidar, Dinero a cobrar, Resultados y Auditoría.
+
+Go Cuotas queda configurado como forma de pago con liquidación automática a 25 días hábiles. Los movimientos manuales pueden eliminarse con auditoría; los automáticos se gestionan desde su origen.
+
+## Publicación
+Reemplazar los archivos del repositorio manteniendo las carpetas y permitir el redeploy automático de Netlify.
