@@ -21,3 +21,8 @@
   from = "/api/web-order-admin"
   to = "/.netlify/functions/web-order-admin"
   status = 200
+
+[[redirects]]
+  from = "/club/:token"
+  to = "/club.html?token=:token"
+  status = 200

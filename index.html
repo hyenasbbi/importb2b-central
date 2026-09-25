@@ -6,9 +6,10 @@
   <meta name="theme-color" content="#070809">
   <title>IMPORTB2B Central</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./assets/css/app.css?v=5.4">
+  <link rel="stylesheet" href="./assets/css/app.css?v=6.1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
   <div id="loginView" class="auth-shell">
@@ -18,7 +19,7 @@
         <div class="auth-brand-copy">
           <span class="eyebrow">IMPORTB2B CENTRAL</span>
           <h1>Panel operativo</h1>
-          <p>Stock · Ventas · Operaciones · Finanzas · Clientes · Catálogo</p>
+          <p>Stock · Ventas · Operaciones · Finanzas · Clientes · Club · PDF · Catálogo</p>
         </div>
       </div>
       <form id="loginForm">
@@ -45,6 +46,8 @@
         <button data-view="products">Productos / Stock</button>
         <button data-view="orders">Operaciones</button>
         <button data-view="customers">Clientes</button>
+        <button data-view="club">Club</button>
+        <button data-view="pdfs">PDF / Catálogos</button>
         <button data-view="finance">Finanzas</button>
         <button data-view="catalog">Catálogo / Web</button>
         <button data-view="imports">Importar Kyte</button>
@@ -67,9 +70,9 @@
     </main>
   </div>
 
-  <script src="./assets/js/config.js?v=5.4"></script>
-  <script src="./assets/js/db.js?v=5.4"></script>
-  <script src="./assets/js/importer.js?v=5.4"></script>
-  <script src="./assets/js/app.js?v=5.4"></script>
+  <script src="./assets/js/config.js?v=6.1"></script>
+  <script src="./assets/js/db.js?v=6.1"></script>
+  <script src="./assets/js/importer.js?v=6.1"></script>
+  <script src="./assets/js/app.js?v=6.1"></script>
 </body>
 </html>
