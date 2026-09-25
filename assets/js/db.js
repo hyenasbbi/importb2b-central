@@ -87,7 +87,7 @@
       const pr=await req.limit(1200); assert(pr);
       const products=pr.data||[], ids=products.map(x=>x.id); if(!ids.length) return [];
       const [vr,sr]=await Promise.all([
-        db.from('importb2b_product_variants').select('id,product_id,sku,variant_name,price_ars,cost_ars,stock_min,active,attributes').in('product_id',ids).eq('active',true).order('variant_name'),
+        db.from('importb2b_product_variants').select('id,product_id,sku,variant_name,price_ars,wholesale_price_ars,cost_ars,stock_min,active,attributes').in('product_id',ids).eq('active',true).order('variant_name'),
         db.from('importb2b_stock_summary').select('*').in('product_id',ids)
       ]); assert(vr); assert(sr);
       const sm=new Map((sr.data||[]).map(x=>[x.variant_id,x]));
@@ -182,7 +182,7 @@
     async setOrderItemStockMode(itemId,active){ const r=await db.rpc('importb2b_set_order_item_stock_mode',{p_item_id:Number(itemId),p_active:Boolean(active)}); assert(r); return r.data; },
 
     async customers(q=''){
-      let req=db.from('importb2b_customer_summary').select('*').eq('active',true).order('full_name').limit(500);
+      let req=db.from('importb2b_customer_360').select('*').eq('active',true).order('full_name').limit(500);
       if(q){ const s=String(q).replace(/[,%()]/g,' '); req=req.or(`full_name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%,customer_code.ilike.%${s}%`); }
       const r=await req; assert(r); return r.data||[];
     },
@@ -191,6 +191,56 @@
       const r=await db.from('importb2b_customers').insert({owner_id:u.id,active:true,source:'manual',...payload}).select().single(); assert(r); return r.data;
     },
     async updateCustomer(id,payload){ const r=await db.from('importb2b_customers').update(payload).eq('id',id); assert(r); },
+
+    async customer360(id){
+      const [c,sales,recv,memberships,claims,actions,rules,profile,events]=await Promise.all([
+        db.from('importb2b_customer_360').select('*').eq('id',id).single(),
+        db.from('importb2b_sales').select('id,sale_code,status,total_ars,profit_ars,original_payment_method,sold_at,notes').eq('customer_id',id).order('sold_at',{ascending:false}).limit(100),
+        db.from('importb2b_receivable_control').select('*').eq('customer_id',id).order('created_at',{ascending:false}),
+        db.from('importb2b_club_memberships').select('*').eq('customer_id',id).order('club_type'),
+        db.from('importb2b_club_reward_claims').select('*').eq('customer_id',id).order('unlocked_at',{ascending:false}),
+        db.from('importb2b_club_actions').select('*').eq('customer_id',id).order('created_at',{ascending:false}).limit(100),
+        db.from('importb2b_club_reward_rules').select('*').eq('active',true).order('club_type').order('milestone'),
+        db.from('importb2b_club_profiles').select('*').eq('customer_id',id).maybeSingle(),
+        db.from('importb2b_club_events').select('*').eq('customer_id',id).order('occurred_at',{ascending:false}).limit(120)
+      ]);[c,sales,recv,memberships,claims,actions,rules,profile,events].forEach(assert);
+      const saleRows=sales.data||[], saleIds=saleRows.map(x=>x.id);let items=[];
+      if(saleIds.length){const ir=await db.from('importb2b_sale_items').select('sale_id,original_item_name,quantity,line_total_ars').in('sale_id',saleIds).order('created_at');assert(ir);items=ir.data||[];}
+      const imap=new Map();for(const x of items){const a=imap.get(x.sale_id)||[];a.push(x);imap.set(x.sale_id,a);}
+      const smap=new Map(saleRows.map(x=>[x.id,x]));
+      return {customer:c.data,sales:saleRows.map(x=>({...x,items:imap.get(x.id)||[]})),receivables:recv.data||[],memberships:memberships.data||[],claims:claims.data||[],actions:(actions.data||[]).map(x=>({...x,sale:smap.get(x.sale_id)||null})),rules:rules.data||[],profile:profile.data||null,events:events.data||[]};
+    },
+    async ensureClubProfile(customerId){ const r=await db.rpc('importb2b_club_ensure_profile',{p_customer_id:customerId});assert(r);return r.data; },
+    async addCustomerClub(customerId,clubType){ const r=await db.rpc('importb2b_club_add_membership',{p_customer_id:customerId,p_club_type:clubType});assert(r);return r.data; },
+    async registerClubPoint(customerId,clubType,saleId=null,purchaseAmount=null,observation=''){
+      const r=await db.rpc('importb2b_club_register_verified_purchase',{p_customer_id:customerId,p_club_type:clubType,p_sale_id:saleId||null,p_purchase_amount:purchaseAmount==null?null:Number(purchaseAmount),p_observation:observation||null});assert(r);return r.data;
+    },
+    async deliverClubReward(claimId,notes=''){ const r=await db.rpc('importb2b_club_deliver_reward',{p_claim_id:claimId,p_notes:notes||null});assert(r);return r.data; },
+    async importLegacyClub(payload){ const r=await db.rpc('importb2b_import_legacy_club',{p_payload:payload});assert(r);return r.data; },
+    async legacyClubMap(){ const u=await authUser();const r=await db.from('importb2b_club_legacy_customer_map').select('*').eq('owner_id',u.id).order('migrated_at',{ascending:false});assert(r);return r.data||[]; },
+    async pdfCatalogProducts(){
+      const products=await this.products('','','all');
+      const ids=products.map(x=>x.id);if(!ids.length)return [];
+      const ir=await db.from('importb2b_product_images').select('product_id,image_url,is_primary,sort_order').in('product_id',ids).order('is_primary',{ascending:false}).order('sort_order');assert(ir);
+      const im=new Map();for(const x of (ir.data||[])){if(!im.has(x.product_id)&&x.image_url)im.set(x.product_id,x.image_url)}
+      return products.map(x=>({...x,pdf_image_url:x.primary_image_url||im.get(x.id)||null}));
+    },
+    async clubOverview(q=''){
+      const u=await authUser();
+      const [ov,mr,cr,pr,rr]=await Promise.all([
+        db.from('importb2b_club_overview').select('*').eq('owner_id',u.id).maybeSingle(),
+        db.from('importb2b_club_memberships').select('*').eq('owner_id',u.id).eq('active',true).order('updated_at',{ascending:false}),
+        db.from('importb2b_customer_360').select('id,full_name,phone,instagram_username,completed_sales,total_spent_ars,pending_receivable_ars,club_points,pending_rewards,member_code,club_access_token').eq('owner_id',u.id).eq('active',true).order('full_name'),
+        db.from('importb2b_club_profiles').select('*').eq('owner_id',u.id).eq('active',true),
+        db.from('importb2b_club_reward_claims').select('*').eq('owner_id',u.id).eq('status','pending').order('unlocked_at',{ascending:false})
+      ]);[ov,mr,cr,pr,rr].forEach(assert);
+      const customers=cr.data||[], cmap=new Map(customers.map(x=>[x.id,x])), pmap=new Map((pr.data||[]).map(x=>[x.customer_id,x])), mmap=new Map();
+      for(const m of (mr.data||[])){const a=mmap.get(m.customer_id)||[];a.push(m);mmap.set(m.customer_id,a);}
+      const term=String(q||'').trim().toLowerCase();
+      const members=[...mmap.entries()].map(([id,clubs])=>({customer:cmap.get(id)||null,profile:pmap.get(id)||null,memberships:clubs})).filter(x=>x.customer&&(!term||[x.customer.full_name,x.customer.phone,x.customer.instagram_username,x.profile?.member_code,...x.memberships.map(m=>m.club_type)].join(' ').toLowerCase().includes(term)));
+      const claims=(rr.data||[]).map(x=>({...x,customer:cmap.get(x.customer_id)||null}));
+      return {overview:ov.data||{members:0,total_points:0,vapers_memberships:0,jerseys_memberships:0,perfumes_memberships:0,importb2b_memberships:0,pending_rewards:0},members,claims};
+    },
 
     async paymentMethods(){ const r=await db.from('importb2b_payment_methods').select('*').eq('active',true).order('sort_order').order('name'); assert(r); return r.data||[]; },
     async completeSale({customerId=null,items,paymentMethodId,shipping=0,discount=0,notes=''}){

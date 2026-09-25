@@ -20,6 +20,12 @@
   let financeKind='all';
   let financeMethod='all';
   let financeTab='summary';
+  let clubSearch='';
+  let pdfSearch='';
+  let pdfCategory='';
+  let pdfOnlyStock=true;
+  let pdfSelected=new Set();
+  let pdfSelectionInitialized=false;
 
   const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n||0));
   const number=n=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(Number(n||0));
@@ -42,12 +48,14 @@
     const v=e.target.value;
     if(currentView==='products') renderProducts(v);
     if(currentView==='customers') renderCustomers(v);
+    if(currentView==='club'){clubSearch=v;renderClub(v);}
+    if(currentView==='pdfs'){pdfSearch=v;renderPdfBuilder();}
     if(currentView==='sell'){posSearch=v;renderPosCatalog();}
   });
   function setView(v){currentView=v;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));render();}
 
   async function render(){
-    const titles={dashboard:'Inicio',sell:'Vender',products:'Productos / Stock',orders:'Operaciones',customers:'Clientes',finance:'Finanzas',catalog:'Catálogo / Web',imports:'Importar Kyte'};
+    const titles={dashboard:'Inicio',sell:'Vender',products:'Productos / Stock',orders:'Operaciones',customers:'Clientes',club:'Club',pdfs:'PDF / Catálogos',finance:'Finanzas',catalog:'Catálogo / Web',imports:'Importar Kyte'};
     $('#viewTitle').textContent=titles[currentView]||'IMPORTB2B'; content.innerHTML='<div class="empty">Cargando…</div>';
     try{
       if(currentView==='dashboard') await renderDashboard();
@@ -55,6 +63,8 @@
       else if(currentView==='products') await renderProducts($('#globalSearch').value);
       else if(currentView==='orders') await renderOrders();
       else if(currentView==='customers') await renderCustomers($('#globalSearch').value);
+      else if(currentView==='club') await renderClub(clubSearch||$('#globalSearch').value);
+      else if(currentView==='pdfs') await renderPdfBuilder();
       else if(currentView==='finance') await renderFinance();
       else if(currentView==='catalog') await renderCatalogAdmin();
       else if(currentView==='imports') await renderImports();
@@ -317,12 +327,189 @@ El stock y el historial se conservan.`))return;
   /* -------------------- CUSTOMERS -------------------- */
   async function renderCustomers(q=''){
     const rows=await DB.customers(q);
-    content.innerHTML=`<div class="section-title"><div><span class="eyebrow">BASE ÚNICA</span><h3>Clientes</h3></div><button id="addCustomer" class="btn primary">+ Cliente</button></div><div class="toolbar"><input id="customerSearch" value="${esc(q)}" placeholder="Buscar por nombre, teléfono, email o código…"></div><div class="table-wrap"><table class="table"><thead><tr><th>Cliente</th><th>Contacto</th><th>Compras Central</th><th>Total Central</th><th>A cobrar</th><th>Última compra</th><th></th></tr></thead><tbody>${rows.map(c=>`<tr><td><b>${esc(c.full_name)}</b><br><small class="muted">${esc(c.customer_code||c.source||'')}</small></td><td>${esc(c.phone||'—')}<br><small class="muted">${esc(c.email||'')}</small></td><td>${number(c.completed_sales)}</td><td>${money(c.total_spent_ars)}</td><td>${Number(c.pending_receivable_ars)>0?`<span class="pill yellow">${money(c.pending_receivable_ars)}</span>`:'—'}</td><td>${c.last_sale_at?safeDate(c.last_sale_at):'—'}</td><td><button class="btn tiny ghost edit-customer" data-id="${c.id}">Editar</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">Sin clientes.</td></tr>'}</tbody></table></div>`;
-    $('#customerSearch').addEventListener('input',e=>{const v=e.target.value;$('#globalSearch').value=v;clearTimeout(timer);timer=setTimeout(()=>renderCustomers(v),150)});$('#addCustomer').addEventListener('click',()=>openCustomerEditor());document.querySelectorAll('.edit-customer').forEach(b=>b.addEventListener('click',()=>openCustomerEditor(rows.find(x=>x.id===b.dataset.id))));
+    content.innerHTML=`<div class="section-title"><div><span class="eyebrow">CLIENTE 360°</span><h3>Clientes</h3><p class="muted">Ventas, deuda, Club y datos personales en una sola ficha.</p></div><button id="addCustomer" class="btn primary">+ Cliente</button></div><div class="toolbar"><input id="customerSearch" value="${esc(q)}" placeholder="Buscar por nombre, teléfono, Instagram o código…"></div><div class="table-wrap"><table class="table"><thead><tr><th>Cliente</th><th>Compras</th><th>Total gastado</th><th>A cobrar</th><th>Club</th><th>Última compra</th><th></th></tr></thead><tbody>${rows.map(c=>`<tr><td><b>${esc(c.full_name)}</b><br><small class="muted">${esc(c.member_code||c.customer_code||c.source||'')}</small></td><td>${number(c.completed_sales)}</td><td>${money(c.total_spent_ars)}</td><td>${Number(c.pending_receivable_ars)>0?`<span class="pill yellow">${money(c.pending_receivable_ars)}</span>`:'—'}</td><td>${Number(c.active_clubs)>0?`<span class="pill red">${number(c.active_clubs)} club${Number(c.active_clubs)===1?'':'es'} · ${number(c.club_points)} pts</span>`:'<span class="muted">Sin Club</span>'}</td><td>${c.last_sale_at?safeDate(c.last_sale_at):'—'}</td><td><button class="btn tiny ghost open-customer360" data-id="${c.id}">Abrir ficha</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">Sin clientes.</td></tr>'}</tbody></table></div>`;
+    $('#customerSearch').addEventListener('input',e=>{const v=e.target.value;$('#globalSearch').value=v;clearTimeout(timer);timer=setTimeout(()=>renderCustomers(v),150)});
+    $('#addCustomer').addEventListener('click',()=>openCustomerEditor());
+    document.querySelectorAll('.open-customer360').forEach(b=>b.addEventListener('click',()=>openCustomer360(b.dataset.id)));
   }
   function openCustomerEditor(customer=null,fromPos=false){
     openModal(`<div class="section-title"><div><span class="eyebrow">CLIENTE</span><h3>${customer?'Editar':'Nuevo'} cliente</h3></div><button class="modal-close">×</button></div><div class="form-grid"><label>Nombre<input id="cuName" value="${esc(customer?.full_name||'')}"></label><label>Teléfono<input id="cuPhone" value="${esc(customer?.phone||'')}"></label><label>Email<input id="cuEmail" type="email" value="${esc(customer?.email||'')}"></label><label>Instagram<input id="cuInstagram" value="${esc(customer?.instagram_username||'')}"></label><label>Dirección<input id="cuAddress" value="${esc(customer?.address||'')}"></label><label>Documento<input id="cuDoc" value="${esc(customer?.document_number||'')}"></label></div><label style="margin-top:12px">Notas<textarea id="cuNotes" rows="3">${esc(customer?.notes||'')}</textarea></label><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveCustomer" class="btn primary">Guardar cliente</button></div>`);
     $('#saveCustomer').addEventListener('click',async()=>{const payload={full_name:$('#cuName').value.trim(),phone:$('#cuPhone').value.trim()||null,email:$('#cuEmail').value.trim()||null,instagram_username:$('#cuInstagram').value.trim()||null,address:$('#cuAddress').value.trim()||null,document_number:$('#cuDoc').value.trim()||null,notes:$('#cuNotes').value.trim()||null};if(!payload.full_name)return alert('Ingresá el nombre');try{if(customer)await DB.updateCustomer(customer.id,payload);else await DB.createCustomer(payload);closeModal();if(fromPos)await renderSell();else await renderCustomers($('#globalSearch').value)}catch(e){alert(e.message)}});
+  }
+
+
+  /* -------------------- PHASE 6 · CUSTOMER 360 + CLUB -------------------- */
+  const clubLabels={vapers:'Club Vapers',jerseys:'Club Jerseys',perfumes:'Club Perfumes',importb2b:'Club IMPORTB2B'};
+  const clubLabel=t=>clubLabels[t]||t;
+
+  async function openCustomer360(customerId,tab='summary'){
+    const data=await DB.customer360(customerId),c=data.customer;
+    const publicLink=data.profile?`${location.origin}/club/${data.profile.access_token}`:null;
+    openModal(`<div class="customer360-shell"><div class="section-title customer360-head"><div><span class="eyebrow">CLIENTE 360°</span><h3>${esc(c.full_name)}</h3><p class="muted">${esc(c.phone||'Sin teléfono')} ${c.instagram_username?`· @${esc(String(c.instagram_username).replace(/^@/,''))}`:''}</p></div><div class="customer360-head-actions">${data.profile?`<span class="pill red">${esc(data.profile.member_code)}</span><button id="copyClubLink" class="btn ghost">Copiar Club</button>`:''}<button id="editCustomer360" class="btn ghost">Editar</button><button class="modal-close modal-x">×</button></div></div><div class="customer360-tabs"><button data-c360-tab="summary" class="${tab==='summary'?'active':''}">Resumen</button><button data-c360-tab="purchases" class="${tab==='purchases'?'active':''}">Compras</button><button data-c360-tab="debts" class="${tab==='debts'?'active':''}">Deudas</button><button data-c360-tab="club" class="${tab==='club'?'active':''}">Club</button><button data-c360-tab="data" class="${tab==='data'?'active':''}">Datos</button></div><div id="customer360Body">${customer360TabHtml(data,tab)}</div></div>`);
+    document.querySelectorAll('[data-c360-tab]').forEach(b=>b.addEventListener('click',()=>openCustomer360(customerId,b.dataset.c360Tab)));
+    $('#editCustomer360')?.addEventListener('click',()=>openCustomerEditor(c));
+    $('#copyClubLink')?.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(publicLink);alert('Enlace del Club copiado')}catch{prompt('Copiá este enlace:',publicLink)}});
+    bindCustomer360Actions(data,tab);
+  }
+
+  function customer360TabHtml(data,tab){
+    const c=data.customer;
+    if(tab==='summary'){
+      return `<div class="customer360-stats"><div><small>Compras</small><b>${number(c.completed_sales)}</b></div><div><small>Total gastado</small><b>${money(c.total_spent_ars)}</b></div><div><small>Ganancia bruta</small><b class="positive">${money(c.gross_profit_ars)}</b></div><div><small>A cobrar</small><b class="${Number(c.pending_receivable_ars)>0?'negative':''}">${money(c.pending_receivable_ars)}</b></div></div><div class="customer360-grid"><section class="card"><div class="section-title"><div><span class="eyebrow">ÚLTIMAS COMPRAS</span><h3>Actividad comercial</h3></div></div><div class="c360-list">${data.sales.slice(0,5).map(s=>`<div class="c360-row"><span><b>${esc(s.sale_code)}</b><small>${safeDate(s.sold_at)} · ${esc(s.original_payment_method||'')}</small></span><strong>${money(s.total_ars)}</strong></div>`).join('')||'<div class="empty">Sin ventas Central.</div>'}</div></section><section class="card"><div class="section-title"><div><span class="eyebrow">CLUB</span><h3>Estado</h3></div></div>${data.memberships.filter(x=>x.active).length?`<div class="club-mini-list">${data.memberships.filter(x=>x.active).map(m=>`<div><span>${esc(clubLabel(m.club_type))}</span><b>${number(m.points)} pts</b></div>`).join('')}</div>`:'<div class="empty compact-empty">Todavía no pertenece a ningún Club.</div>'}${Number(c.pending_rewards)>0?`<div class="notice good-notice" style="margin-top:10px">${number(c.pending_rewards)} premio(s) pendiente(s) de entrega.</div>`:''}</section></div>`;
+    }
+    if(tab==='purchases'){
+      return `<div class="card"><div class="section-title"><div><span class="eyebrow">COMPRAS</span><h3>Historial de ventas</h3></div></div><div class="c360-list">${data.sales.map(s=>`<details class="c360-sale"><summary><span><b>${esc(s.sale_code)}</b><small>${safeDate(s.sold_at)} · ${esc(s.original_payment_method||'')}</small></span><strong>${money(s.total_ars)}</strong></summary><div class="c360-sale-body">${s.items.map(i=>`<div><span>${esc(i.original_item_name)} × ${number(i.quantity)}</span><b>${money(i.line_total_ars)}</b></div>`).join('')||'<span class="muted">Sin detalle.</span>'}</div></details>`).join('')||'<div class="empty">Sin ventas Central.</div>'}</div></div>`;
+    }
+    if(tab==='debts'){
+      return `<div class="card"><div class="section-title"><div><span class="eyebrow">CUENTA CORRIENTE</span><h3>Dinero a cobrar</h3></div></div><div class="c360-list">${data.receivables.map(r=>`<div class="c360-debt"><span><b>${esc(r.sale_code||r.description||'Cuenta por cobrar')}</b><small>${esc(r.items_summary||r.description||'')} ${r.due_at?`· vence ${esc(r.due_at)}`:''}</small></span><div><small>Pagado ${money(r.paid_amount)}</small><b>${money(r.pending_amount)}</b></div></div>`).join('')||'<div class="empty">Sin deuda pendiente.</div>'}</div></div>`;
+    }
+    if(tab==='club'){
+      const active=data.memberships.filter(x=>x.active), missing=['vapers','jerseys','perfumes','importb2b'].filter(t=>!active.some(m=>m.club_type===t));
+      const claims=data.claims.filter(x=>x.status==='pending');
+      return `<div class="club-c360-head"><div><span class="eyebrow">FIDELIZACIÓN</span><h3>Club IMPORTB2B</h3><p class="muted">1 punto = compra + historia etiquetando a IMPORTB2B, verificadas por el equipo.</p></div><div class="customer360-head-actions">${missing.length?`<button id="addClubMembership" class="btn ghost">+ Agregar Club</button>`:''}${data.profile?`<button id="copyClubLinkBody" class="btn primary">Compartir tarjeta</button>`:''}</div></div><div class="club-membership-grid">${active.map(m=>membershipCardHtml(m,data)).join('')||'<div class="card empty">Este cliente todavía no tiene membresías.</div>'}</div>${claims.length?`<section class="card" style="margin-top:14px"><div class="section-title"><div><span class="eyebrow">PENDIENTES</span><h3>Premios por entregar</h3></div></div><div class="club-claims">${claims.map(x=>`<div class="club-claim-row"><span><b>${esc(x.reward_name)}</b><small>${esc(clubLabel(x.club_type))} · meta ${x.milestone} pts</small></span><button class="btn tiny good deliver-club-reward" data-id="${x.id}">Marcar entregado</button></div>`).join('')}</div></section>`:''}<section class="card" style="margin-top:14px"><div class="section-title"><div><span class="eyebrow">TRAZABILIDAD</span><h3>Historial del Club</h3></div></div><div class="club-history-list">${(data.events||[]).slice(0,40).map(e=>`<div class="club-history-row"><span><b>${esc(e.description)}</b><small>${esc(e.event_type)} · ${safeDate(e.occurred_at)}</small></span></div>`).join('')||'<div class="empty compact-empty">Sin eventos históricos.</div>'}</div></section>`;
+    }
+    return `<div class="customer360-grid"><section class="card"><div class="section-title"><div><span class="eyebrow">CONTACTO</span><h3>Datos del cliente</h3></div></div><div class="data-kv"><div><small>Nombre</small><b>${esc(c.full_name)}</b></div><div><small>Teléfono</small><b>${esc(c.phone||'—')}</b></div><div><small>Email</small><b>${esc(c.email||'—')}</b></div><div><small>Instagram</small><b>${esc(c.instagram_username||'—')}</b></div><div><small>Dirección</small><b>${esc(c.address||'—')}</b></div><div><small>Documento</small><b>${esc(c.document_number||'—')}</b></div></div></section><section class="card"><div class="section-title"><div><span class="eyebrow">NOTAS</span><h3>Información interna</h3></div></div><p>${esc(c.notes||'Sin notas.')}</p><button id="editCustomerData" class="btn ghost">Editar datos</button></section></div>`;
+  }
+
+  function membershipCardHtml(m,data){
+    const rules=data.rules.filter(r=>r.club_type===m.club_type),next=rules.find(r=>Number(r.milestone)>Number(m.points));
+    const pct=next?Math.min(100,Math.round(Number(m.points)/Number(next.milestone)*100)):100;
+    return `<article class="club-membership card"><div class="club-membership-title"><span><small>${esc(clubLabel(m.club_type))}</small><b>${number(m.points)} puntos</b></span><button class="btn tiny primary add-club-point" data-club="${m.club_type}">+1 punto</button></div><div class="club-progress"><i style="width:${pct}%"></i></div><small>${next?`Próximo: ${esc(next.reward_name)} a los ${next.milestone} pts`:'Todas las metas configuradas alcanzadas'}</small><div class="club-reward-chips">${rules.map(r=>{const claim=data.claims.find(c=>c.club_type===m.club_type&&Number(c.milestone)===Number(r.milestone));const status=claim?.status==='delivered'?'Entregado':Number(m.points)>=Number(r.milestone)?'Desbloqueado':'Bloqueado';return`<span class="reward-chip ${status==='Entregado'?'done':status==='Desbloqueado'?'unlocked':''}"><b>${r.milestone}</b> ${esc(r.reward_name)} · ${status}</span>`}).join('')}</div></article>`;
+  }
+
+  function bindCustomer360Actions(data,tab){
+    if(tab==='data')$('#editCustomerData')?.addEventListener('click',()=>openCustomerEditor(data.customer));
+    if(tab!=='club')return;
+    $('#addClubMembership')?.addEventListener('click',()=>openAddClubMembership(data));
+    const publicLink=data.profile?`${location.origin}/club/${data.profile.access_token}`:null;
+    $('#copyClubLinkBody')?.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(publicLink);alert('Enlace del Club copiado')}catch{prompt('Copiá este enlace:',publicLink)}});
+    document.querySelectorAll('.add-club-point').forEach(b=>b.addEventListener('click',()=>openRegisterClubPoint(data,b.dataset.club)));
+    document.querySelectorAll('.deliver-club-reward').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Marcar este premio como entregado?'))return;const note=prompt('Nota opcional:','')||'';try{await DB.deliverClubReward(b.dataset.id,note);await openCustomer360(data.customer.id,'club')}catch(e){alert(e.message)}}));
+  }
+
+  function openAddClubMembership(data){
+    const active=data.memberships.filter(x=>x.active).map(x=>x.club_type),missing=['vapers','jerseys','perfumes','importb2b'].filter(x=>!active.includes(x));
+    if(!missing.length)return alert('El cliente ya pertenece a todos los clubes.');
+    openModal(`<div class="section-title"><div><span class="eyebrow">CLUB</span><h3>Agregar membresía</h3></div><button class="modal-close modal-x">×</button></div><label>Club<select id="newClubType">${missing.map(x=>`<option value="${x}">${esc(clubLabel(x))}</option>`).join('')}</select></label><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveClubMembership" class="btn primary">Agregar Club</button></div>`);
+    $('#saveClubMembership').addEventListener('click',async()=>{try{await DB.addCustomerClub(data.customer.id,$('#newClubType').value);closeModal();await openCustomer360(data.customer.id,'club')}catch(e){alert(e.message)}});
+  }
+
+  function openRegisterClubPoint(data,clubType){
+    const used=new Set(data.actions.filter(a=>a.club_type===clubType&&a.sale_id).map(a=>a.sale_id));
+    const sales=data.sales.filter(s=>s.status==='completed'&&!used.has(s.id));
+    openModal(`<div class="section-title"><div><span class="eyebrow">${esc(clubLabel(clubType))}</span><h3>Compra + historia verificada</h3></div><button class="modal-close modal-x">×</button></div><div class="notice good-notice">Este botón suma el punto inmediatamente. Usalo solo cuando la historia etiquetando a IMPORTB2B ya esté verificada.</div><label style="margin-top:12px">Venta vinculada<select id="clubSale"><option value="">Registro manual / sin venta Central</option>${sales.map(s=>`<option value="${s.id}" data-total="${Number(s.total_ars||0)}">${esc(s.sale_code)} · ${money(s.total_ars)} · ${safeDate(s.sold_at)}</option>`).join('')}</select></label><div class="form-grid"><label>Monto de compra<input id="clubAmount" type="number" min="0" placeholder="${clubType==='importb2b'?'Mínimo 30000':'Opcional'}"></label><label>Observación<input id="clubObservation" placeholder="Producto, referencia o detalle"></label></div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="confirmClubPoint" class="btn primary">Confirmar · +1 punto</button></div>`);
+    $('#clubSale').addEventListener('change',e=>{const o=e.target.selectedOptions[0];if(o?.dataset.total)$('#clubAmount').value=o.dataset.total});
+    $('#confirmClubPoint').addEventListener('click',async()=>{const saleId=$('#clubSale').value||null,amount=$('#clubAmount').value?Number($('#clubAmount').value):null,obs=$('#clubObservation').value.trim();if(clubType==='importb2b'&&Number(amount||0)<30000)return alert('Club IMPORTB2B requiere compra mínima de $30.000');try{await DB.registerClubPoint(data.customer.id,clubType,saleId,amount,obs);closeModal();await openCustomer360(data.customer.id,'club')}catch(e){alert(e.message)}});
+  }
+
+  async function renderClub(q=''){
+    clubSearch=q||'';const data=await DB.clubOverview(clubSearch),o=data.overview||{};
+    content.innerHTML=`<div class="section-title"><div><span class="eyebrow">FIDELIZACIÓN</span><h3>Club IMPORTB2B</h3><p class="muted">Un cliente, un código, múltiples clubes con progreso independiente.</p></div><button id="legacyClubImport" class="btn ghost">Migrar Club anterior</button></div><div class="club-overview-grid"><div class="card metric"><small>Miembros</small><b>${number(o.members)}</b><small>Clientes con Club activo</small></div><div class="card metric"><small>Puntos registrados</small><b>${number(o.total_points)}</b><small>Compra + historia verificadas</small></div><div class="card metric"><small>Premios pendientes</small><b>${number(o.pending_rewards)}</b><small>Por entregar</small></div><div class="card metric"><small>Membresías</small><b>${number(Number(o.vapers_memberships||0)+Number(o.jerseys_memberships||0)+Number(o.perfumes_memberships||0)+Number(o.importb2b_memberships||0))}</b><small>Entre todos los clubes</small></div></div><div class="club-split" style="margin-top:14px"><section class="card"><div class="section-title"><div><span class="eyebrow">MIEMBROS</span><h3>Clientes del Club</h3></div></div><div class="toolbar"><input id="clubSearch" value="${esc(clubSearch)}" placeholder="Buscar miembro, código, teléfono o club…"></div><div class="club-member-list">${data.members.map(x=>`<button class="club-member-row open-club-member" data-id="${x.customer.id}"><span><b>${esc(x.customer.full_name)}</b><small>${esc(x.profile?.member_code||'Sin código')} · ${x.memberships.map(m=>esc(clubLabel(m.club_type))).join(' · ')}</small></span><span><b>${number(x.memberships.reduce((a,m)=>a+Number(m.points||0),0))} pts</b><small>${number(x.customer.pending_rewards||0)} premios pendientes</small></span></button>`).join('')||'<div class="empty">Todavía no hay membresías en Central.</div>'}</div></section><section class="card"><div class="section-title"><div><span class="eyebrow">PREMIOS</span><h3>Pendientes de entrega</h3></div></div><div class="club-claims">${data.claims.map(x=>`<div class="club-claim-row"><span><b>${esc(x.reward_name)}</b><small>${esc(x.customer?.full_name||'Cliente')} · ${esc(clubLabel(x.club_type))} · ${x.milestone} pts</small></span><button class="btn tiny good deliver-overview-reward" data-id="${x.id}">Entregar</button></div>`).join('')||'<div class="empty compact-empty">Sin premios pendientes.</div>'}</div></section></div>`;
+    $('#legacyClubImport')?.addEventListener('click',openLegacyClubImport);
+    $('#clubSearch')?.addEventListener('input',e=>{clubSearch=e.target.value;$('#globalSearch').value=clubSearch;clearTimeout(timer);timer=setTimeout(()=>renderClub(clubSearch),150)});
+    document.querySelectorAll('.open-club-member').forEach(b=>b.addEventListener('click',()=>openCustomer360(b.dataset.id,'club')));
+    document.querySelectorAll('.deliver-overview-reward').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Marcar premio como entregado?'))return;try{await DB.deliverClubReward(b.dataset.id,'');await renderClub(clubSearch)}catch(e){alert(e.message)}}));
+  }
+
+
+  async function openLegacyClubImport(){
+    const map=await DB.legacyClubMap().catch(()=>[]);
+    openModal(`<div class="section-title"><div><span class="eyebrow">MIGRACIÓN SEGURA</span><h3>Club IMPORTB2B anterior</h3><p class="muted">Seleccioná los seis CSV exportados de Supabase. El sistema fusiona clientes por teléfono, Instagram o nombre y conserva códigos, puntos, premios e historial.</p></div><button class="modal-close modal-x">×</button></div>${map.length?`<div class="notice good-notice">Ya hay ${map.length} clientes históricos mapeados. Podés ejecutar nuevamente: la importación es idempotente.</div>`:''}<div class="legacy-import-grid"><label>1 · clients.csv<input id="legacyClients" type="file" accept=".csv,text/csv"></label><label>2 · client_clubs.csv<input id="legacyClubs" type="file" accept=".csv,text/csv"></label><label>3 · club_actions.csv<input id="legacyActions" type="file" accept=".csv,text/csv"></label><label>4 · reward_claims.csv<input id="legacyClaims" type="file" accept=".csv,text/csv"></label><label>5 · client_events.csv<input id="legacyEvents" type="file" accept=".csv,text/csv"></label><label>6 · club_reward_rules.csv<input id="legacyRules" type="file" accept=".csv,text/csv"></label></div><div id="legacyImportResult" class="muted small-text" style="margin-top:12px">Los archivos se leen en tu navegador y se envían autenticados a tu Supabase. No se guardan en GitHub.</div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="runLegacyImport" class="btn primary">Migrar todo</button></div>`);
+    $('#runLegacyImport').addEventListener('click',async()=>{
+      const btn=$('#runLegacyImport'),out=$('#legacyImportResult');
+      const fields=[['clients','#legacyClients'],['client_clubs','#legacyClubs'],['club_actions','#legacyActions'],['reward_claims','#legacyClaims'],['client_events','#legacyEvents'],['club_reward_rules','#legacyRules']];
+      if(fields.some(([,id])=>!$(id).files[0]))return alert('Seleccioná los seis CSV.');
+      btn.disabled=true;btn.textContent='Migrando…';
+      try{
+        const payload={};
+        for(const [key,id] of fields){payload[key]=await parseLegacyCsv($(id).files[0],key);out.textContent=`Leyendo ${key}… ${payload[key].length} filas`;}
+        const r=await DB.importLegacyClub(payload);
+        out.innerHTML=`<span class="positive"><b>Migración completada.</b></span> Nuevos: ${number(r.created_customers)} · Fusionados: ${number(r.matched_customers)} · Acciones: ${number(r.actions_processed)} · Eventos: ${number(r.events_processed)} · Premios: ${number(r.claims_processed)}`;
+        btn.textContent='Listo';
+        setTimeout(()=>{closeModal();renderClub(clubSearch)},1200);
+      }catch(e){console.error(e);out.innerHTML=`<span class="error">${esc(e.message)}</span>`;btn.disabled=false;btn.textContent='Reintentar'}
+    });
+  }
+
+  function parseLegacyCsv(file,key){
+    return new Promise((resolve,reject)=>Papa.parse(file,{header:true,skipEmptyLines:true,complete:r=>{
+      if(r.errors?.length)return reject(new Error(`CSV ${key}: ${r.errors[0].message}`));
+      const rows=(r.data||[]).filter(x=>Object.values(x).some(v=>String(v??'').trim()!==''));
+      if(key==='client_events')for(const row of rows){try{row.metadata=typeof row.metadata==='string'?JSON.parse(row.metadata||'{}'):row.metadata||{}}catch{row.metadata={raw:row.metadata}}}
+      resolve(rows);
+    },error:reject}));
+  }
+
+  /* -------------------- PHASE 6.1 · PDF AUTOMÁTICO -------------------- */
+  async function renderPdfBuilder(){
+    const [cats,all]=await Promise.all([DB.categories(),DB.pdfCatalogProducts()]);
+    let rows=all.filter(p=>p.catalog_visible!==false);
+    if(pdfCategory)rows=rows.filter(p=>p.category===pdfCategory);
+    if(pdfOnlyStock)rows=rows.filter(p=>p.variants.some(v=>Number(v.stock?.available||0)>0));
+    const term=String(pdfSearch||'').trim().toLowerCase();
+    if(term)rows=rows.filter(p=>[p.name,p.sku,p.category,...p.variants.flatMap(v=>[v.variant_name,v.sku])].join(' ').toLowerCase().includes(term));
+    if(!pdfSelectionInitialized){rows.forEach(p=>pdfSelected.add(p.id));pdfSelectionInitialized=true;}
+    const visibleIds=new Set(rows.map(x=>x.id));
+    const selectedVisible=rows.filter(x=>pdfSelected.has(x.id));
+    content.innerHTML=`<div class="pdf-builder-head card"><div><span class="eyebrow">GENERADOR AUTOMÁTICO</span><h3>PDF desde Stock Central</h3><p class="muted">Usa nombres, variantes, fotos, stock y precios actuales. No hay que volver a cargar productos.</p></div><div class="pdf-head-actions"><button id="pdfClient" class="btn primary">PDF Clientes</button><button id="pdfReseller" class="btn ghost">PDF Revendedores</button></div></div><div class="pdf-builder-grid"><aside class="card pdf-controls"><label>Buscar<input id="pdfSearch" value="${esc(pdfSearch)}" placeholder="Producto, talle, sabor…"></label><label>Categoría<select id="pdfCategory"><option value="">Todas</option>${cats.map(c=>`<option value="${esc(c)}" ${pdfCategory===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label class="check"><input id="pdfOnlyStock" type="checkbox" ${pdfOnlyStock?'checked':''}> Solo productos con stock</label><label class="check"><input id="pdfExactStock" type="checkbox"> Mostrar cantidad exacta</label><label>Título<input id="pdfTitle" value="CATÁLOGO IMPORTB2B"></label><label>Subtítulo<input id="pdfSubtitle" value="Stock disponible"></label><div class="pdf-selection-summary"><small>Seleccionados</small><b>${selectedVisible.length}</b><span>de ${rows.length} visibles</span></div><button id="pdfSelectAll" class="btn ghost full">Seleccionar visibles</button><button id="pdfClear" class="btn ghost full">Quitar selección</button></aside><section class="card"><div class="section-title"><div><span class="eyebrow">PRODUCTOS</span><h3>Elegí qué incluir</h3></div></div><div class="pdf-product-list">${rows.map(p=>{const av=p.variants.reduce((a,v)=>a+Number(v.stock?.available||0),0);const prices=p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean);return`<label class="pdf-product-row"><input class="pdf-product-check" data-id="${p.id}" type="checkbox" ${pdfSelected.has(p.id)?'checked':''}><span class="pdf-product-thumb">${p.pdf_image_url?`<img src="${esc(p.pdf_image_url)}" alt="">`:'<i>IB</i>'}</span><span class="grow"><b>${esc(p.name)}</b><small>${esc(p.category||'Sin categoría')} · ${number(av)} disponibles · ${p.variants.length} variantes</small></span><strong>${prices.length?money(Math.min(...prices)):'—'}</strong></label>`}).join('')||'<div class="empty">No hay productos con estos filtros.</div>'}</div></section></div>`;
+    $('#pdfSearch').addEventListener('input',e=>{pdfSearch=e.target.value;$('#globalSearch').value=pdfSearch;clearTimeout(timer);timer=setTimeout(renderPdfBuilder,160)});
+    $('#pdfCategory').addEventListener('change',e=>{pdfCategory=e.target.value;renderPdfBuilder()});
+    $('#pdfOnlyStock').addEventListener('change',e=>{pdfOnlyStock=e.target.checked;renderPdfBuilder()});
+    document.querySelectorAll('.pdf-product-check').forEach(x=>x.addEventListener('change',()=>{x.checked?pdfSelected.add(x.dataset.id):pdfSelected.delete(x.dataset.id)}));
+    $('#pdfSelectAll').addEventListener('click',()=>{rows.forEach(x=>pdfSelected.add(x.id));renderPdfBuilder()});
+    $('#pdfClear').addEventListener('click',()=>{for(const id of visibleIds)pdfSelected.delete(id);renderPdfBuilder()});
+    $('#pdfClient').addEventListener('click',()=>generateStockPdf(all.filter(x=>pdfSelected.has(x.id)),{mode:'client',exactStock:$('#pdfExactStock').checked,title:$('#pdfTitle').value.trim()||'CATÁLOGO IMPORTB2B',subtitle:$('#pdfSubtitle').value.trim()}));
+    $('#pdfReseller').addEventListener('click',()=>generateStockPdf(all.filter(x=>pdfSelected.has(x.id)),{mode:'reseller',exactStock:$('#pdfExactStock').checked,title:'CATÁLOGO MAYORISTA',subtitle:$('#pdfSubtitle').value.trim()}));
+  }
+
+  async function generateStockPdf(products,opts){
+    if(!products.length)return alert('Seleccioná al menos un producto.');
+    if(!window.jspdf?.jsPDF)return alert('No se pudo cargar el generador PDF.');
+    const onlyStock=pdfOnlyStock;
+    const usable=products.map(p=>({...p,variants:p.variants.filter(v=>!onlyStock||Number(v.stock?.available||0)>0)})).filter(p=>p.variants.length);
+    if(!usable.length)return alert('No hay variantes disponibles para exportar.');
+    const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=210,H=297,margin=16;let logo=null;
+    if(opts.mode==='client')logo=await imageToData('./assets/img/logo-importb2b.png','#0c0d0f').catch(()=>null);
+    drawPdfCover(doc,opts,usable.length,logo);
+    for(let i=0;i<usable.length;i++){
+      const p=usable[i];doc.addPage();
+      await drawPdfProduct(doc,p,opts,i+1,usable.length,logo);
+    }
+    const date=new Date().toISOString().slice(0,10);doc.save(`${opts.mode==='client'?'IMPORTB2B':'Catalogo-Mayorista'}-${date}.pdf`);
+  }
+
+  function pdfText(doc,text,x,y,size=10,style='normal',maxWidth=178){doc.setFont('helvetica',style);doc.setFontSize(size);return doc.splitTextToSize(String(text??''),maxWidth).map((line,i)=>doc.text(line,x,y+i*(size*.38)))}
+  function drawPdfCover(doc,opts,count,logo){
+    doc.setFillColor(12,13,15);doc.rect(0,0,210,297,'F');
+    if(logo&&opts.mode==='client')try{doc.addImage(logo,'JPEG',65,34,80,35,undefined,'FAST')}catch{}
+    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(28);doc.text(opts.title||'CATÁLOGO',105,125,{align:'center'});
+    doc.setDrawColor(237,28,36);doc.setLineWidth(1.2);doc.line(78,135,132,135);
+    doc.setFont('helvetica','normal');doc.setFontSize(12);doc.setTextColor(190,194,198);doc.text(opts.subtitle||'',105,148,{align:'center'});
+    doc.setFontSize(10);doc.text(`${count} productos · ${new Date().toLocaleDateString('es-AR')}`,105,164,{align:'center'});
+    if(opts.mode==='client'){doc.setTextColor(237,28,36);doc.setFont('helvetica','bold');doc.text('IMPORTB2B',105,270,{align:'center'})}
+  }
+  async function drawPdfProduct(doc,p,opts,index,total,logo){
+    doc.setFillColor(19,21,23);doc.rect(0,0,210,297,'F');
+    doc.setTextColor(237,28,36);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text((p.category||'PRODUCTO').toUpperCase(),16,18);
+    doc.setTextColor(255,255,255);doc.setFontSize(20);const title=doc.splitTextToSize(p.name,178);doc.text(title,16,30);
+    if(opts.mode==='client'&&logo)try{doc.addImage(logo,'JPEG',169,12,25,11,undefined,'FAST')}catch{}
+    let imageY=48;
+    if(p.pdf_image_url){const img=await imageToData(p.pdf_image_url).catch(()=>null);if(img){try{doc.setFillColor(10,11,12);doc.roundedRect(16,imageY,178,103,2,2,'F');doc.addImage(img,'JPEG',21,imageY+5,168,93,undefined,'FAST')}catch{}}}
+    else{doc.setDrawColor(55,58,61);doc.rect(16,imageY,178,103);doc.setTextColor(100,103,106);doc.setFontSize(14);doc.text('SIN FOTO',105,imageY+53,{align:'center'})}
+    let y=164;doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');doc.text('VARIANTE',16,y);doc.text('STOCK',125,y);doc.text('PRECIO',194,y,{align:'right'});y+=4;doc.setDrawColor(65,68,72);doc.line(16,y,194,y);y+=8;
+    for(const v of p.variants.slice(0,12)){
+      const price=opts.mode==='reseller'?Number(v.wholesale_price_ars||v.price_ars||0):Number(v.price_ars||0);const av=Number(v.stock?.available||0);
+      doc.setTextColor(235,237,239);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text(String(v.variant_name||'Única').slice(0,46),16,y);
+      doc.setTextColor(av>0?120:170,av>0?220:170,av>0?155:170);doc.text(opts.exactStock?`${number(av)} u.`:(av>0?'Disponible':'Sin stock'),125,y);
+      doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.text(price?money(price):'Consultar',194,y,{align:'right'});y+=9;
+    }
+    if(p.variants.length>12){doc.setFont('helvetica','normal');doc.setTextColor(160,164,168);doc.text(`+ ${p.variants.length-12} variantes adicionales`,16,y)}
+    doc.setDrawColor(237,28,36);doc.line(16,276,194,276);doc.setFontSize(7.5);doc.setTextColor(160,164,168);doc.text(`${index} / ${total}`,194,284,{align:'right'});if(opts.mode==='client'){doc.setTextColor(235,235,235);doc.setFont('helvetica','bold');doc.text('IMPORTB2B',16,284)}
+  }
+  async function imageToData(url,bg='#ffffff'){
+    const res=await fetch(url,{mode:'cors'});if(!res.ok)throw new Error('Imagen no disponible');const blob=await res.blob();
+    const bmp=await createImageBitmap(blob);const max=1200,scale=Math.min(1,max/Math.max(bmp.width,bmp.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bmp.width*scale));canvas.height=Math.max(1,Math.round(bmp.height*scale));const ctx=canvas.getContext('2d');ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bmp,0,0,canvas.width,canvas.height);bmp.close?.();return canvas.toDataURL('image/jpeg',.9);
   }
 
   /* -------------------- ORDERS -> STOCK -------------------- */
