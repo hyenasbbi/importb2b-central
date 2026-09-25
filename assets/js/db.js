@@ -15,31 +15,65 @@
     async user(){ try{return await authUser()}catch{return null} },
 
     async dashboard(){
-      const monthStart=new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
-      const todayStart=new Date(); todayStart.setHours(0,0,0,0);
-      const [p,s,o,r,m,b,v,sales]=await Promise.all([
+      const now=new Date();
+      const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+      const todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+      const yesterdayStart=new Date(todayStart);yesterdayStart.setDate(yesterdayStart.getDate()-1);
+      const salesStart=yesterdayStart<monthStart?yesterdayStart:monthStart;
+      const [p,v,sales,recv,sett,web,vars,stock,mov,recentWeb,recentMov]=await Promise.all([
         db.from('importb2b_products').select('id',{count:'exact',head:true}).eq('active',true),
-        db.from('importb2b_stock_summary').select('available,in_transit'),
-        db.from('importb2b_orders').select('id',{count:'exact',head:true}),
-        db.from('receivables').select('pending_amount,status').neq('status','paid').neq('status','cancelled'),
-        db.from('movements').select('kind,ars_equivalent,amount,currency').gte('occurred_at',monthStart.toISOString()),
-        db.from('importb2b_import_batch_stats').select('product_review,product_ready,product_imported,created_at').order('created_at',{ascending:false}).limit(1),
         db.from('importb2b_stock_valuation').select('*').limit(1),
-        db.from('importb2b_sales').select('id,total_ars,sold_at,status').eq('status','completed').gte('sold_at',monthStart.toISOString())
+        db.from('importb2b_sales').select('id,sale_code,total_ars,profit_ars,sold_at,status,customer_id,original_payment_method').eq('status','completed').gte('sold_at',salesStart.toISOString()).order('sold_at',{ascending:true}),
+        db.from('importb2b_receivable_control').select('id,pending_amount,status,client_name,sale_code').neq('status','paid').neq('status','cancelled'),
+        db.from('importb2b_settlement_control').select('id,net_amount,status,provider,expected_at,sale_code,customer_name').eq('status','pending'),
+        db.from('importb2b_web_orders').select('id',{count:'exact',head:true}).eq('status','pending'),
+        db.from('importb2b_product_variants').select('id,stock_min').eq('active',true),
+        db.from('importb2b_stock_summary').select('variant_id,available,in_transit'),
+        db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id,ars_equivalent').gte('occurred_at',monthStart.toISOString()),
+        db.from('importb2b_web_orders').select('id,order_code,status,total_ars,customer_name,created_at').order('created_at',{ascending:false}).limit(5),
+        db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id,ars_equivalent').order('occurred_at',{ascending:false}).limit(8)
       ]);
-      [p,s,o,r,m,b,v,sales].forEach(assert);
-      const receivable=(r.data||[]).reduce((a,x)=>a+Number(x.pending_amount||0),0);
-      let income=0,expense=0;
-      for(const x of (m.data||[])){
-        const val=Number(x.ars_equivalent ?? (x.currency==='ARS'?x.amount:0) ?? 0);
-        if(x.kind==='income') income+=val; else if(x.kind==='expense') expense+=val;
-      }
-      const monthSales=(sales.data||[]).reduce((a,x)=>a+Number(x.total_ars||0),0);
-      const todaySales=(sales.data||[]).filter(x=>new Date(x.sold_at)>=todayStart).reduce((a,x)=>a+Number(x.total_ars||0),0);
-      const todayCount=(sales.data||[]).filter(x=>new Date(x.sold_at)>=todayStart).length;
+      [p,v,sales,recv,sett,web,vars,stock,mov,recentWeb,recentMov].forEach(assert);
       const valuation=(v.data||[])[0]||{physical_units:0,available_units:0,reserved_units:0,in_transit_units:0,stock_cost_ars:0,stock_sale_value_ars:0,expected_profit_ars:0};
-      const stock=Number(valuation.available_units||0), transit=Number(valuation.in_transit_units||0);
-      return {products:p.count||0,stock,transit,orders:o.count||0,receivable,income,expense,monthSales,todaySales,todayCount,valuation,importBatch:(b.data||[])[0]||null};
+      const allSales=sales.data||[];
+      const isToday=x=>new Date(x.sold_at)>=todayStart;
+      const isYesterday=x=>{const d=new Date(x.sold_at);return d>=yesterdayStart&&d<todayStart};
+      const isMonth=x=>new Date(x.sold_at)>=monthStart;
+      const today=allSales.filter(isToday), yesterday=allSales.filter(isYesterday), month=allSales.filter(isMonth);
+      const sum=a=>a.reduce((n,x)=>n+Number(x.total_ars||0),0);
+      const todaySales=sum(today),yesterdaySales=sum(yesterday),monthSales=sum(month);
+      const todayCount=today.length,monthCount=month.length;
+      const todayTicket=todayCount?todaySales/todayCount:0;
+      const daysElapsed=Math.max(1,Math.floor((todayStart-monthStart)/86400000)+1);
+      const monthDailyAvg=monthSales/daysElapsed;
+      const hours=Array.from({length:15},(_,i)=>({hour:i+8,total:0,count:0}));
+      for(const sale of today){const h=new Date(sale.sold_at).getHours();const slot=hours.find(x=>x.hour===h);if(slot){slot.total+=Number(sale.total_ars||0);slot.count++}}
+      const stockMap=new Map((stock.data||[]).map(x=>[x.variant_id,x]));
+      const lowStock=(vars.data||[]).filter(x=>{const s=stockMap.get(x.id)||{};const av=Number(s.available||0),min=Number(x.stock_min||0);return min>0&&av<=min}).length;
+      const receivable=(recv.data||[]).reduce((a,x)=>a+Number(x.pending_amount||0),0);
+      const settlements=(sett.data||[]).reduce((a,x)=>a+Number(x.net_amount||0),0);
+      let income=0,expense=0;
+      for(const x of (mov.data||[])){
+        if(['internal_conversion','internal_transfer'].includes(x.source_type))continue;
+        const val=Number(x.ars_equivalent ?? (x.currency==='ARS'?x.amount:0) ?? 0);
+        if(x.kind==='income')income+=val; else if(x.kind==='expense')expense+=val;
+      }
+      const recent=[
+        ...month.slice(-6).reverse().map(x=>({type:'sale',date:x.sold_at,title:`Venta ${x.sale_code}`,amount:Number(x.total_ars||0),status:'completed'})),
+        ...(recentWeb.data||[]).map(x=>({type:'web',date:x.created_at,title:`${x.order_code} · ${x.customer_name}`,amount:Number(x.total_ars||0),status:x.status})),
+        ...(recentMov.data||[]).filter(x=>x.source_type!=='sale').map(x=>({type:'finance',date:x.occurred_at,title:x.description||x.category||'Movimiento',amount:(x.kind==='expense'?-1:1)*Number(x.ars_equivalent??x.amount??0),status:x.kind}))
+      ].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,8);
+      return {
+        products:p.count||0,
+        stock:Number(valuation.available_units||0),
+        transit:Number(valuation.in_transit_units||0),
+        valuation,
+        todaySales,todayCount,todayTicket,yesterdaySales,monthSales,monthCount,monthDailyAvg,hours,
+        receivable,receivableCount:(recv.data||[]).length,
+        settlements,settlementCount:(sett.data||[]).length,
+        webPending:web.count||0,lowStock,
+        income,expense,operationalNet:income-expense,recent
+      };
     },
 
     async categories(){
@@ -231,6 +265,27 @@
       const r=await db.rpc(fn,params);assert(r);return r.data;
     },
 
+    async createManualMovement(payload){
+      const u=await authUser();
+      const currency=payload.currency||'ARS', amount=Number(payload.amount||0);
+      if(amount<=0) throw new Error('El monto debe ser mayor a 0');
+      const quote=currency==='USDT'?Number(payload.quote_ars||0):null;
+      if(currency==='USDT'&&quote<=0) throw new Error('Ingresá la cotización USDT');
+      const row={kind:payload.kind,amount,currency,payment_method:payload.payment_method,category:payload.category||'OTRO',description:payload.description||null,occurred_at:payload.occurred_at||new Date().toISOString(),quote_type:currency==='USDT'?(payload.quote_type||'buy'):null,quote_ars:quote,ars_equivalent:currency==='USDT'?amount*quote:amount,created_by:u.id,source_type:'manual',cash_holder:payload.payment_method==='efectivo'?(payload.holder||'nahuel'):null,transfer_holder:payload.payment_method==='transferencia'?(payload.holder||'nahuel'):null,usdt_holder:payload.payment_method==='usdt'?(payload.holder||'nahuel'):null};
+      const r=await db.from('movements').insert(row).select().single();assert(r);return r.data;
+    },
+    async createManualSettlement(payload){
+      const u=await authUser();
+      const gross=Number(payload.gross_amount||0),fees=Number(payload.fees_amount||0);
+      if(gross<=0||fees<0||fees>gross) throw new Error('Revisá bruto y comisiones');
+      const r=await db.from('settlements').insert({provider:payload.provider||'otro',description:payload.description||null,gross_amount:gross,fees_amount:fees,expected_at:payload.expected_at||null,status:'pending',destination_method:'transferencia',created_by:u.id,payment_method_id:payload.payment_method_id||null}).select().single();assert(r);return r.data;
+    },
+    async updateManualSettlement(id,payload){ const r=await db.from('settlements').update(payload).eq('id',id).is('source_type',null).eq('status','pending').select().single();assert(r);return r.data; },
+    async createManualReceivable(payload){
+      const u=await authUser();const total=Number(payload.total_amount||0);if(total<=0)throw new Error('El total debe ser mayor a 0');
+      const r=await db.from('receivables').insert({client_name:payload.client_name,client_phone:payload.client_phone||null,description:payload.description||null,total_amount:total,paid_amount:0,due_at:payload.due_at||null,status:'pending',created_by:u.id}).select().single();assert(r);return r.data;
+    },
+    async updateManualReceivable(id,payload){ const r=await db.from('receivables').update(payload).eq('id',id).is('source_type',null).select().single();assert(r);return r.data; },
     async updateFinanceMovement(id,payload){
       const r=await db.rpc('importb2b_update_finance_movement',{
         p_movement_id:id,
@@ -242,13 +297,37 @@
         p_occurred_at:payload.occurred_at??null
       });assert(r);return r.data;
     },
-
-    async recentFinance(limit=250){
-      const [m,s,r]=await Promise.all([
-        db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id').order('occurred_at',{ascending:false}).limit(limit),
-        db.from('settlements').select('id,provider,description,gross_amount,fees_amount,net_amount,expected_at,status,source_type,source_id').eq('status','pending').order('expected_at').limit(20),
-        db.from('receivables').select('id,client_name,client_phone,description,total_amount,paid_amount,pending_amount,due_at,status,source_type,source_id').neq('status','paid').neq('status','cancelled').order('created_at',{ascending:false}).limit(20)
-      ]); [m,s,r].forEach(assert); return {movements:m.data||[],settlements:s.data||[],receivables:r.data||[]};
-    }
+    async deleteManualMovement(id){ const r=await db.rpc('importb2b_delete_manual_movement',{p_movement_id:id});assert(r);return r.data; },
+    async settleFinanceItem(id,method,holder){ const r=await db.rpc('importb2b_settle_finance_item',{p_settlement_id:id,p_destination_method:method,p_holder:holder});assert(r);return r.data; },
+    async deleteManualSettlement(id){ const r=await db.rpc('importb2b_delete_manual_settlement',{p_settlement_id:id});assert(r);return r.data; },
+    async deleteManualReceivable(id){ const r=await db.rpc('importb2b_delete_manual_receivable',{p_receivable_id:id});assert(r);return r.data; },
+    async recordReceivablePayment(id,amount,method,holder){ const r=await db.rpc('record_receivable_payment_v2',{p_receivable_id:id,p_amount:Number(amount),p_payment_method:method,p_holder:holder});assert(r);return r.data; },
+    async linkSettlementSale(settlementId,saleId){ const r=await db.rpc('importb2b_link_settlement_to_sale',{p_settlement_id:settlementId,p_sale_id:saleId});assert(r);return r.data; },
+    async linkReceivableSale(receivableId,saleId){ const r=await db.rpc('importb2b_link_receivable_to_sale',{p_receivable_id:receivableId,p_sale_id:saleId});assert(r);return r.data; },
+    async financeData(limit=400){
+      const [m,s,r,q,a,sales]=await Promise.all([
+        db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id,ars_equivalent,cash_holder,transfer_holder,usdt_holder,edited_at').order('occurred_at',{ascending:false}).limit(limit),
+        db.from('importb2b_settlement_control').select('*').order('expected_at',{ascending:true}).limit(200),
+        db.from('importb2b_receivable_control').select('*').order('created_at',{ascending:false}).limit(200),
+        db.from('quote_snapshots').select('buy_ars,sell_ars,source,captured_at').order('captured_at',{ascending:false}).limit(1),
+        db.from('audit_log').select('id,entity_type,entity_id,action,actor_id,old_data,new_data,created_at').in('entity_type',['movement','settlement','receivable']).order('created_at',{ascending:false}).limit(100),
+        db.from('importb2b_sales').select('id,sale_code,total_ars,sold_at,customer_id,status,original_payment_method').order('sold_at',{ascending:false}).limit(250)
+      ]);[m,s,r,q,a,sales].forEach(assert);
+      const movements=m.data||[], settlements=s.data||[], receivables=r.data||[];
+      const balances={cash:0,transfer:0,usdt:0};let income=0,expense=0;
+      for(const x of movements){
+        const sign=x.kind==='income'?1:-1;
+        if(x.currency==='USDT'&&x.payment_method==='usdt')balances.usdt+=sign*Number(x.amount||0);
+        if(x.currency==='ARS'&&x.payment_method==='efectivo')balances.cash+=sign*Number(x.amount||0);
+        if(x.currency==='ARS'&&x.payment_method==='transferencia')balances.transfer+=sign*Number(x.amount||0);
+        if(!['internal_conversion','internal_transfer'].includes(x.source_type)){
+          const val=Number(x.ars_equivalent ?? (x.currency==='ARS'?x.amount:0) ?? 0);
+          if(x.kind==='income')income+=val; else if(x.kind==='expense')expense+=val;
+        }
+      }
+      return {movements,settlements,receivables,quote:(q.data||[])[0]||null,audit:a.data||[],sales:sales.data||[],balances,income,expense,net:income-expense};
+    },
+    async receivablePayments(id){ const r=await db.from('receivable_payments').select('*').eq('receivable_id',id).order('created_at',{ascending:false});assert(r);return r.data||[]; },
+    async recentFinance(limit=250){ return this.financeData(limit); }
   };
 })();
