@@ -1,0 +1,19 @@
+-- IMPORTB2B Central — Fase 6.1
+-- Esta migración YA FUE APLICADA directamente al Supabase principal.
+-- Se conserva este archivo en GitHub como registro de versión.
+--
+-- Migraciones registradas en Supabase:
+--   importb2b_phase61_legacy_club_importer
+--   importb2b_phase61_map_rls_write
+--
+-- Cambios activos en la base:
+-- - legacy_source_id en importb2b_club_profiles / memberships / actions / reward_claims
+-- - importb2b_club_legacy_customer_map
+-- - importb2b_club_events
+-- - RLS de lectura/escritura para el mapa histórico
+-- - RPC autenticada public.importb2b_import_legacy_club(jsonb)
+-- - importb2b_club_ensure_profile continúa la numeración histórica IMP-xxxxxx
+--
+-- No volver a ejecutar manualmente este archivo: el frontend Fase 6.1 utiliza
+-- la RPC ya instalada para migrar los seis CSV del Club anterior de forma
+-- idempotente y sin publicar los CSV ni sus datos en GitHub.
