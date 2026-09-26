@@ -14,6 +14,10 @@
   let posRecentSales=[];
   let posSearch='';
   let posCategory='';
+  let posViewMode=localStorage.getItem('importb2b-pos-view')||'grid';
+  let posHolder=localStorage.getItem('importb2b-pos-holder')||'nahuel';
+  let posQuickPending=[];
+  let financeCache=null;
   let webOrderStatusFilter='pending';
   let operationsTab='purchases';
   let financeSearch='';
@@ -42,7 +46,11 @@
   function leave(){ window.currentUser=null; $('#appView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); }
   $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#loginError').textContent='';const {error}=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(error)$('#loginError').textContent=error.message});
   $('#logoutBtn').addEventListener('click',()=>db.auth.signOut());
-  $('#nav').addEventListener('click',e=>{const b=e.target.closest('button[data-view]');if(!b)return;setView(b.dataset.view)});
+  function closeMobileMenu(){document.querySelector('.sidebar')?.classList.remove('open');$('#mobileMenuBackdrop')?.classList.remove('open');$('#appView')?.classList.remove('mobile-menu-open')}
+  function openMobileMenu(){document.querySelector('.sidebar')?.classList.add('open');$('#mobileMenuBackdrop')?.classList.add('open');$('#appView')?.classList.add('mobile-menu-open')}
+  $('#mobileMenuBtn')?.addEventListener('click',()=>document.querySelector('.sidebar')?.classList.contains('open')?closeMobileMenu():openMobileMenu());
+  $('#mobileMenuBackdrop')?.addEventListener('click',closeMobileMenu);
+  $('#nav').addEventListener('click',e=>{const b=e.target.closest('button[data-view]');if(!b)return;closeMobileMenu();setView(b.dataset.view)});
   $('#globalSearch').addEventListener('input',e=>{
     const v=e.target.value;
     if(currentView==='products') renderProducts(v);
@@ -55,7 +63,13 @@
 
   async function render(){
     const titles={dashboard:'Inicio',sell:'Vender',products:'Productos / Stock',orders:'Operaciones',customers:'Clientes',club:'Club',pdfs:'PDF / Catálogos',finance:'Finanzas',catalog:'Catálogo / Web',imports:'Importar Kyte'};
-    $('#viewTitle').textContent=titles[currentView]||'IMPORTB2B'; content.innerHTML='<div class="empty">Cargando…</div>';
+    const searchPlaceholders={products:'Buscar producto, SKU, categoría…',customers:'Buscar cliente, teléfono o Instagram…',club:'Buscar miembro del Club…',pdfs:'Buscar producto para el PDF…'};
+    $('#viewTitle').textContent=titles[currentView]||'IMPORTB2B';
+    const gs=$('#globalSearch'),gsWrap=document.querySelector('.global-search');
+    const showGlobalSearch=Object.prototype.hasOwnProperty.call(searchPlaceholders,currentView);
+    if(gsWrap)gsWrap.classList.toggle('hidden',!showGlobalSearch);
+    if(gs&&showGlobalSearch)gs.placeholder=searchPlaceholders[currentView];
+    content.innerHTML='<div class="empty">Cargando…</div>';
     try{
       if(currentView==='dashboard') await renderDashboard();
       else if(currentView==='sell') await renderSell();
@@ -95,7 +109,7 @@
         <button class="dash-alert" data-go="orders"><span>Pedidos del catálogo</span><b>${number(d.webPending)}</b><small>${d.webPending?'Requieren atención':'Sin pendientes'}</small></button>
         <button class="dash-alert" data-go="finance" data-finance="settlements"><span>Dinero a liquidar</span><b>${money(d.settlements)}</b><small>${number(d.settlementCount)} operaciones</small></button>
         <button class="dash-alert" data-go="finance" data-finance="receivables"><span>Dinero a cobrar</span><b>${money(d.receivable)}</b><small>${number(d.receivableCount)} cuentas</small></button>
-        <button class="dash-alert" data-go="products"><span>Stock crítico</span><b>${number(d.lowStock)}</b><small>Variantes en mínimo</small></button>
+        <button class="dash-alert" data-go="products"><span>Stock crítico</span><b>${number(d.lowStock)}</b><small>Variantes en mínimo</small></button>${d.quickPending?`<button class="dash-alert quick-alert" data-go="sell"><span>Ventas fugaces</span><b>${number(d.quickPending)}</b><small>Stock pendiente de vincular</small></button>`:''}
       </section>
 
       <section class="dashboard-mini-stats">
@@ -131,68 +145,75 @@
     return {subtotal,shipping,discount,adjustment,total:Math.max(0,base+adjustment),method};
   }
   async function renderSell(){
-    const [cats,products,methods,customers,recent]=await Promise.all([DB.categories(),DB.products('','','available'),DB.paymentMethods(),DB.customers(''),DB.recentSales(12)]);
-    posProducts=products;posMethods=methods;posCustomers=customers;posRecentSales=recent;
+    const [cats,products,methods,customers,recent,pendingQuick]=await Promise.all([DB.categories(),DB.products('','','all'),DB.paymentMethods(),DB.customers(''),DB.recentSales(20),DB.pendingQuickSales()]);
+    posProducts=products;posMethods=methods;posCustomers=customers;posRecentSales=recent;posQuickPending=pendingQuick;
     const currentCustomer=$('#posCustomer')?.value||'';
     const currentMethod=$('#posPayment')?.value||methods[0]?.id||'';
     const currentShipping=$('#posShipping')?.value||'0',currentDiscount=$('#posDiscount')?.value||'0',currentNotes=$('#posNotes')?.value||'';
     content.innerHTML=`
+      ${pendingQuick.length?`<div class="notice quick-sale-warning"><span><b>⚡ ${pendingQuick.length} venta${pendingQuick.length===1?'':'s'} fugaz${pendingQuick.length===1?'':'es'} con stock pendiente</b><small>El dinero ya fue registrado. Falta vincular el artículo para descontar inventario.</small></span><button id="reviewQuickSales" class="btn ghost tiny">Vincular ahora</button></div>`:''}
       <section class="pos-catalog card pos-catalog-full">
-        <div class="section-title"><div><span class="eyebrow">VENTA RÁPIDA</span><h3>Productos</h3></div><span class="pill blue">${products.reduce((a,p)=>a+p.variants.filter(v=>Number(v.stock.available)>0).length,0)} variantes disponibles</span></div>
-        <div class="toolbar"><input id="posSearch" value="${esc(posSearch)}" placeholder="Buscar producto, SKU, modelo, color, talle o sabor…"><select id="posCategory"><option value="">Todas las categorías</option>${cats.map(c=>`<option value="${esc(c)}" ${c===posCategory?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
-        <div id="posCatalogGrid" class="pos-product-grid pos-product-grid-wide"></div>
+        <div class="section-title"><div><span class="eyebrow">VENDER</span><h3>Productos</h3></div><span class="pill blue">${products.reduce((a,p)=>a+p.variants.filter(v=>Number(v.stock.available)>0).length,0)} variantes con stock</span></div>
+        <div class="pos-shell-tools">
+          <div class="pos-quick-tools"><input id="posSearch" value="${esc(posSearch)}" placeholder="Buscar producto, SKU, modelo, color, talle o sabor…"><button id="quickSaleBtn" class="pos-icon-btn quick" title="Venta fugaz">⚡</button><button id="posViewToggle" class="pos-icon-btn ${posViewMode==='grid'?'active':''}" title="Cambiar vista">${posViewMode==='grid'?'☷':'▦'}</button></div>
+          <div id="posCategoryStrip" class="pos-category-strip"><button class="pos-category-chip ${!posCategory?'active':''}" data-pos-cat="">TODOS</button>${cats.map(c=>`<button class="pos-category-chip ${c===posCategory?'active':''}" data-pos-cat="${esc(c)}">${esc(c).toUpperCase()}</button>`).join('')}</div>
+        </div>
+        <div id="posCatalogGrid" class="pos-product-grid pos-product-grid-wide ${posViewMode==='grid'?'cards-view':'list-view'}"></div>
       </section>
 
       <button id="cartToggle" class="cart-launcher" type="button" aria-label="Abrir carrito">
-        <span class="cart-launcher-count" id="cartLauncherCount">0</span>
-        <span class="cart-launcher-copy"><small>CARRITO</small><b id="cartLauncherLabel">Venta vacía</b></span>
-        <strong id="cartLauncherTotal">${money(0)}</strong>
+        <span class="cart-launcher-count" id="cartLauncherCount">0</span><span class="cart-launcher-copy"><small>CARRITO</small><b id="cartLauncherLabel">Venta vacía</b></span><strong id="cartLauncherTotal">${money(0)}</strong>
       </button>
       <div id="cartBackdrop" class="cart-backdrop"></div>
       <aside id="posCartDrawer" class="cart-drawer" aria-hidden="true">
-        <div class="cart-drawer-head">
-          <div><span class="eyebrow">CARRITO</span><h3>Venta actual</h3></div>
-          <div class="cart-drawer-head-actions"><span id="cartCount" class="pill">0</span><button id="cartClose" class="drawer-close" type="button">×</button></div>
-        </div>
+        <div class="cart-drawer-head"><div><span class="eyebrow">CARRITO</span><h3>Venta actual</h3></div><div class="cart-drawer-head-actions"><span id="cartCount" class="pill">0</span><button id="cartClose" class="drawer-close" type="button">×</button></div></div>
         <div class="cart-drawer-body">
           <div class="pos-customer-row"><label>Cliente<select id="posCustomer"><option value="">Venta sin cliente</option>${customers.map(c=>`<option value="${c.id}" ${c.id===currentCustomer?'selected':''}>${esc(c.full_name)}${c.phone?` · ${esc(c.phone)}`:''}</option>`).join('')}</select></label><button id="quickCustomer" class="btn ghost tiny">+ Cliente</button></div>
           <div id="cartItems" class="cart-items"></div>
           <div class="pos-fields"><label>Envío<input id="posShipping" type="number" min="0" step="100" value="${esc(currentShipping)}"></label><label>Descuento<input id="posDiscount" type="number" min="0" step="100" value="${esc(currentDiscount)}"></label></div>
           <label>Forma de pago<select id="posPayment">${methods.map(m=>`<option value="${m.id}" ${m.id===currentMethod?'selected':''}>${esc(m.name)}${Number(m.adjustment_value)?` · ${m.adjustment_direction==='discount'?'-':'+'}${number(m.adjustment_value)}${m.adjustment_kind==='percent'?'%':''}`:''}</option>`).join('')}</select></label>
           <div id="paymentHint" class="payment-hint"></div>
-          <label>Nota<textarea id="posNotes" rows="2" placeholder="Opcional">${esc(currentNotes)}</textarea></label>
-          <div id="cartTotals"></div>
+          <label id="posHolderWrap">¿Quién recibe el dinero?<select id="posHolder"><option value="nahuel" ${posHolder==='nahuel'?'selected':''}>Nahuel</option><option value="esteban" ${posHolder==='esteban'?'selected':''}>Esteban</option></select></label>
+          <label>Nota<textarea id="posNotes" rows="2" placeholder="Opcional">${esc(currentNotes)}</textarea></label><div id="cartTotals"></div>
         </div>
         <div class="cart-drawer-footer"><button id="finishSale" class="btn primary full">Finalizar venta</button></div>
       </aside>
-
       <section class="card" style="margin-top:14px"><div class="section-title"><div><span class="eyebrow">HISTORIAL</span><h3>Últimas ventas</h3></div></div><div id="recentSales"></div></section>`;
-    renderPosCatalog(); renderCart(); renderRecentSales();
+    renderPosCatalog();renderCart();renderRecentSales();
     $('#posSearch').addEventListener('input',e=>{posSearch=e.target.value;$('#globalSearch').value=posSearch;renderPosCatalog()});
-    $('#posCategory').addEventListener('change',e=>{posCategory=e.target.value;renderPosCatalog()});
+    document.querySelectorAll('[data-pos-cat]').forEach(b=>b.addEventListener('click',()=>{posCategory=b.dataset.posCat||'';renderSell()}));
+    $('#posViewToggle').addEventListener('click',()=>{posViewMode=posViewMode==='grid'?'list':'grid';localStorage.setItem('importb2b-pos-view',posViewMode);renderPosCatalog();const b=$('#posViewToggle');b.textContent=posViewMode==='grid'?'☷':'▦';b.classList.toggle('active',posViewMode==='grid')});
     ['#posShipping','#posDiscount','#posPayment'].forEach(sel=>$(sel).addEventListener('input',renderCartTotals));
-    $('#quickCustomer').addEventListener('click',()=>openCustomerEditor(null,true));
-    $('#finishSale').addEventListener('click',finishSale);
-    $('#cartToggle').addEventListener('click',openCartDrawer);
-    $('#cartClose').addEventListener('click',closeCartDrawer);
-    $('#cartBackdrop').addEventListener('click',closeCartDrawer);
+    $('#posHolder').addEventListener('change',e=>{posHolder=e.target.value;localStorage.setItem('importb2b-pos-holder',posHolder)});
+    $('#quickCustomer').addEventListener('click',()=>openCustomerEditor(null,true));$('#finishSale').addEventListener('click',finishSale);$('#cartToggle').addEventListener('click',openCartDrawer);$('#cartClose').addEventListener('click',closeCartDrawer);$('#cartBackdrop').addEventListener('click',closeCartDrawer);
+    $('#quickSaleBtn').addEventListener('click',openQuickSale);
+    $('#reviewQuickSales')?.addEventListener('click',()=>openPendingQuickSales());
   }
-  function openCartDrawer(){
-    $('#posCartDrawer')?.classList.add('open'); $('#cartBackdrop')?.classList.add('open'); $('#posCartDrawer')?.setAttribute('aria-hidden','false'); document.body.classList.add('cart-open');
-  }
-  function closeCartDrawer(){
-    $('#posCartDrawer')?.classList.remove('open'); $('#cartBackdrop')?.classList.remove('open'); $('#posCartDrawer')?.setAttribute('aria-hidden','true'); document.body.classList.remove('cart-open');
-  }
+  function openCartDrawer(){$('#posCartDrawer')?.classList.add('open');$('#cartBackdrop')?.classList.add('open');$('#posCartDrawer')?.setAttribute('aria-hidden','false');document.body.classList.add('cart-open')}
+  function closeCartDrawer(){$('#posCartDrawer')?.classList.remove('open');$('#cartBackdrop')?.classList.remove('open');$('#posCartDrawer')?.setAttribute('aria-hidden','true');document.body.classList.remove('cart-open')}
   function renderPosCatalog(){
-    const el=$('#posCatalogGrid'); if(!el)return;
-    const q=posSearch.trim().toLowerCase();
+    const el=$('#posCatalogGrid');if(!el)return;const q=posSearch.trim().toLowerCase();
     const rows=posProducts.filter(p=>(!posCategory||p.category===posCategory)&&(!q||[p.name,p.sku,p.category,...p.variants.flatMap(v=>[v.variant_name,v.sku])].join(' ').toLowerCase().includes(q)));
-    el.innerHTML=rows.map(p=>{
-      const variants=p.variants.filter(v=>Number(v.stock.available)>0);
-      if(!variants.length)return'';
-      return `<article class="pos-product-card"><div class="pos-product-head"><div><b>${esc(p.name)}</b><small>${esc(p.category||'')}</small></div><span class="pill ${variants.reduce((a,v)=>a+Number(v.stock.available),0)>0?'green':'red'}">${number(variants.reduce((a,v)=>a+Number(v.stock.available),0))}</span></div><div class="pos-variants">${variants.map(v=>`<button class="variant-add" data-pid="${p.id}" data-vid="${v.id}"><span><b>${esc(v.variant_name||'Única')}</b><small>${esc(v.sku||'Sin SKU')} · stock ${number(v.stock.available)}</small></span><strong>${money(v.price_ars)}</strong><em>+</em></button>`).join('')}</div></article>`;
-    }).join('')||'<div class="empty">No hay productos disponibles para esta búsqueda.</div>';
-    el.querySelectorAll('.variant-add').forEach(b=>b.addEventListener('click',()=>addToCart(b.dataset.pid,b.dataset.vid)));
+    el.className=`pos-product-grid pos-product-grid-wide ${posViewMode==='grid'?'cards-view':'list-view'}`;
+    el.innerHTML=rows.map(p=>{const variants=p.variants.filter(v=>Number(v.stock.available)>0),total=variants.reduce((a,v)=>a+Number(v.stock.available||0),0),prices=(variants.length?variants:p.variants).map(v=>Number(v.price_ars||0)).filter(Boolean),price=prices.length?Math.min(...prices):0;const img=p.thumbnail_url||p.primary_image_url;return `<article class="pos-product-card-v63 ${total<=0?'out':''}" data-product="${p.id}"><div class="pos-product-photo">${img?`<img loading="lazy" decoding="async" src="${esc(img)}" alt="${esc(p.name)}">`:'<div class="pos-product-placeholder">IB</div>'}</div><div class="pos-product-copy"><b>${esc(p.name)}</b><small>${esc(p.category||'')}</small><strong>${price?money(price):'Consultar'}</strong><small class="stock-text ${total<=0?'out':total<=1?'low':'ok'}">${total<=0?'Agotado':`Stock: ${number(total)}`}</small></div></article>`}).join('')||'<div class="empty">No hay productos para esta búsqueda.</div>';
+    el.querySelectorAll('[data-product]').forEach(card=>card.addEventListener('click',()=>{const p=posProducts.find(x=>x.id===card.dataset.product);if(!p)return;const vars=p.variants.filter(v=>Number(v.stock.available)>0);if(!vars.length)return alert('Producto agotado');if(vars.length===1)addToCart(p.id,vars[0].id);else openVariantPicker(p,vars)}));
+  }
+  function openVariantPicker(p,variants){
+    openModal(`<div class="section-title"><div><span class="eyebrow">OPCIONES</span><h3>${esc(p.name)}</h3><small class="muted">Elegí la variante disponible</small></div><button class="modal-close modal-x">×</button></div><div class="variant-sheet-list">${variants.map(v=>`<button class="variant-sheet-option" data-variant-pick="${v.id}"><i class="variant-box">${esc((v.variant_name||'U').slice(0,5))}</i><span><b>${esc(v.variant_name||'Única')}</b><small>${esc(v.sku||'Sin SKU')}</small></span><strong>${money(v.price_ars)}<small>Stock: ${number(v.stock.available)}</small></strong></button>`).join('')}</div>`);
+    $('#modalLayer')?.classList.add('variant-sheet-layer');document.querySelectorAll('[data-variant-pick]').forEach(b=>b.addEventListener('click',()=>{addToCart(p.id,b.dataset.variantPick);closeModal();openCartDrawer()}));
+  }
+  function openQuickSale(){
+    const method=posMethods.find(x=>x.finance_mode==='movement')||posMethods[0];
+    openModal(`<div class="section-title"><div><span class="eyebrow">⚡ VENTA FUGAZ</span><h3>Registrar sin buscar producto</h3><p class="muted">El dinero se registra ahora. El stock queda pendiente para vincular después.</p></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Monto<input id="qsAmount" type="number" min="1" step="100" inputmode="numeric"></label><label>Forma de pago<select id="qsPayment">${posMethods.map(m=>`<option value="${m.id}" ${m.id===method?.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label><label id="qsHolderWrap">¿Quién recibe?<select id="qsHolder"><option value="nahuel">Nahuel</option><option value="esteban">Esteban</option></select></label><label>Cliente (opcional)<select id="qsCustomer"><option value="">Sin cliente</option>${posCustomers.map(c=>`<option value="${c.id}">${esc(c.full_name)}</option>`).join('')}</select></label></div><label style="margin-top:12px">Descripción<input id="qsNotes" placeholder="Ej. Camiseta Argentina / perfume / venta rápida"></label><div class="notice" style="margin-top:12px">⚠ Quedará una alerta de <b>stock pendiente de vincular</b>.</div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveQuickSale" class="btn primary">Registrar venta fugaz</button></div>`);
+    const sync=()=>{const m=posMethods.find(x=>x.id===$('#qsPayment').value);$('#qsHolderWrap').classList.toggle('hidden',m?.finance_mode!=='movement')};$('#qsPayment').addEventListener('change',sync);sync();
+    $('#saveQuickSale').addEventListener('click',async()=>{const amount=Number($('#qsAmount').value||0),m=posMethods.find(x=>x.id===$('#qsPayment').value);if(amount<=0)return alert('Ingresá un monto');if(m?.finance_mode==='receivable'&&!$('#qsCustomer').value)return alert('Cuenta corriente requiere cliente');try{const r=await DB.quickSale({amount,paymentMethodId:m.id,holder:m.finance_mode==='movement'?$('#qsHolder').value:null,customerId:$('#qsCustomer').value||null,notes:$('#qsNotes').value.trim()||null});closeModal();await renderSell();alert(`${r.sale_code} registrada. Recordá vincular el producto para descontar stock.`)}catch(e){alert(e.message)}});
+  }
+  function openPendingQuickSales(){
+    openModal(`<div class="section-title"><div><span class="eyebrow">STOCK PENDIENTE</span><h3>Ventas fugaces</h3></div><button class="modal-close modal-x">×</button></div><div class="list">${posQuickPending.map(s=>`<div class="row"><span><b>${esc(s.sale_code)} · ${money(s.total_ars)}</b><small class="muted">${safeDate(s.sold_at)} · ${esc(s.notes||'Sin descripción')}</small></span><button class="btn tiny primary link-quick-stock" data-id="${s.id}">Vincular stock</button></div>`).join('')||'<div class="empty">Todo vinculado.</div>'}</div>`);document.querySelectorAll('.link-quick-stock').forEach(b=>b.addEventListener('click',()=>openQuickSaleStockLink(b.dataset.id)));
+  }
+  function openQuickSaleStockLink(saleId){
+    const options=posProducts.flatMap(p=>p.variants.filter(v=>Number(v.stock.available)>0).map(v=>({p,v})));const sale=posQuickPending.find(x=>x.id===saleId);
+    openModal(`<div class="section-title"><div><span class="eyebrow">VINCULAR STOCK</span><h3>${esc(sale?.sale_code||'Venta fugaz')}</h3><p class="muted">Elegí el artículo que salió del inventario.</p></div><button class="modal-close modal-x">×</button></div><label>Producto / variante<select id="qslVariant"><option value="">Seleccionar…</option>${options.map(x=>`<option value="${x.v.id}">${esc(x.p.name)} · ${esc(x.v.variant_name)} · stock ${number(x.v.stock.available)}</option>`).join('')}</select></label><label>Cantidad<input id="qslQty" type="number" min="1" step="1" value="1"></label><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveQuickLink" class="btn primary">Descontar stock y vincular</button></div>`);$('#saveQuickLink').addEventListener('click',async()=>{if(!$('#qslVariant').value)return alert('Elegí una variante');try{await DB.linkQuickSaleItem(saleId,$('#qslVariant').value,Number($('#qslQty').value||1));closeModal();await renderSell()}catch(e){alert(e.message)}});
   }
   function addToCart(productId,variantId){
     const p=posProducts.find(x=>x.id===productId),v=p?.variants.find(x=>x.id===variantId); if(!p||!v)return;
@@ -220,21 +241,19 @@
     renderCartTotals();
   }
   function renderCartTotals(){
-    const box=$('#cartTotals');if(!box)return; const t=calcTotals(),m=t.method;
-    $('#paymentHint').innerHTML=m?`${m.finance_mode==='settlement'?'Se registra como <b>dinero a liquidar</b>.':m.finance_mode==='receivable'?'Se registra como <b>cuenta por cobrar</b>.':'Se registra automáticamente como <b>ingreso</b> en Finanzas.'}`:'';
+    const box=$('#cartTotals');if(!box)return;const t=calcTotals(),m=t.method;
+    $('#paymentHint').innerHTML=m?`${m.finance_mode==='settlement'?'Se registra como <b>dinero a liquidar</b>.':m.finance_mode==='receivable'?'Se registra como <b>cuenta por cobrar</b>.':`Se registra como <b>ingreso</b> y queda asignado a quien recibe el dinero.`}`:'';
+    const holderWrap=$('#posHolderWrap');if(holderWrap)holderWrap.classList.toggle('hidden',m?.finance_mode!=='movement');
     box.innerHTML=`<div class="totals-list"><div><span>Subtotal</span><b>${money(t.subtotal)}</b></div><div><span>Descuento</span><b>-${money(t.discount)}</b></div><div><span>Envío</span><b>${money(t.shipping)}</b></div>${t.adjustment?`<div><span>${t.adjustment>0?'Recargo':'Descuento'} ${esc(m?.name||'')}</span><b>${t.adjustment>0?'+':''}${money(t.adjustment)}</b></div>`:''}<div class="grand-total"><span>Total</span><strong>${money(t.total)}</strong></div></div>`;
-    const btn=$('#finishSale');if(btn){btn.disabled=!saleCart.length||!m;btn.textContent=`Finalizar ${money(t.total)}`}
-    if($('#cartLauncherTotal')) $('#cartLauncherTotal').textContent=money(t.total);
+    const btn=$('#finishSale');if(btn){btn.disabled=!saleCart.length||!m;btn.textContent=`Finalizar ${money(t.total)}`}if($('#cartLauncherTotal'))$('#cartLauncherTotal').textContent=money(t.total);
   }
   async function finishSale(){
-    if(!saleCart.length)return; const t=calcTotals(); if(!t.method)return alert('Elegí una forma de pago');
-    const customerId=$('#posCustomer').value||null; if(t.method.finance_mode==='receivable'&&!customerId)return alert('Cuenta corriente requiere seleccionar un cliente');
-    if(!confirm(`Confirmar venta por ${money(t.total)} con ${t.method.name}?`))return;
-    const btn=$('#finishSale');btn.disabled=true;btn.textContent='Registrando…'; const snapshot=saleCart.map(x=>({...x}));
-    try{
-      const result=await DB.completeSale({customerId,items:snapshot.map(x=>({variant_id:x.variantId,quantity:x.qty,unit_price_ars:x.price})),paymentMethodId:t.method.id,shipping:t.shipping,discount:t.discount,notes:$('#posNotes').value.trim()});
-      const customer=posCustomers.find(x=>x.id===customerId)||null; saleCart=[]; await renderSell(); openReceipt(result,snapshot,customer);
-    }catch(e){alert(e.message);btn.disabled=false;renderCartTotals()}
+    if(!saleCart.length)return;const t=calcTotals();if(!t.method)return alert('Elegí una forma de pago');
+    const customerId=$('#posCustomer').value||null;if(t.method.finance_mode==='receivable'&&!customerId)return alert('Cuenta corriente requiere seleccionar un cliente');
+    const holder=t.method.finance_mode==='movement'?($('#posHolder')?.value||posHolder):null;if(t.method.finance_mode==='movement'&&!holder)return alert('Elegí quién recibe el dinero');
+    if(!confirm(`Confirmar venta por ${money(t.total)} con ${t.method.name}${holder?` · recibe ${holder==='nahuel'?'Nahuel':'Esteban'}`:''}?`))return;
+    const btn=$('#finishSale');btn.disabled=true;btn.textContent='Registrando…';const snapshot=saleCart.map(x=>({...x}));
+    try{const result=await DB.completeSale({customerId,items:snapshot.map(x=>({variant_id:x.variantId,quantity:x.qty,unit_price_ars:x.price})),paymentMethodId:t.method.id,shipping:t.shipping,discount:t.discount,notes:$('#posNotes').value.trim(),holder});const customer=posCustomers.find(x=>x.id===customerId)||null;saleCart=[];await renderSell();openReceipt(result,snapshot,customer)}catch(e){alert(e.message);btn.disabled=false;renderCartTotals()}
   }
   function openReceipt(r,items,customer){
     openModal(`<div class="receipt"><div class="receipt-brand"><img src="./assets/img/logo-importb2b.png" alt="IMPORTB2B"><div><span class="eyebrow">VENTA REGISTRADA</span><h3>Recibo ${esc(r.sale_code)}</h3></div></div><div class="receipt-meta"><span>${safeDate(r.sold_at)}</span><span>${customer?esc(customer.full_name):'Consumidor final'}</span></div><div class="receipt-lines">${items.map(x=>`<div><span>${x.qty}× ${esc(x.name)}${x.variant&&x.variant!=='Única'?` · ${esc(x.variant)}`:''}</span><b>${money(x.qty*x.price)}</b></div>`).join('')}</div><div class="receipt-totals"><div><span>Subtotal</span><b>${money(r.subtotal_ars)}</b></div><div><span>Descuento</span><b>-${money(r.discount_ars)}</b></div><div><span>Envío</span><b>${money(r.shipping_ars)}</b></div>${Number(r.adjustment_ars)?`<div><span>Ajuste ${esc(r.payment_method)}</span><b>${Number(r.adjustment_ars)>0?'+':''}${money(r.adjustment_ars)}</b></div>`:''}<div class="grand-total"><span>Total</span><strong>${money(r.total_ars)}</strong></div></div><div class="notice good-notice">${r.finance_mode==='settlement'?'Registrada en dinero a liquidar.':r.finance_mode==='receivable'?'Registrada como cuenta por cobrar.':'Ingreso registrado automáticamente en Control Financiero.'}</div><div class="modal-actions"><button class="btn ghost modal-close">Cerrar</button><button id="printReceipt" class="btn ghost">Imprimir</button><button id="newSale" class="btn primary">Nueva venta</button></div></div>`);
@@ -248,15 +267,18 @@
   async function openSaleDetail(id){
     try{
       const s=await DB.saleDetail(id);
-      openModal(`<div class="section-title"><div><span class="eyebrow">VENTA</span><h3>${esc(s.sale_code||'Detalle')}</h3><small class="muted">${safeDate(s.sold_at||s.created_at)} · ${esc(s.original_payment_method||'')}</small></div><button class="modal-close modal-x">×</button></div><div class="receipt-lines">${(s.items||[]).map(i=>`<div><span>${number(i.quantity)}× ${esc(i.original_item_name)}</span><b>${money(i.line_total_ars)}</b></div>`).join('')||'<div class="empty">Sin productos.</div>'}</div><div class="order-total-lines"><div><span>Subtotal</span><b>${money(s.subtotal_ars)}</b></div><div><span>Descuento</span><b>-${money(s.discount_ars)}</b></div><div><span>Envío</span><b>${money(s.shipping_ars)}</b></div>${Number(s.fee_ars)?`<div><span>Ajuste de pago</span><b>${money(s.fee_ars)}</b></div>`:''}<div class="grand"><span>Total</span><b>${money(s.total_ars)}</b></div></div>${s.notes?`<div class="notice" style="margin-top:12px">${esc(s.notes)}</div>`:''}<div class="modal-actions"><button class="btn ghost modal-close">Cerrar</button>${s.status==='completed'?`<button id="cancelSaleFromDetail" class="btn danger-btn">Anular venta</button>`:''}</div>`);
+      openModal(`<div class="section-title"><div><span class="eyebrow">VENTA</span><h3 class="${s.status==='cancelled'?'sale-cancelled-row':''}">${esc(s.sale_code||'Detalle')}</h3><small class="muted">${safeDate(s.sold_at||s.created_at)} · ${esc(s.original_payment_method||'')}</small></div><button class="modal-close modal-x">×</button></div>${s.stock_link_status==='pending'?`<div class="notice">⚡ Venta fugaz: el dinero está registrado pero falta vincular el producto al stock.</div>`:''}<div class="receipt-lines">${(s.items||[]).map(i=>`<div><span>${number(i.quantity)}× ${esc(i.original_item_name)}</span><b>${money(i.line_total_ars)}</b></div>`).join('')||'<div class="empty">Sin productos vinculados.</div>'}</div><div class="order-total-lines"><div><span>Subtotal</span><b>${money(s.subtotal_ars)}</b></div><div><span>Descuento</span><b>-${money(s.discount_ars)}</b></div><div><span>Envío</span><b>${money(s.shipping_ars)}</b></div>${Number(s.fee_ars)?`<div><span>Ajuste de pago</span><b>${money(s.fee_ars)}</b></div>`:''}<div class="grand"><span>Total</span><b>${money(s.total_ars)}</b></div></div>${s.notes?`<div class="notice" style="margin-top:12px">${esc(s.notes)}</div>`:''}<div class="modal-actions"><button class="btn ghost modal-close">Cerrar</button>${s.status==='completed'&&s.stock_link_status==='pending'?`<button id="linkStockFromDetail" class="btn ghost">Vincular stock</button>`:''}${s.status==='completed'?`<button id="cancelSaleFromDetail" class="btn danger-btn">Anular venta</button>`:''}</div>`);
+      $('#linkStockFromDetail')?.addEventListener('click',()=>{closeModal();openQuickSaleStockLink(s.id)});
       $('#cancelSaleFromDetail')?.addEventListener('click',async()=>{const reason=prompt(`Motivo para anular ${s.sale_code}:`,'Error / devolución');if(reason===null)return;if(!confirm('Esto devolverá el stock y revertirá el efecto financiero. ¿Continuar?'))return;try{await DB.cancelSale(s.id,reason);closeModal();if(currentView==='finance')await renderFinance();else await renderSell()}catch(e){alert(e.message)}});
     }catch(e){alert(e.message)}
   }
 
   function renderRecentSales(){
     const el=$('#recentSales');if(!el)return;
-    el.innerHTML=`<div class="table-wrap"><table class="table"><thead><tr><th>Venta</th><th>Fecha</th><th>Cliente</th><th>Pago</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody>${posRecentSales.map(s=>`<tr><td><b>${esc(s.sale_code)}</b></td><td>${safeDate(s.sold_at)}</td><td>${esc(s.customer?.full_name||'Consumidor final')}</td><td>${esc(s.payments?.[0]?.method?.name||s.original_payment_method||'—')}</td><td>${money(s.total_ars)}</td><td>${statusPill(s.status)}</td><td>${s.status==='completed'?`<button class="btn tiny danger-btn cancel-sale" data-id="${s.id}" data-code="${esc(s.sale_code)}">Anular</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Aún no hay ventas en Central.</td></tr>'}</tbody></table></div>`;
-    el.querySelectorAll('.cancel-sale').forEach(b=>b.addEventListener('click',async()=>{const reason=prompt(`Motivo para anular ${b.dataset.code}:`,'Error / devolución');if(reason===null)return;if(!confirm('Esto devolverá el stock y revertirá el efecto financiero. ¿Continuar?'))return;try{await DB.cancelSale(b.dataset.id,reason);await renderSell()}catch(e){alert(e.message)}}));
+    el.innerHTML=`<div class="table-wrap"><table class="table"><thead><tr><th>Venta</th><th>Fecha</th><th>Cliente</th><th>Pago</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody>${posRecentSales.map(s=>`<tr class="${s.status==='cancelled'?'sale-cancelled-row':''}"><td><button class="btn tiny ghost open-recent-sale" data-id="${s.id}">${esc(s.sale_code)}</button>${s.stock_link_status==='pending'?` <span class="pill stock-pending-pill">Stock pendiente</span>`:''}</td><td>${safeDate(s.sold_at)}</td><td>${esc(s.customer?.full_name||'Consumidor final')}</td><td>${esc(s.payments?.[0]?.method?.name||s.original_payment_method||'—')}</td><td>${money(s.total_ars)}</td><td>${statusPill(s.status)}</td><td>${s.status==='completed'?(s.stock_link_status==='pending'?`<button class="btn tiny ghost link-quick-sale" data-id="${s.id}">Vincular</button> `:'')+`<button class="btn tiny danger-btn cancel-sale" data-id="${s.id}" data-code="${esc(s.sale_code)}">Anular</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Aún no hay ventas en Central.</td></tr>'}</tbody></table></div>`;
+    el.querySelectorAll('.open-recent-sale').forEach(b=>b.addEventListener('click',()=>openSaleDetail(b.dataset.id)));
+    el.querySelectorAll('.link-quick-sale').forEach(b=>b.addEventListener('click',()=>openQuickSaleStockLink(b.dataset.id)));
+    el.querySelectorAll('.cancel-sale').forEach(b=>b.addEventListener('click',async()=>{const reason=prompt(`Motivo para anular ${b.dataset.code}:`,'Error / devolución');if(reason===null)return;if(!confirm('Esto devolverá el stock vinculado y revertirá el dinero en Finanzas. La venta seguirá visible como CANCELADA. ¿Continuar?'))return;try{await DB.cancelSale(b.dataset.id,reason);await renderSell()}catch(e){alert(e.message)}}));
   }
 
   /* -------------------- PRODUCTS -------------------- */
@@ -272,15 +294,21 @@
     const [p,cats]=await Promise.all([DB.productDetail(productId),DB.categories()]);
     const vape=String(p.category||'').toLowerCase()==='vapers';
     const totalAvailable=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0);
-    const imageCards=(p.images||[]).map(img=>`<div class="product-image-card ${img.is_primary?'primary':''}"><img src="${esc(img.image_url)}" alt="${esc(img.alt_text||p.name)}"><div class="product-image-actions">${img.is_primary?'<span class="pill green">Principal</span>':`<button class="btn tiny ghost set-primary-image" data-img="${img.id}">Principal</button>`}<button class="btn tiny danger-btn delete-product-image" data-img="${img.id}">Eliminar</button></div></div>`).join('');
+    const imageCards=(p.images||[]).map(img=>`<div class="product-image-card ${img.is_primary?'primary':''} ${img.thumbnail_url?'optimized':''}"><img src="${esc(img.thumbnail_url||img.image_url)}" alt="${esc(img.alt_text||p.name)}"><div class="product-image-actions">${img.is_primary?'<span class="pill green">Principal</span>':`<button class="btn tiny ghost set-primary-image" data-img="${img.id}">Principal</button>`}<button class="btn tiny danger-btn delete-product-image" data-img="${img.id}">Eliminar</button></div></div>`).join('');
     const rows=p.variants.map(v=>`<tr data-variant="${v.id}"><td><input class="v-name" value="${esc(v.variant_name)}"></td><td><input class="v-sku" value="${esc(v.sku||'')}"></td><td><input class="v-cost" type="number" step="0.01" value="${Number(v.cost_ars||0)}"></td><td><input class="v-price" type="number" step="0.01" value="${Number(v.price_ars||0)}"></td><td><input class="v-min" type="number" step="1" value="${Number(v.stock_min||0)}"></td><td><b>${number(v.stock.on_hand)}</b><br><small class="muted">disp. ${number(v.stock.available)}</small></td><td><button class="btn tiny ghost adjust-stock" data-vid="${v.id}" data-current="${Number(v.stock.on_hand||0)}">Ajustar</button></td></tr>`).join('');
-    openModal(`<div class="section-title"><div><span class="eyebrow">PRODUCTO</span><h3>Editar producto</h3><small class="muted">${number(totalAvailable)} unidades disponibles</small></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Nombre<input id="epName" value="${esc(p.name)}"></label><label>Categoría<select id="epCategory">${cats.map(c=>`<option value="${esc(c)}" ${c===p.category?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label>SKU general<input id="epSku" value="${esc(p.sku||'')}"></label><label class="check"><input id="epCatalog" type="checkbox" ${p.catalog_visible?'checked':''}> Visible en catálogo</label></div><div class="section-title product-variant-title" style="margin-top:18px"><div><h3>${vape?'Sabores':'Variantes'}</h3><small class="muted">${vape?'Cada sabor comparte el mismo modelo de Vaper.':'Color, talle, modelo o número deben vivir como variantes del mismo producto.'}</small></div><div class="product-editor-actions"><button id="mergeProduct" class="btn ghost">Unificar otro producto</button><button id="addVariant" class="btn ghost">+ ${vape?'Sabor':'Variante'}</button></div></div><div class="table-wrap"><table class="table compact"><thead><tr><th>${vape?'Sabor':'Variante'}</th><th>SKU</th><th>Costo</th><th>Precio</th><th>Mín.</th><th>Stock físico</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">Sin variantes.</td></tr>'}</tbody></table></div><div class="product-images-section"><div class="section-title"><div><h3>Fotos del catálogo</h3><small class="muted">Se usan automáticamente en el catálogo público.</small></div><label class="btn ghost upload-image-label">+ Subir fotos<input id="productImageUpload" type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple hidden></label></div><div class="product-image-grid">${imageCards||'<div class="empty">Todavía no hay fotos cargadas.</div>'}</div></div><div class="modal-actions product-modal-actions"><button id="deleteProduct" class="btn danger-btn">Eliminar producto</button><div class="modal-action-main"><button class="btn ghost modal-close">Cancelar</button><button id="saveProduct" class="btn primary">Guardar cambios</button></div></div>`);
+    openModal(`<div class="section-title"><div><span class="eyebrow">PRODUCTO</span><h3>Editar producto</h3><small class="muted">${number(totalAvailable)} unidades disponibles</small></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Nombre<input id="epName" value="${esc(p.name)}"></label><label>Categoría<select id="epCategory">${cats.map(c=>`<option value="${esc(c)}" ${c===p.category?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label>SKU general<input id="epSku" value="${esc(p.sku||'')}"></label><label class="check"><input id="epCatalog" type="checkbox" ${p.catalog_visible?'checked':''}> Visible en catálogo</label></div><div class="section-title product-variant-title" style="margin-top:18px"><div><h3>${vape?'Sabores':'Variantes'}</h3><small class="muted">${vape?'Cada sabor comparte el mismo modelo de Vaper.':'Color, talle, modelo o número deben vivir como variantes del mismo producto.'}</small></div><div class="product-editor-actions"><button id="mergeProduct" class="btn ghost">Unificar otro producto</button><button id="addVariant" class="btn ghost">+ ${vape?'Sabor':'Variante'}</button></div></div><div class="table-wrap"><table class="table compact"><thead><tr><th>${vape?'Sabor':'Variante'}</th><th>SKU</th><th>Costo</th><th>Precio</th><th>Mín.</th><th>Stock físico</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">Sin variantes.</td></tr>'}</tbody></table></div><div class="product-images-section"><div class="section-title"><div><h3>Fotos del catálogo</h3><small class="muted">En PC podés arrastrar varias fotos. Central las comprime y genera miniaturas automáticamente.</small></div></div><div id="productImageDropZone" class="product-image-dropzone" tabindex="0"><b>Arrastrá las fotos del producto acá</b><small>También podés hacer click para elegirlas · JPG, PNG, WEBP o AVIF · se optimizan antes de subir</small><span id="productUploadProgress" class="product-upload-progress"></span><input id="productImageUpload" type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple hidden></div><div class="product-image-grid">${imageCards||'<div class="empty">Todavía no hay fotos cargadas.</div>'}</div></div><div class="modal-actions product-modal-actions"><button id="deleteProduct" class="btn danger-btn">Eliminar producto</button><div class="modal-action-main"><button class="btn ghost modal-close">Cancelar</button><button id="saveProduct" class="btn primary">Guardar cambios</button></div></div>`);
 
     $('#saveProduct').addEventListener('click',async()=>{const btn=$('#saveProduct');btn.disabled=true;try{const cat=$('#epCategory').value;await DB.saveProduct(productId,{name:$('#epName').value.trim(),category:cat,sku:$('#epSku').value.trim()||null,catalog_visible:$('#epCatalog').checked});for(const tr of document.querySelectorAll('[data-variant]')){const variant=tr.querySelector('.v-name').value.trim()||'Única';const payload={variant_name:variant,sku:tr.querySelector('.v-sku').value.trim()||null,cost_ars:Number(tr.querySelector('.v-cost').value||0),price_ars:Number(tr.querySelector('.v-price').value||0),stock_min:Number(tr.querySelector('.v-min').value||0)};if(cat.toLowerCase()==='vapers')payload.attributes={sabor:variant};await DB.saveVariant(tr.dataset.variant,payload)}closeModal();await renderProducts($('#globalSearch').value)}catch(e){alert(e.message)}finally{btn.disabled=false}});
     document.querySelectorAll('.adjust-stock').forEach(b=>b.addEventListener('click',async()=>{const current=Number(b.dataset.current),val=prompt(`Stock físico actual: ${current}
 Nueva cantidad física:`,String(current));if(val===null)return;const next=Number(val);if(!Number.isFinite(next)||next<0)return alert('Cantidad inválida');const note=prompt('Motivo:','Conteo físico / corrección manual')||'Ajuste manual';try{await DB.adjustStock(productId,b.dataset.vid,current,next,note);closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}}));
     $('#addVariant').addEventListener('click',async()=>{const name=prompt(vape?'Nombre del sabor:':'Nombre de variante (color, talle, número, modelo):','');if(!name)return;const price=Number(prompt('Precio venta ARS:','0')||0),cost=Number(prompt('Costo ARS:','0')||0),initial=Number(prompt('Stock inicial:','0')||0);if([price,cost,initial].some(x=>!Number.isFinite(x))||initial<0)return alert('Valores inválidos');try{await DB.createVariant(productId,{variant_name:name.trim(),cost_ars:cost,price_ars:price,stock_min:0,active:true,attributes:vape?{sabor:name.trim()}:{opcion:name.trim()}},initial,'Alta manual de variante');closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}});
-    $('#productImageUpload')?.addEventListener('change',async e=>{const files=[...(e.target.files||[])];if(!files.length)return;const hadPrimary=(p.images||[]).some(x=>x.is_primary);try{for(let i=0;i<files.length;i++)await DB.uploadProductImage(productId,files[i],!hadPrimary&&i===0);closeModal();await openProductEditor(productId)}catch(err){alert(err.message)}});
+    const imageInput=$('#productImageUpload'),dropZone=$('#productImageDropZone'),progress=$('#productUploadProgress');
+    const uploadImages=async files=>{files=[...files].filter(f=>f?.type?.startsWith('image/'));if(!files.length)return;const hadPrimary=(p.images||[]).some(x=>x.is_primary);try{dropZone.classList.add('drag');for(let i=0;i<files.length;i++){progress.textContent=`Optimizando y subiendo ${i+1} / ${files.length}: ${files[i].name}`;await DB.uploadProductImage(productId,files[i],!hadPrimary&&i===0)}progress.textContent='✓ Fotos optimizadas y guardadas';setTimeout(async()=>{closeModal();await openProductEditor(productId)},250)}catch(err){dropZone.classList.remove('drag');progress.textContent='';alert(err.message)}};
+    imageInput?.addEventListener('change',e=>{const files=[...(e.target.files||[])];e.target.value='';uploadImages(files)});
+    dropZone?.addEventListener('click',()=>imageInput?.click());dropZone?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();imageInput?.click()}});
+    ['dragenter','dragover'].forEach(ev=>dropZone?.addEventListener(ev,e=>{e.preventDefault();dropZone.classList.add('drag')}));
+    ['dragleave','drop'].forEach(ev=>dropZone?.addEventListener(ev,e=>{e.preventDefault();if(ev==='dragleave')dropZone.classList.remove('drag')}));
+    dropZone?.addEventListener('drop',e=>uploadImages(e.dataTransfer?.files||[]));
     document.querySelectorAll('.set-primary-image').forEach(b=>b.addEventListener('click',async()=>{try{await DB.setPrimaryImage(productId,b.dataset.img);closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}}));
     document.querySelectorAll('.delete-product-image').forEach(b=>b.addEventListener('click',async()=>{const img=(p.images||[]).find(x=>String(x.id)===String(b.dataset.img));if(!img||!confirm('¿Eliminar esta foto?'))return;try{await DB.deleteProductImage(productId,img);closeModal();await openProductEditor(productId)}catch(e){alert(e.message)}}));
     $('#mergeProduct').addEventListener('click',()=>openMergeProduct(productId,p));
@@ -725,8 +753,51 @@ El stock y el historial se conservan.`))return;
   }
 
   /* -------------------- FINANCE -------------------- */
+  function financeHolderValue(movement,method){
+    if(method==='transferencia')return String(movement.transfer_holder||'').toLowerCase();
+    if(method==='efectivo')return String(movement.cash_holder||'').toLowerCase();
+    if(method==='usdt')return String(movement.usdt_holder||'').toLowerCase();
+    return '';
+  }
+  function financeMethodMovements(f,method){
+    return (f?.movements||[]).filter(x=>{
+      if(method==='usdt')return x.currency==='USDT'&&x.payment_method==='usdt';
+      return x.currency==='ARS'&&x.payment_method===method;
+    });
+  }
+  function financeHolderBreakdown(f,method){
+    const out={nahuel:0,esteban:0,unassigned:0,total:0};
+    for(const x of financeMethodMovements(f,method)){
+      const sign=x.kind==='income'?1:-1;
+      const value=sign*Number(x.amount||0);
+      const holder=financeHolderValue(x,method);
+      if(holder==='nahuel')out.nahuel+=value;
+      else if(holder==='esteban')out.esteban+=value;
+      else out.unassigned+=value;
+      out.total+=value;
+    }
+    return out;
+  }
+  function financeMethodLabel(method){return method==='transferencia'?'Transferencias':method==='efectivo'?'Efectivo':'USDT'}
+  function financeAmountByMethod(method,n){return method==='usdt'?`${number(n)} USDT`:money(n)}
+  function renderFinanceHolderCard(f,method){
+    const b=financeHolderBreakdown(f,method),label=financeMethodLabel(method);
+    return `<details class="card finance-holder-card" open><summary><div><span class="eyebrow">${esc(label.toUpperCase())}</span><strong>${financeAmountByMethod(method,b.total)}</strong></div><span class="accordion-chevron">⌄</span></summary><div class="finance-holder-rows"><button class="finance-holder-row open-holder-movements" data-method="${method}" data-holder="nahuel"><span>Nahuel</span><b>${financeAmountByMethod(method,b.nahuel)}</b></button><button class="finance-holder-row open-holder-movements" data-method="${method}" data-holder="esteban"><span>Esteban</span><b>${financeAmountByMethod(method,b.esteban)}</b></button><button class="finance-holder-row unassigned ${Math.abs(b.unassigned)>0.000001?'has-value':''} assign-unassigned-group" data-method="${method}"><span>Sin asignar</span><b>${financeAmountByMethod(method,b.unassigned)}</b><small>${Math.abs(b.unassigned)>0.000001?'Tocar para asignar':'Todo asignado'}</small></button></div></details>`;
+  }
+  function openFinanceHolderMovements(method,holder){
+    const f=financeCache;if(!f)return;
+    const rows=financeMethodMovements(f,method).filter(x=>financeHolderValue(x,method)===holder);
+    openModal(`<div class="section-title"><div><span class="eyebrow">${esc(financeMethodLabel(method).toUpperCase())}</span><h3>${holder==='nahuel'?'Nahuel':'Esteban'}</h3><p class="muted">Movimientos que explican este saldo.</p></div><button class="modal-close modal-x">×</button></div><div class="finance-holder-history">${rows.map(x=>`<div class="finance-holder-movement"><div><b>${x.kind==='income'?'+':'−'} ${financeAmountByMethod(method,Math.abs(Number(x.amount||0)))}</b><small>${safeDate(x.occurred_at)} · ${esc(x.category||'—')}</small></div><span>${esc(x.description||'Sin detalle')}</span></div>`).join('')||'<div class="empty">No hay movimientos para este titular.</div>'}</div>`);
+  }
+  function openUnassignedFinance(method){
+    const f=financeCache;if(!f)return;
+    const rows=financeMethodMovements(f,method).filter(x=>!['nahuel','esteban'].includes(financeHolderValue(x,method)));
+    openModal(`<div class="section-title"><div><span class="eyebrow">SIN ASIGNAR</span><h3>${esc(financeMethodLabel(method))}</h3><p class="muted">Asignar no genera otro ingreso: solo identifica quién tiene el dinero.</p></div><button class="modal-close modal-x">×</button></div><div class="finance-unassigned-list">${rows.map(x=>`<div class="finance-unassigned-item"><div><b>${x.kind==='income'?'+':'−'} ${financeAmountByMethod(method,Math.abs(Number(x.amount||0)))}</b><small>${safeDate(x.occurred_at)} · ${esc(x.description||x.category||'Movimiento')}</small></div><div class="finance-assign-actions"><button class="btn tiny ghost assign-movement-holder" data-id="${x.id}" data-holder="nahuel">Nahuel</button><button class="btn tiny ghost assign-movement-holder" data-id="${x.id}" data-holder="esteban">Esteban</button></div></div>`).join('')||'<div class="empty">No hay dinero sin asignar.</div>'}</div>`);
+    document.querySelectorAll('.assign-movement-holder').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;try{await DB.assignMovementHolder(b.dataset.id,b.dataset.holder);closeModal();await renderFinance()}catch(e){alert(e.message);b.disabled=false}}));
+  }
   async function renderFinance(){
     const f=await DB.financeData(500);
+    financeCache=f;
     const pendingSett=f.settlements.filter(x=>x.status==='pending');
     const openRecv=f.receivables.filter(x=>!['paid','cancelled'].includes(x.status));
     const methods=[...new Set(f.movements.map(x=>x.payment_method).filter(Boolean))].sort();
@@ -735,7 +806,8 @@ El stock y el historial se conservan.`))return;
     let body='';
     if(financeTab==='summary'){
       const q=f.quote||{};const usdtVal=f.balances.usdt*Number(q.sell_ars||0);const available=f.balances.cash+f.balances.transfer+usdtVal;
-      body=`<div class="finance-dashboard-grid"><section class="card finance-balance-card"><span class="eyebrow">SALDO DISPONIBLE ESTIMADO</span><h3>${money(available)}</h3><p class="muted">Transferencias + efectivo + USDT valorizado a cotización de venta.</p><div class="finance-balance-breakdown"><div><small>Transferencias</small><b>${money(f.balances.transfer)}</b></div><div><small>Efectivo</small><b>${money(f.balances.cash)}</b></div><div><small>USDT</small><b>${number(f.balances.usdt)} USDT</b></div></div></section><section class="card finance-quote-card"><span class="eyebrow">USDT / ARS</span><h3>Cotización</h3>${q.captured_at?`<div class="quote-pair"><div><small>Compra USDT</small><b>${money(q.buy_ars)}</b></div><div class="profit"><small>Venta USDT</small><b>${money(q.sell_ars)}</b></div></div><p class="muted small-text">${esc(q.source||'Cotización')} · ${safeDate(q.captured_at)}</p>`:'<div class="empty">Sin cotización disponible.</div>'}</section></div>
+      body=`<div class="finance-dashboard-grid"><section class="card finance-balance-card"><span class="eyebrow">SALDO DISPONIBLE ESTIMADO</span><h3>${money(available)}</h3><p class="muted">Transferencias + efectivo + USDT valorizado a cotización de venta.</p></section><section class="card finance-quote-card"><span class="eyebrow">USDT / ARS</span><h3>Cotización</h3>${q.captured_at?`<div class="quote-pair"><div><small>Compra USDT</small><b>${money(q.buy_ars)}</b></div><div class="profit"><small>Venta USDT</small><b>${money(q.sell_ars)}</b></div></div><p class="muted small-text">${esc(q.source||'Cotización')} · ${safeDate(q.captured_at)}</p>`:'<div class="empty">Sin cotización disponible.</div>'}</section></div>
+      <div class="finance-holder-stack">${renderFinanceHolderCard(f,'transferencia')}${renderFinanceHolderCard(f,'efectivo')}${renderFinanceHolderCard(f,'usdt')}</div>
       <div class="finance-control-cards"><button data-fin-jump="settlements"><small>Pendiente de acreditación</small><b>${money(pendingSett.reduce((a,x)=>a+Number(x.net_amount||0),0))}</b><span>${pendingSett.length} operaciones</span></button><button data-fin-jump="receivables"><small>Total a cobrar</small><b>${money(openRecv.reduce((a,x)=>a+Number(x.pending_amount||0),0))}</b><span>${openRecv.length} cuentas</span></button><button data-fin-jump="results"><small>Resultado operativo</small><b class="${f.net>=0?'profit':'negative'}">${money(f.net)}</b><span>Ingresos − egresos reales</span></button></div>`;
     }else if(financeTab==='movements'){
       const q=financeSearch.trim().toLowerCase();
@@ -756,6 +828,8 @@ El stock y el historial se conservan.`))return;
     content.innerHTML=`${tabbar}${actionbar}<div class="finance-tab-body">${body}</div>`;
     document.querySelectorAll('[data-fin-tab]').forEach(b=>b.addEventListener('click',()=>{financeTab=b.dataset.finTab;renderFinance()}));
     document.querySelectorAll('[data-fin-jump]').forEach(b=>b.addEventListener('click',()=>{financeTab=b.dataset.finJump;renderFinance()}));
+    document.querySelectorAll('.open-holder-movements').forEach(b=>b.addEventListener('click',()=>openFinanceHolderMovements(b.dataset.method,b.dataset.holder)));
+    document.querySelectorAll('.assign-unassigned-group').forEach(b=>b.addEventListener('click',()=>openUnassignedFinance(b.dataset.method)));
     $('#newMovement')?.addEventListener('click',openNewFinanceMovement);
     $('#newSettlement')?.addEventListener('click',openNewSettlement);
     $('#newReceivable')?.addEventListener('click',openNewReceivable);
@@ -832,8 +906,9 @@ El stock y el historial se conservan.`))return;
       <div class="table-wrap" style="margin-top:14px"><table class="table"><thead><tr><th>Producto</th><th>Variante</th><th>Cant.</th><th>Precio</th><th>Total</th></tr></thead><tbody>${o.items.map(i=>`<tr><td><b>${esc(i.product_name)}</b></td><td>${esc(i.variant_name)}</td><td>${number(i.quantity)}</td><td>${money(i.unit_price_ars)}</td><td>${money(i.line_total_ars)}</td></tr>`).join('')}</tbody></table></div>
       <div class="order-total-lines"><div><span>Subtotal</span><b>${money(o.subtotal_ars)}</b></div><div><span>Envío</span><b>${money(o.shipping_ars)}</b></div>${Number(o.adjustment_ars)?`<div><span>Ajuste de pago</span><b>${money(o.adjustment_ars)}</b></div>`:''}<div class="grand"><span>Total</span><b>${money(o.total_ars)}</b></div></div>
       ${o.notes?`<div class="notice" style="margin-top:12px">${esc(o.notes)}</div>`:''}
+      ${o.status==='pending'&&o.payment_method?.finance_mode==='movement'?`<div class="card web-order-holder-card" style="margin-top:12px"><span class="eyebrow">DESTINO DEL DINERO</span><label style="margin-top:10px">¿Quién recibe esta venta?<select id="webOrderHolder"><option value="nahuel" ${posHolder==='nahuel'?'selected':''}>Nahuel</option><option value="esteban" ${posHolder==='esteban'?'selected':''}>Esteban</option></select></label><small class="muted">Se guardará junto a ${esc(o.payment_method.finance_payment_method==='efectivo'?'Efectivo':'Transferencia')} para que Finanzas sepa dónde quedó el dinero.</small></div>`:''}
       <div class="modal-actions">${o.status==='pending'?`<button id="cancelWebOrder" class="btn danger-btn">Cancelar pedido</button><button id="confirmWebOrder" class="btn primary">Confirmar → Venta</button>`:`<button class="btn ghost modal-close">Cerrar</button>`}</div>`);
-    $('#confirmWebOrder')?.addEventListener('click',async()=>{if(!confirm('¿Confirmar este pedido y convertirlo en venta real? Se descontará stock y se registrará en Finanzas.'))return;const b=$('#confirmWebOrder');b.disabled=true;try{const r=await DB.webOrderAction(o.id,'confirm');alert(`Venta ${r.sale?.sale_code||''} confirmada`);closeModal();if(currentView==='orders')await renderOrders();else await renderCatalogAdmin()}catch(e){alert(e.message);b.disabled=false}});
+    $('#confirmWebOrder')?.addEventListener('click',async()=>{const holder=o.payment_method?.finance_mode==='movement'?($('#webOrderHolder')?.value||null):null;if(o.payment_method?.finance_mode==='movement'&&!holder)return alert('Elegí quién recibe el dinero.');if(holder){posHolder=holder;localStorage.setItem('importb2b-pos-holder',holder)}if(!confirm('¿Confirmar este pedido y convertirlo en venta real? Se descontará stock y se registrará en Finanzas.'))return;const b=$('#confirmWebOrder');b.disabled=true;try{const r=await DB.webOrderAction(o.id,'confirm','',holder);alert(`Venta ${r.sale?.sale_code||''} confirmada`);closeModal();if(currentView==='orders')await renderOrders();else await renderCatalogAdmin()}catch(e){alert(e.message);b.disabled=false}});
     $('#cancelWebOrder')?.addEventListener('click',async()=>{const reason=prompt('Motivo de cancelación:','Cliente canceló')||'';if(!confirm('¿Cancelar y liberar el stock reservado?'))return;try{await DB.webOrderAction(o.id,'cancel',reason);closeModal();if(currentView==='orders')await renderOrders();else await renderCatalogAdmin()}catch(e){alert(e.message)}});
   }
 

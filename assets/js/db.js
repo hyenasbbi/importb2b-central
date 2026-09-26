@@ -11,6 +11,41 @@
     return data.user;
   }
 
+  async function blobToImageSource(blob){
+    if('createImageBitmap' in window){
+      try{return await createImageBitmap(blob,{imageOrientation:'from-image'});}catch(e){try{return await createImageBitmap(blob);}catch(_){}}
+    }
+    return await new Promise((resolve,reject)=>{
+      const u=URL.createObjectURL(blob),img=new Image();
+      img.onload=()=>{URL.revokeObjectURL(u);resolve(img)};
+      img.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo leer la imagen'))};
+      img.src=u;
+    });
+  }
+
+  async function resizeImageBlob(file,maxSide=1600,quality=.82){
+    const src=await blobToImageSource(file);
+    const ow=src.width||src.naturalWidth,oh=src.height||src.naturalHeight;
+    if(!ow||!oh) throw new Error('Imagen sin dimensiones válidas');
+    const scale=Math.min(1,maxSide/Math.max(ow,oh));
+    const w=Math.max(1,Math.round(ow*scale)),h=Math.max(1,Math.round(oh*scale));
+    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext('2d',{alpha:true});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.clearRect(0,0,w,h);ctx.drawImage(src,0,0,w,h);
+    src.close?.();
+    let blob=await new Promise(r=>canvas.toBlob(r,'image/webp',quality));
+    if(!blob) blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',Math.min(.9,quality+.05)));
+    canvas.width=1;canvas.height=1;
+    if(!blob) throw new Error('No se pudo optimizar la imagen');
+    return {blob,width:w,height:h};
+  }
+
+  async function prepareCatalogImage(file){
+    if(!file?.type?.startsWith('image/')) throw new Error('Archivo de imagen inválido');
+    const main=await resizeImageBlob(file,1700,.82);
+    const thumb=await resizeImageBlob(file,480,.72);
+    return {main,thumb,originalSize:Number(file.size||0),originalName:file.name||'producto'};
+  }
+
   window.DB={
     async user(){ try{return await authUser()}catch{return null} },
 
@@ -20,7 +55,7 @@
       const todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
       const yesterdayStart=new Date(todayStart);yesterdayStart.setDate(yesterdayStart.getDate()-1);
       const salesStart=yesterdayStart<monthStart?yesterdayStart:monthStart;
-      const [p,v,sales,recv,sett,web,vars,stock,mov,recentWeb,recentMov]=await Promise.all([
+      const [p,v,sales,recv,sett,web,vars,stock,mov,recentWeb,recentMov,quickPending]=await Promise.all([
         db.from('importb2b_products').select('id',{count:'exact',head:true}).eq('active',true),
         db.from('importb2b_stock_valuation').select('*').limit(1),
         db.from('importb2b_sales').select('id,sale_code,total_ars,profit_ars,sold_at,status,customer_id,original_payment_method').eq('status','completed').gte('sold_at',salesStart.toISOString()).order('sold_at',{ascending:true}),
@@ -31,9 +66,10 @@
         db.from('importb2b_stock_summary').select('variant_id,available,in_transit'),
         db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id,ars_equivalent').gte('occurred_at',monthStart.toISOString()),
         db.from('importb2b_web_orders').select('id,order_code,status,total_ars,customer_name,created_at').order('created_at',{ascending:false}).limit(5),
-        db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id,ars_equivalent').order('occurred_at',{ascending:false}).limit(8)
+        db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id,ars_equivalent').order('occurred_at',{ascending:false}).limit(8),
+        db.from('importb2b_sales').select('id',{count:'exact',head:true}).eq('status','completed').eq('stock_link_status','pending')
       ]);
-      [p,v,sales,recv,sett,web,vars,stock,mov,recentWeb,recentMov].forEach(assert);
+      [p,v,sales,recv,sett,web,vars,stock,mov,recentWeb,recentMov,quickPending].forEach(assert);
       const valuation=(v.data||[])[0]||{physical_units:0,available_units:0,reserved_units:0,in_transit_units:0,stock_cost_ars:0,stock_sale_value_ars:0,expected_profit_ars:0};
       const allSales=sales.data||[];
       const isToday=x=>new Date(x.sold_at)>=todayStart;
@@ -71,7 +107,7 @@
         todaySales,todayCount,todayTicket,yesterdaySales,monthSales,monthCount,monthDailyAvg,hours,
         receivable,receivableCount:(recv.data||[]).length,
         settlements,settlementCount:(sett.data||[]).length,
-        webPending:web.count||0,lowStock,
+        webPending:web.count||0,quickPending:quickPending.count||0,lowStock,
         income,expense,operationalNet:income-expense,recent
       };
     },
@@ -86,17 +122,19 @@
       if(category) req=req.eq('category',category);
       const pr=await req.limit(1200); assert(pr);
       const products=pr.data||[], ids=products.map(x=>x.id); if(!ids.length) return [];
-      const [vr,sr]=await Promise.all([
+      const [vr,sr,ir]=await Promise.all([
         db.from('importb2b_product_variants').select('id,product_id,sku,variant_name,price_ars,wholesale_price_ars,cost_ars,stock_min,active,attributes').in('product_id',ids).eq('active',true).order('variant_name'),
-        db.from('importb2b_stock_summary').select('*').in('product_id',ids)
-      ]); assert(vr); assert(sr);
+        db.from('importb2b_stock_summary').select('*').in('product_id',ids),
+        db.from('importb2b_product_images').select('product_id,image_url,thumbnail_url,is_primary,sort_order').in('product_id',ids).order('is_primary',{ascending:false}).order('sort_order')
+      ]); assert(vr); assert(sr); assert(ir);
       const sm=new Map((sr.data||[]).map(x=>[x.variant_id,x]));
+      const im=new Map(); for(const x of (ir.data||[])){ if(!im.has(x.product_id)) im.set(x.product_id,x); }
       const vm=new Map();
       for(const v of (vr.data||[])){
         const a=vm.get(v.product_id)||[];
         a.push({...v,stock:sm.get(v.id)||{on_hand:0,reserved:0,in_transit:0,available:0}}); vm.set(v.product_id,a);
       }
-      let out=products.map(p=>({...p,variants:vm.get(p.id)||[]}));
+      let out=products.map(p=>{const img=im.get(p.id)||{};return {...p,thumbnail_url:img.thumbnail_url||img.image_url||p.primary_image_url||null,variants:vm.get(p.id)||[]}});
       const term=String(q||'').trim().toLowerCase();
       if(term) out=out.filter(p=>[
         p.name,p.sku,p.category,
@@ -243,11 +281,16 @@
     },
 
     async paymentMethods(){ const r=await db.from('importb2b_payment_methods').select('*').eq('active',true).order('sort_order').order('name'); assert(r); return r.data||[]; },
-    async completeSale({customerId=null,items,paymentMethodId,shipping=0,discount=0,notes=''}){
-      const r=await db.rpc('importb2b_complete_sale',{p_customer_id:customerId||null,p_items:items,p_payment_method_id:paymentMethodId,p_shipping_ars:Number(shipping||0),p_discount_ars:Number(discount||0),p_notes:notes||null}); assert(r); return r.data;
+    async completeSale({customerId=null,items,paymentMethodId,shipping=0,discount=0,notes='',holder=null}){
+      const r=await db.rpc('importb2b_complete_sale',{p_customer_id:customerId||null,p_items:items,p_payment_method_id:paymentMethodId,p_shipping_ars:Number(shipping||0),p_discount_ars:Number(discount||0),p_notes:notes||null,p_holder:holder||null}); assert(r); return r.data;
     },
+    async quickSale({amount,paymentMethodId,holder=null,customerId=null,notes=''}){
+      const r=await db.rpc('importb2b_complete_quick_sale',{p_amount_ars:Number(amount),p_payment_method_id:paymentMethodId,p_holder:holder||null,p_customer_id:customerId||null,p_notes:notes||null});assert(r);return r.data;
+    },
+    async pendingQuickSales(){ const r=await db.from('importb2b_sales').select('id,sale_code,total_ars,original_payment_method,notes,sold_at,stock_link_status').eq('status','completed').eq('stock_link_status','pending').order('sold_at',{ascending:false}).limit(100);assert(r);return r.data||[]; },
+    async linkQuickSaleItem(saleId,variantId,quantity=1){ const r=await db.rpc('importb2b_link_quick_sale_item',{p_sale_id:saleId,p_variant_id:variantId,p_quantity:Number(quantity)});assert(r);return r.data; },
     async recentSales(limit=20){
-      const sr=await db.from('importb2b_sales').select('id,sale_code,status,customer_id,subtotal_ars,discount_ars,fee_ars,shipping_ars,total_ars,profit_ars,original_payment_method,notes,seller_name,sold_at,created_at').order('sold_at',{ascending:false}).limit(limit); assert(sr);
+      const sr=await db.from('importb2b_sales').select('id,sale_code,status,customer_id,subtotal_ars,discount_ars,fee_ars,shipping_ars,total_ars,profit_ars,original_payment_method,notes,seller_name,source,stock_link_status,sold_at,created_at').order('sold_at',{ascending:false}).limit(limit); assert(sr);
       const sales=sr.data||[], ids=sales.map(x=>x.id), customerIds=[...new Set(sales.map(x=>x.customer_id).filter(Boolean))];
       let customers=[],payments=[];
       if(customerIds.length){ const r=await db.from('importb2b_customers').select('id,full_name,phone').in('id',customerIds); assert(r); customers=r.data||[]; }
@@ -268,13 +311,18 @@
 
     async uploadProductImage(productId,file,isPrimary=false){
       const u=await authUser();
-      const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
-      const path=`${u.id}/${productId}/${crypto.randomUUID()}.${ext}`;
-      const up=await db.storage.from('importb2b-catalog').upload(path,file,{cacheControl:'3600',upsert:false,contentType:file.type||undefined});
-      if(up.error) throw up.error;
-      const pub=db.storage.from('importb2b-catalog').getPublicUrl(path).data.publicUrl;
-      if(isPrimary){ await db.from('importb2b_product_images').update({is_primary:false}).eq('product_id',productId); }
-      const ins=await db.from('importb2b_product_images').insert({owner_id:u.id,product_id:productId,image_url:pub,storage_path:path,alt_text:file.name,is_primary:isPrimary,sort_order:0}).select().single();assert(ins);
+      const prepared=await prepareCatalogImage(file);
+      const token=crypto.randomUUID();
+      const mainPath=`${u.id}/${productId}/${token}.webp`;
+      const thumbPath=`${u.id}/${productId}/${token}_thumb.webp`;
+      const upMain=await db.storage.from('importb2b-catalog').upload(mainPath,prepared.main.blob,{cacheControl:'31536000',upsert:false,contentType:prepared.main.blob.type||'image/webp'});
+      if(upMain.error) throw upMain.error;
+      const upThumb=await db.storage.from('importb2b-catalog').upload(thumbPath,prepared.thumb.blob,{cacheControl:'31536000',upsert:false,contentType:prepared.thumb.blob.type||'image/webp'});
+      if(upThumb.error){await db.storage.from('importb2b-catalog').remove([mainPath]);throw upThumb.error;}
+      const pub=db.storage.from('importb2b-catalog').getPublicUrl(mainPath).data.publicUrl;
+      const thumbPub=db.storage.from('importb2b-catalog').getPublicUrl(thumbPath).data.publicUrl;
+      if(isPrimary){ const x=await db.from('importb2b_product_images').update({is_primary:false}).eq('product_id',productId);assert(x); }
+      const ins=await db.from('importb2b_product_images').insert({owner_id:u.id,product_id:productId,image_url:pub,storage_path:mainPath,thumbnail_url:thumbPub,thumbnail_storage_path:thumbPath,alt_text:prepared.originalName,is_primary:isPrimary,sort_order:0,original_size_bytes:prepared.originalSize,optimized_size_bytes:prepared.main.blob.size,width:prepared.main.width,height:prepared.main.height,mime_type:prepared.main.blob.type||'image/webp'}).select().single();assert(ins);
       if(isPrimary){ const r=await db.from('importb2b_products').update({primary_image_url:pub}).eq('id',productId);assert(r); }
       return ins.data;
     },
@@ -287,7 +335,7 @@
       return r.data;
     },
     async deleteProductImage(productId,image){
-      if(image.storage_path){ const r=await db.storage.from('importb2b-catalog').remove([image.storage_path]); if(r.error) throw r.error; }
+      const paths=[image.storage_path,image.thumbnail_storage_path].filter(Boolean);if(paths.length){ const r=await db.storage.from('importb2b-catalog').remove(paths); if(r.error) throw r.error; }
       const d=await db.from('importb2b_product_images').delete().eq('id',image.id);assert(d);
       if(image.is_primary){
         const n=await db.from('importb2b_product_images').select('*').eq('product_id',productId).order('created_at').limit(1);assert(n);
@@ -305,13 +353,13 @@
       const [o,i,m]=await Promise.all([
         db.from('importb2b_web_orders').select('*').eq('id',id).single(),
         db.from('importb2b_web_order_items').select('*').eq('order_id',id).order('created_at'),
-        db.from('importb2b_payment_methods').select('id,name,code').eq('active',true)
+        db.from('importb2b_payment_methods').select('id,name,code,finance_mode,finance_payment_method').eq('active',true)
       ]);[o,i,m].forEach(assert);const mm=new Map((m.data||[]).map(x=>[x.id,x]));return {...o.data,items:i.data||[],payment_method:mm.get(o.data.payment_method_id)||null};
     },
-    async webOrderAction(id,action,reason=''){
+    async webOrderAction(id,action,reason='',holder=null){
       const fn=action==='confirm'?'importb2b_confirm_web_order':action==='cancel'?'importb2b_cancel_web_order':null;
       if(!fn) throw new Error('Acción inválida');
-      const params=action==='confirm'?{p_order_id:id}:{p_order_id:id,p_reason:reason||null};
+      const params=action==='confirm'?{p_order_id:id,p_holder:holder||null}:{p_order_id:id,p_reason:reason||null};
       const r=await db.rpc(fn,params);assert(r);return r.data;
     },
 
@@ -354,6 +402,7 @@
     async recordReceivablePayment(id,amount,method,holder){ const r=await db.rpc('record_receivable_payment_v2',{p_receivable_id:id,p_amount:Number(amount),p_payment_method:method,p_holder:holder});assert(r);return r.data; },
     async linkSettlementSale(settlementId,saleId){ const r=await db.rpc('importb2b_link_settlement_to_sale',{p_settlement_id:settlementId,p_sale_id:saleId});assert(r);return r.data; },
     async linkReceivableSale(receivableId,saleId){ const r=await db.rpc('importb2b_link_receivable_to_sale',{p_receivable_id:receivableId,p_sale_id:saleId});assert(r);return r.data; },
+    async assignMovementHolder(movementId,holder){ const r=await db.rpc('importb2b_assign_movement_holder',{p_movement_id:movementId,p_holder:holder});assert(r);return r.data; },
     async financeData(limit=400){
       const [m,s,r,q,a,sales]=await Promise.all([
         db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id,ars_equivalent,cash_holder,transfer_holder,usdt_holder,edited_at').order('occurred_at',{ascending:false}).limit(limit),
