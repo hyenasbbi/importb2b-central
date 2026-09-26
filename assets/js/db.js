@@ -94,11 +94,16 @@
         const val=Number(x.ars_equivalent ?? (x.currency==='ARS'?x.amount:0) ?? 0);
         if(x.kind==='income')income+=val; else if(x.kind==='expense')expense+=val;
       }
-      const recent=[
-        ...month.slice(-6).reverse().map(x=>({type:'sale',date:x.sold_at,title:`Venta ${x.sale_code}`,amount:Number(x.total_ars||0),status:'completed'})),
-        ...(recentWeb.data||[]).map(x=>({type:'web',date:x.created_at,title:`${x.order_code} · ${x.customer_name}`,amount:Number(x.total_ars||0),status:x.status})),
-        ...(recentMov.data||[]).filter(x=>x.source_type!=='sale').map(x=>({type:'finance',date:x.occurred_at,title:x.description||x.category||'Movimiento',amount:(x.kind==='expense'?-1:1)*Number(x.ars_equivalent??x.amount??0),status:x.kind}))
-      ].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,8);
+      const recent=(recentMov.data||[]).map(x=>({
+        type:x.source_type==='sale'?'sale':'finance',
+        date:x.occurred_at,
+        title:x.description||x.category||'Movimiento',
+        amount:(x.kind==='expense'?-1:1)*Number(x.ars_equivalent??x.amount??0),
+        status:x.kind,
+        movement_id:x.id,
+        source_type:x.source_type,
+        source_id:x.source_id
+      })).slice(0,8);
       return {
         products:p.count||0,
         stock:Number(valuation.available_units||0),
