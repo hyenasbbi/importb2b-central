@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#070809">
   <title>IMPORTB2B Central</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./assets/css/app.css?v=6.2">
+  <link rel="stylesheet" href="./assets/css/app.css?v=6.3">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -32,6 +32,7 @@
   </div>
 
   <div id="appView" class="app hidden">
+    <div id="mobileMenuBackdrop" class="mobile-menu-backdrop"></div>
     <aside class="sidebar">
       <div class="brand">
         <img class="brand-logo" src="./assets/img/logo-importb2b.png" alt="IMPORTB2B logo">
@@ -57,7 +58,8 @@
 
     <main>
       <header class="topbar">
-        <div>
+        <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Abrir menú">☰</button>
+        <div class="topbar-title">
           <span class="eyebrow">IMPORTB2B CENTRAL</span>
           <h2 id="viewTitle">Inicio</h2>
           <span id="userLabel" class="muted"></span>
@@ -70,9 +72,9 @@
     </main>
   </div>
 
-  <script src="./assets/js/config.js?v=6.1"></script>
-  <script src="./assets/js/db.js?v=6.1"></script>
-  <script src="./assets/js/importer.js?v=6.1"></script>
-  <script src="./assets/js/app.js?v=6.2"></script>
+  <script src="./assets/js/config.js?v=6.3"></script>
+  <script src="./assets/js/db.js?v=6.3"></script>
+  <script src="./assets/js/importer.js?v=6.3"></script>
+  <script src="./assets/js/app.js?v=6.3"></script>
 </body>
 </html>
