@@ -341,6 +341,39 @@
     },
     async saveWholesalePrice(variantId,minQty,price){ const r=await db.rpc('importb2b_save_wholesale_price',{p_variant_id:variantId,p_min_quantity:Number(minQty),p_price_ars:Number(price)});assert(r);return r.data; },
 
+    async statistics(days=30){
+      const n=Math.max(7,Math.min(180,Number(days)||30));
+      const since=new Date();since.setHours(0,0,0,0);since.setDate(since.getDate()-(n-1));
+      const sinceIso=since.toISOString();
+      const sinceDate=sinceIso.slice(0,10);
+      const [sr,cr,mr,or]=await Promise.all([
+        db.from('importb2b_sales').select('id,sale_code,total_ars,profit_ars,sold_at,customer_id,original_payment_method,status').eq('status','completed').gte('sold_at',sinceIso).order('sold_at',{ascending:true}),
+        db.from('importb2b_customers').select('id,full_name,created_at').eq('active',true),
+        db.from('importb2b_club_memberships').select('id,customer_id,club_type,points,active').eq('active',true),
+        db.from('importb2b_orders').select('id,order_number,order_date,investment_usd,total_units,purchase_status').gte('order_date',sinceDate).order('order_date',{ascending:true})
+      ]);[sr,cr,mr,or].forEach(assert);
+      const sales=sr.data||[],customers=cr.data||[],memberships=mr.data||[],orders=or.data||[];
+      const ids=sales.map(x=>x.id);let items=[];
+      if(ids.length){const ir=await db.from('importb2b_sale_items').select('sale_id,product_id,variant_id,original_item_name,quantity,line_total_ars,unit_cost_ars').in('sale_id',ids);assert(ir);items=ir.data||[];}
+      const cmap=new Map(customers.map(x=>[x.id,x.full_name]));
+      const total=sales.reduce((a,x)=>a+Number(x.total_ars||0),0),profit=sales.reduce((a,x)=>a+Number(x.profit_ars||0),0);
+      const daily=new Map();
+      for(let i=0;i<n;i++){const d=new Date(since);d.setDate(since.getDate()+i);daily.set(d.toISOString().slice(0,10),{date:d.toISOString().slice(0,10),total:0,count:0});}
+      for(const x of sales){const k=new Date(x.sold_at).toISOString().slice(0,10),d=daily.get(k);if(d){d.total+=Number(x.total_ars||0);d.count++;}}
+      const products=new Map();for(const i of items){const k=i.original_item_name||'Producto';const v=products.get(k)||{name:k,units:0,total:0,profit:0};v.units+=Number(i.quantity||0);v.total+=Number(i.line_total_ars||0);v.profit+=Number(i.line_total_ars||0)-Number(i.unit_cost_ars||0)*Number(i.quantity||0);products.set(k,v);}
+      const payments=new Map();for(const x of sales){const k=x.original_payment_method||'Sin método',v=payments.get(k)||{name:k,total:0,count:0};v.total+=Number(x.total_ars||0);v.count++;payments.set(k,v);}
+      const byCustomer=new Map();for(const x of sales){if(!x.customer_id)continue;const v=byCustomer.get(x.customer_id)||{id:x.customer_id,name:cmap.get(x.customer_id)||'Cliente',total:0,count:0};v.total+=Number(x.total_ars||0);v.count++;byCustomer.set(x.customer_id,v);}
+      return {
+        days:n,total,count:sales.length,profit,ticket:sales.length?total/sales.length:0,
+        margin:total?profit/total*100:0,newCustomers:customers.filter(x=>new Date(x.created_at)>=since).length,
+        clubMembers:new Set(memberships.map(x=>x.customer_id)).size,clubPoints:memberships.reduce((a,x)=>a+Number(x.points||0),0),
+        purchaseInvestmentUsd:orders.reduce((a,x)=>a+Number(x.investment_usd||0),0),purchaseUnits:orders.reduce((a,x)=>a+Number(x.total_units||0),0),
+        daily:[...daily.values()],topProducts:[...products.values()].sort((a,b)=>b.total-a.total).slice(0,8),
+        payments:[...payments.values()].sort((a,b)=>b.total-a.total),topCustomers:[...byCustomer.values()].sort((a,b)=>b.total-a.total).slice(0,8)
+      };
+    },
+    async users(){ const r=await db.from('profiles').select('id,full_name,role,created_at').order('created_at',{ascending:true});assert(r);return r.data||[]; },
+
     async paymentMethods(){ const r=await db.from('importb2b_payment_methods').select('*').eq('active',true).order('sort_order').order('name'); assert(r); return r.data||[]; },
     async completeSale({customerId=null,items,paymentMethodId,shipping=0,discount=0,notes='',holder=null}){
       const r=await db.rpc('importb2b_complete_sale',{p_customer_id:customerId||null,p_items:items,p_payment_method_id:paymentMethodId,p_shipping_ars:Number(shipping||0),p_discount_ars:Number(discount||0),p_notes:notes||null,p_holder:holder||null}); assert(r); return r.data;
