@@ -419,3 +419,24 @@ main{min-width:0}
 }
 @media(max-width:430px){.purchase-summary-grid,.purchase-summary-cards,.tracking-kpis,.expense-summary{grid-template-columns:1fr}.club-adjust-current{grid-template-columns:1fr}}
 .form-grid .wide{grid-column:1/-1}
+
+
+/* ==================== PHASE 6.5.1: iOS / MOBILE VIEWPORT HOTFIX ==================== */
+html,body{max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html.ui-scroll-locked,body.ui-scroll-locked{overflow:hidden!important;overscroll-behavior:none!important}
+.mobile-menu-backdrop,.sidebar{overscroll-behavior:contain}
+
+@media(max-width:760px){
+  /* iOS Safari zooms form controls below 16px. Keep controls at native reading size. */
+  input,select,textarea{font-size:16px!important;line-height:1.25;min-height:46px}
+  textarea{min-height:104px}
+  .global-search input{font-size:16px!important}
+
+  /* Overlay scroll belongs to the overlay, never to the page behind it. */
+  .modal-layer{overflow:hidden;overscroll-behavior:contain;padding:max(8px,env(safe-area-inset-top)) 8px max(8px,env(safe-area-inset-bottom))}
+  .modal-card{max-height:calc(100dvh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom)));overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-gutter:stable}
+  .sidebar{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+
+  /* Avoid accidental double-tap viewport movement on navigation/actions. */
+  button,.btn,#nav button,.mobile-menu-btn{touch-action:manipulation}
+}
