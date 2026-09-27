@@ -50,11 +50,57 @@
   function leave(){ window.currentUser=null; $('#appView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); }
   $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#loginError').textContent='';const {error}=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(error)$('#loginError').textContent=error.message});
   $('#logoutBtn').addEventListener('click',()=>db.auth.signOut());
-  function closeMobileMenu(){document.querySelector('.sidebar')?.classList.remove('open');$('#mobileMenuBackdrop')?.classList.remove('open');$('#appView')?.classList.remove('mobile-menu-open')}
-  function openMobileMenu(){document.querySelector('.sidebar')?.classList.add('open');$('#mobileMenuBackdrop')?.classList.add('open');$('#appView')?.classList.add('mobile-menu-open')}
+  // iOS/mobile viewport lock: overlays never move the page underneath them.
+  const uiScrollLocks=new Set();
+  let uiLockedScrollY=0;
+  function lockPageScroll(reason){
+    if(uiScrollLocks.has(reason))return;
+    if(uiScrollLocks.size===0){
+      uiLockedScrollY=window.scrollY||window.pageYOffset||0;
+      document.documentElement.classList.add('ui-scroll-locked');
+      document.body.classList.add('ui-scroll-locked');
+      document.body.style.position='fixed';
+      document.body.style.top=`-${uiLockedScrollY}px`;
+      document.body.style.left='0';
+      document.body.style.right='0';
+      document.body.style.width='100%';
+    }
+    uiScrollLocks.add(reason);
+  }
+  function unlockPageScroll(reason,{restore=true}={}){
+    uiScrollLocks.delete(reason);
+    if(uiScrollLocks.size)return;
+    const y=uiLockedScrollY;
+    document.documentElement.classList.remove('ui-scroll-locked');
+    document.body.classList.remove('ui-scroll-locked');
+    document.body.style.position='';
+    document.body.style.top='';
+    document.body.style.left='';
+    document.body.style.right='';
+    document.body.style.width='';
+    if(restore)window.scrollTo({top:y,left:0,behavior:'auto'});
+    else window.scrollTo({top:0,left:0,behavior:'auto'});
+  }
+  function closeMobileMenu(options={}){
+    document.querySelector('.sidebar')?.classList.remove('open');
+    $('#mobileMenuBackdrop')?.classList.remove('open');
+    $('#appView')?.classList.remove('mobile-menu-open');
+    unlockPageScroll('mobile-menu',options);
+  }
+  function openMobileMenu(){
+    lockPageScroll('mobile-menu');
+    document.querySelector('.sidebar')?.classList.add('open');
+    $('#mobileMenuBackdrop')?.classList.add('open');
+    $('#appView')?.classList.add('mobile-menu-open');
+  }
   $('#mobileMenuBtn')?.addEventListener('click',()=>document.querySelector('.sidebar')?.classList.contains('open')?closeMobileMenu():openMobileMenu());
-  $('#mobileMenuBackdrop')?.addEventListener('click',closeMobileMenu);
-  $('#nav').addEventListener('click',e=>{const b=e.target.closest('button[data-view]');if(!b)return;closeMobileMenu();setView(b.dataset.view)});
+  $('#mobileMenuBackdrop')?.addEventListener('click',()=>closeMobileMenu());
+  $('#nav').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-view]');if(!b)return;
+    // Main navigation always starts at the top of the target view, without sliding the frozen background.
+    closeMobileMenu({restore:false});
+    setView(b.dataset.view);
+  });
   $('#globalSearch').addEventListener('input',e=>{
     const v=e.target.value;
     if(currentView==='products') renderProducts(v);
@@ -1060,8 +1106,20 @@ El stock y el historial se conservan.`))return;
   }
   function openImportRowEditor(row,batchId){const n=row.normalized_data||{};const isVape=String(n.category||'').toLowerCase()==='vapers';openModal(`<div class="section-title"><div><h3>Revisar fila #${row.row_number}</h3></div><button class="modal-close">×</button></div><div class="form-grid"><label>Producto base<input id="irBase" value="${esc(n.base_name||n.name||'')}"></label><label>Categoría<input id="irCategory" value="${esc(n.category==='SIN CLASIFICAR'?'':n.category||'')}"></label><label>${isVape?'Sabor':'Variante / talle'}<input id="irVariant" value="${esc(isVape?n.flavor||'':n.size||'')}"></label><label>Stock<input id="irStock" type="number" value="${Number(n.stock||0)}"></label><label>Costo<input id="irCost" type="number" value="${Number(n.cost_ars||0)}"></label><label>Precio<input id="irPrice" type="number" value="${Number(n.price_ars||0)}"></label></div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveImportRow" class="btn primary">Guardar</button></div>`);$('#saveImportRow').addEventListener('click',async()=>{const base=$('#irBase').value.trim(),category=$('#irCategory').value.trim()||'SIN CLASIFICAR',variant=$('#irVariant').value.trim();if(!base)return alert('Falta nombre');const updated={...n,base_name:base,category,stock:Number($('#irStock').value||0),cost_ars:Number($('#irCost').value||0),price_ars:Number($('#irPrice').value||0),issues:[]};if(category.toLowerCase()==='vapers'){updated.flavor=variant||null;updated.size=null;updated.name=variant?`${base} - ${variant}`:base}else{updated.size=variant?variant.toUpperCase():null;updated.flavor=null;updated.name=variant?`${base} - ${variant.toUpperCase()}`:base}try{await DB.saveImportProduct(row.id,batchId,updated);closeModal();await renderImports()}catch(e){alert(e.message)}})}
 
-  function openModal(inner){closeModal();const el=document.createElement('div');el.id='modalLayer';el.className='modal-layer';el.innerHTML=`<div class="modal-card">${inner}</div>`;document.body.appendChild(el);el.addEventListener('click',e=>{if(e.target===el||e.target.closest('.modal-close'))closeModal()})}
-  function closeModal(){document.querySelector('#modalLayer')?.remove()}
+  function openModal(inner){
+    closeModal();
+    lockPageScroll('modal');
+    const el=document.createElement('div');
+    el.id='modalLayer';el.className='modal-layer';el.innerHTML=`<div class="modal-card">${inner}</div>`;
+    document.body.appendChild(el);
+    el.addEventListener('click',e=>{if(e.target===el||e.target.closest('.modal-close'))closeModal()});
+  }
+  function closeModal(){
+    const modal=document.querySelector('#modalLayer');
+    if(!modal)return;
+    modal.remove();
+    unlockPageScroll('modal');
+  }
 
   start();
 })();
