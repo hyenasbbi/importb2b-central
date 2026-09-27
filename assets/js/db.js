@@ -201,7 +201,7 @@
     async commitKyteProducts(batchId){ const r=await db.rpc('importb2b_commit_kyte_products',{p_batch_id:batchId}); assert(r); return r.data; },
 
     async recentOrders(){
-      const or=await db.from('importb2b_orders').select('id,order_number,order_date,total_units,investment_usd,note').order('order_date',{ascending:false}).limit(15); assert(or);
+      const or=await db.from('importb2b_orders').select('id,order_number,order_date,total_units,investment_usd,merchandise_usdt,shipping_input_amount,shipping_input_currency,shipping_usdt,usdt_rate_ars,shipping_usdt_per_unit,note,provider,purchase_status,purchase_payment_method,purchase_payment_holder,purchase_payment_amount_ars,purchase_paid_at').order('order_date',{ascending:false}).limit(80); assert(or);
       const orders=or.data||[], orderIds=orders.map(x=>x.id); if(!orderIds.length) return [];
       const ir=await db.from('importb2b_order_items').select('id,order_id,product,detail,category,quantity,cost_ars,cost_usd,excluded_from_stock,product_id,variant_id,received_quantity,stock_link_status').in('order_id',orderIds).order('id'); assert(ir);
       const items=ir.data||[], itemIds=items.map(x=>x.id);
@@ -214,7 +214,7 @@
       const pmap=new Map(products.map(x=>[x.id,x])), vmap=new Map(variants.map(x=>[x.id,x])), amap=new Map();
       for(const a of allocations){ const arr=amap.get(a.order_item_id)||[]; arr.push({...a,product:pmap.get(a.product_id)||null,variant:vmap.get(a.variant_id)||null}); amap.set(a.order_item_id,arr); }
       const imap=new Map(); for(const i of items){ const arr=imap.get(i.order_id)||[]; arr.push({...i,allocations:amap.get(i.id)||[]}); imap.set(i.order_id,arr); }
-      const sr=await db.from('importb2b_shipments').select('order_id,carrier_name,tracking_number,normalized_status,latest_checkpoint_description,is_received,received_at').in('order_id',orderIds); assert(sr);
+      const sr=await db.from('importb2b_shipments').select('id,order_id,carrier_name,tracking_number,tracking_provider,tracking_registered,provider_global_status,normalized_status,latest_checkpoint_description,latest_checkpoint_location,latest_checkpoint_at,is_received,received_at,last_sync_at,sync_error').in('order_id',orderIds); assert(sr);
       const smap=new Map((sr.data||[]).map(x=>[x.order_id,x]));
       return orders.map(o=>({...o,items:imap.get(o.id)||[],shipment:smap.get(o.id)||null}));
     },
@@ -264,9 +264,13 @@
     async pdfCatalogProducts(){
       const products=await this.products('','','all');
       const ids=products.map(x=>x.id);if(!ids.length)return [];
-      const ir=await db.from('importb2b_product_images').select('product_id,image_url,is_primary,sort_order').in('product_id',ids).order('is_primary',{ascending:false}).order('sort_order');assert(ir);
+      const [ir,wr]=await Promise.all([
+        db.from('importb2b_product_images').select('product_id,image_url,thumbnail_url,is_primary,sort_order').in('product_id',ids).order('is_primary',{ascending:false}).order('sort_order'),
+        db.from('importb2b_wholesale_pricing').select('product_id,variant_id,wholesale_6_ars,wholesale_12_ars,wholesale_36_ars')
+      ]);assert(ir);assert(wr);
       const im=new Map();for(const x of (ir.data||[])){if(!im.has(x.product_id)&&x.image_url)im.set(x.product_id,x.image_url)}
-      return products.map(x=>({...x,pdf_image_url:x.primary_image_url||im.get(x.id)||null}));
+      const wm=new Map((wr.data||[]).map(x=>[x.variant_id,x]));
+      return products.map(x=>({...x,pdf_image_url:x.primary_image_url||im.get(x.id)||null,variants:x.variants.map(v=>({...v,wholesale_tiers:wm.get(v.id)||null}))}));
     },
     async clubOverview(q=''){
       const u=await authUser();
@@ -284,6 +288,58 @@
       const claims=(rr.data||[]).map(x=>({...x,customer:cmap.get(x.customer_id)||null}));
       return {overview:ov.data||{members:0,total_points:0,vapers_memberships:0,jerseys_memberships:0,perfumes_memberships:0,importb2b_memberships:0,pending_rewards:0},members,claims};
     },
+
+    /* -------- FASE 6.5 · ADMIN CLIENTES / COMPRAS / TRACKING / MAYORISTA -------- */
+    async mergeCustomers(targetId,sourceId){ const r=await db.rpc('importb2b_merge_customers',{p_target_customer_id:targetId,p_source_customer_id:sourceId});assert(r);return r.data; },
+    async archiveCustomer(id,reason=''){ const r=await db.rpc('importb2b_archive_customer',{p_customer_id:id,p_reason:reason||null});assert(r);return r.data; },
+    async deleteCustomerSafe(id){ const r=await db.rpc('importb2b_delete_customer_safe',{p_customer_id:id});assert(r);return r.data; },
+    async adjustClubPoints(membershipId,newPoints,reason){ const r=await db.rpc('importb2b_adjust_club_points',{p_membership_id:membershipId,p_new_points:Number(newPoints),p_reason:reason});assert(r);return r.data; },
+
+    async createPurchaseOrder(payload){
+      const r=await db.rpc('importb2b_create_purchase_order',{
+        p_order_date:payload.orderDate,p_usdt_rate:Number(payload.usdtRate),p_shipping_amount:Number(payload.shippingAmount||0),
+        p_shipping_currency:payload.shippingCurrency||'USDT',p_provider:payload.provider||null,p_note:payload.note||null,p_items:payload.items||[]
+      });assert(r);return r.data;
+    },
+    async registerPurchasePayment(orderId,amount,method,holder){ const r=await db.rpc('importb2b_register_purchase_payment',{p_order_id:Number(orderId),p_amount_ars:Number(amount),p_method:method,p_holder:holder});assert(r);return r.data; },
+    async createExpense(payload){ const r=await db.rpc('importb2b_create_expense',{p_date:payload.date,p_type:payload.type,p_provider:payload.provider||null,p_description:payload.description||null,p_amount_ars:Number(payload.amountArs||0),p_amount_usd:payload.amountUsd==null?null:Number(payload.amountUsd),p_dollar_rate:payload.dollarRate==null?null:Number(payload.dollarRate),p_order_id:payload.orderId?Number(payload.orderId):null,p_product_id:payload.productId||null,p_payment_method:payload.paymentMethod||null,p_holder:payload.holder||null});assert(r);return r.data; },
+    async expenses(){ const r=await db.from('importb2b_expenses').select('*').order('expense_date',{ascending:false}).order('id',{ascending:false}).limit(500);assert(r);return r.data||[]; },
+    async deleteExpense(id){
+      const e=await db.from('importb2b_expenses').select('*').eq('id',Number(id)).single();assert(e);
+      if(e.data.finance_movement_id){ try{await this.deleteManualMovement(e.data.finance_movement_id)}catch(err){throw new Error('No se pudo revertir el movimiento financiero: '+err.message)} }
+      const r=await db.from('importb2b_expenses').delete().eq('id',Number(id));assert(r);return true;
+    },
+    async trackingData(){
+      const [s,e]=await Promise.all([
+        db.from('importb2b_shipments').select('*').order('created_at',{ascending:false}).limit(300),
+        db.from('importb2b_tracking_events').select('*').order('event_datetime',{ascending:false}).limit(1200)
+      ]);assert(s);assert(e);return {shipments:s.data||[],events:e.data||[]};
+    },
+    async createShipment(orderId,tracking,carrier='Via Cargo'){
+      const u=await authUser();
+      const ins=await db.from('importb2b_shipments').insert({owner_id:u.id,order_id:Number(orderId),carrier_name:carrier,tracking_number:String(tracking).trim(),tracking_provider:'17TRACK',normalized_status:'NO_UPDATES'}).select().single();assert(ins);
+      await db.from('importb2b_orders').update({purchase_status:'in_transit',updated_at:new Date().toISOString()}).eq('id',Number(orderId));
+      const reg=await db.functions.invoke('seventeen-track-register',{body:{shipment_id:ins.data.id}});
+      if(reg.error) return {...ins.data,register_error:reg.error.message};
+      return ins.data;
+    },
+    async registerShipment(id){ const r=await db.functions.invoke('seventeen-track-register',{body:{shipment_id:Number(id)}});if(r.error)throw r.error;return r.data; },
+    async refreshShipment(id){ const r=await db.functions.invoke('seventeen-track-refresh',{body:{shipment_id:Number(id)}});if(r.error)throw r.error;return r.data; },
+    async markShipmentPickedUp(id){ const r=await db.rpc('importb2b_mark_shipment_picked_up',{p_shipment_id:Number(id)});assert(r);return r.data; },
+    async deleteShipment(id){ const e=await db.from('importb2b_tracking_events').delete().eq('shipment_id',Number(id));assert(e);const r=await db.from('importb2b_shipments').delete().eq('id',Number(id));assert(r);return true; },
+
+    async wholesaleData(){
+      const [rows,margins]=await Promise.all([
+        db.from('importb2b_wholesale_pricing').select('*').order('category').order('product_name').order('variant_name'),
+        db.from('importb2b_margins').select('*').order('category')
+      ]);assert(rows);assert(margins);return {rows:rows.data||[],margins:margins.data||[]};
+    },
+    async saveMargins(rows){
+      const u=await authUser();
+      const data=rows.map(x=>({owner_id:u.id,category:x.category,retail:Number(x.retail||0),wholesale_6:Number(x.wholesale_6||0),wholesale_12:Number(x.wholesale_12||0),wholesale_36:Number(x.wholesale_36||0),updated_at:new Date().toISOString()}));
+      const r=await db.from('importb2b_margins').upsert(data,{onConflict:'owner_id,category'});assert(r);return true;
+    },
+    async saveWholesalePrice(variantId,minQty,price){ const r=await db.rpc('importb2b_save_wholesale_price',{p_variant_id:variantId,p_min_quantity:Number(minQty),p_price_ars:Number(price)});assert(r);return r.data; },
 
     async paymentMethods(){ const r=await db.from('importb2b_payment_methods').select('*').eq('active',true).order('sort_order').order('name'); assert(r); return r.data||[]; },
     async completeSale({customerId=null,items,paymentMethodId,shipping=0,discount=0,notes='',holder=null}){

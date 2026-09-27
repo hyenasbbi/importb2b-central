@@ -30,6 +30,9 @@
   let pdfCategory='';
   let pdfOnlyStock=true;
   let pdfSelected=new Set();
+  let pdfWholesaleTier=6;
+  let wholesaleSearch='';
+  let wholesaleCategory='';
 
   const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n||0));
   const number=n=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(Number(n||0));
@@ -59,12 +62,13 @@
     if(currentView==='club'){clubSearch=v;renderClub(v);}
     if(currentView==='pdfs'){pdfSearch=v;renderPdfBuilder();}
     if(currentView==='sell'){posSearch=v;renderPosCatalog();}
+    if(currentView==='wholesale'){wholesaleSearch=v;renderWholesale();}
   });
   function setView(v){currentView=v;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));render();}
 
   async function render(){
-    const titles={dashboard:'Inicio',sell:'Vender',products:'Productos / Stock',orders:'Operaciones',customers:'Clientes',club:'Club',pdfs:'PDF / Catálogos',finance:'Finanzas',catalog:'Catálogo / Web',imports:'Importar Kyte'};
-    const searchPlaceholders={products:'Buscar producto, SKU, categoría…',customers:'Buscar cliente, teléfono o Instagram…',club:'Buscar miembro del Club…',pdfs:'Buscar producto para el PDF…'};
+    const titles={dashboard:'Inicio',sell:'Vender',products:'Productos / Stock',orders:'Operaciones',customers:'Clientes',club:'Club',pdfs:'PDF / Catálogos',wholesale:'Mayorista',finance:'Finanzas',catalog:'Catálogo / Web',imports:'Importar Kyte'};
+    const searchPlaceholders={products:'Buscar producto, SKU, categoría…',customers:'Buscar cliente, teléfono o Instagram…',club:'Buscar miembro del Club…',pdfs:'Buscar producto para el PDF…',wholesale:'Buscar producto, variante o categoría…'};
     $('#viewTitle').textContent=titles[currentView]||'IMPORTB2B';
     const gs=$('#globalSearch'),gsWrap=document.querySelector('.global-search');
     const showGlobalSearch=Object.prototype.hasOwnProperty.call(searchPlaceholders,currentView);
@@ -79,6 +83,7 @@
       else if(currentView==='customers') await renderCustomers($('#globalSearch').value);
       else if(currentView==='club') await renderClub(clubSearch||$('#globalSearch').value);
       else if(currentView==='pdfs') await renderPdfBuilder();
+      else if(currentView==='wholesale') await renderWholesale();
       else if(currentView==='finance') await renderFinance();
       else if(currentView==='catalog') await renderCatalogAdmin();
       else if(currentView==='imports') await renderImports();
@@ -363,8 +368,20 @@ El stock y el historial se conservan.`))return;
     document.querySelectorAll('.open-customer360').forEach(b=>b.addEventListener('click',()=>openCustomer360(b.dataset.id)));
   }
   function openCustomerEditor(customer=null,fromPos=false){
-    openModal(`<div class="section-title"><div><span class="eyebrow">CLIENTE</span><h3>${customer?'Editar':'Nuevo'} cliente</h3></div><button class="modal-close">×</button></div><div class="form-grid"><label>Nombre<input id="cuName" value="${esc(customer?.full_name||'')}"></label><label>Teléfono<input id="cuPhone" value="${esc(customer?.phone||'')}"></label><label>Email<input id="cuEmail" type="email" value="${esc(customer?.email||'')}"></label><label>Instagram<input id="cuInstagram" value="${esc(customer?.instagram_username||'')}"></label><label>Dirección<input id="cuAddress" value="${esc(customer?.address||'')}"></label><label>Documento<input id="cuDoc" value="${esc(customer?.document_number||'')}"></label></div><label style="margin-top:12px">Notas<textarea id="cuNotes" rows="3">${esc(customer?.notes||'')}</textarea></label><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveCustomer" class="btn primary">Guardar cliente</button></div>`);
+    openModal(`<div class="section-title"><div><span class="eyebrow">CLIENTE</span><h3>${customer?'Editar':'Nuevo'} cliente</h3></div><button class="modal-close">×</button></div><div class="form-grid"><label>Nombre<input id="cuName" value="${esc(customer?.full_name||'')}"></label><label>Teléfono<input id="cuPhone" value="${esc(customer?.phone||'')}"></label><label>Email<input id="cuEmail" type="email" value="${esc(customer?.email||'')}"></label><label>Instagram<input id="cuInstagram" value="${esc(customer?.instagram_username||'')}"></label><label>Dirección<input id="cuAddress" value="${esc(customer?.address||'')}"></label><label>Documento<input id="cuDoc" value="${esc(customer?.document_number||'')}"></label></div><label style="margin-top:12px">Notas<textarea id="cuNotes" rows="3">${esc(customer?.notes||'')}</textarea></label>${customer?`<section class="customer-admin-zone"><div><span class="eyebrow">ADMINISTRACIÓN</span><h4>Gestionar ficha</h4><p class="muted">Unificá duplicados o retiralos de la base activa sin romper ventas, deuda ni Club.</p></div><div class="customer-admin-actions"><button id="mergeCustomerBtn" class="btn ghost">Unificar cliente</button><button id="archiveCustomerBtn" class="btn ghost">Archivar</button><button id="deleteCustomerBtn" class="btn danger-btn">Eliminar</button></div></section>`:''}<div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveCustomer" class="btn primary">Guardar cliente</button></div>`);
     $('#saveCustomer').addEventListener('click',async()=>{const payload={full_name:$('#cuName').value.trim(),phone:$('#cuPhone').value.trim()||null,email:$('#cuEmail').value.trim()||null,instagram_username:$('#cuInstagram').value.trim()||null,address:$('#cuAddress').value.trim()||null,document_number:$('#cuDoc').value.trim()||null,notes:$('#cuNotes').value.trim()||null};if(!payload.full_name)return alert('Ingresá el nombre');try{if(customer)await DB.updateCustomer(customer.id,payload);else await DB.createCustomer(payload);closeModal();if(fromPos)await renderSell();else await renderCustomers($('#globalSearch').value)}catch(e){alert(e.message)}});
+    $('#mergeCustomerBtn')?.addEventListener('click',()=>openMergeCustomer(customer));
+    $('#archiveCustomerBtn')?.addEventListener('click',async()=>{const reason=prompt('Motivo para archivar esta ficha:','Duplicado / cliente inactivo');if(reason===null)return;if(!confirm('La ficha dejará de aparecer en Clientes, pero se conserva todo su historial. ¿Continuar?'))return;try{await DB.archiveCustomer(customer.id,reason);closeModal();await renderCustomers($('#globalSearch').value)}catch(e){alert(e.message)}});
+    $('#deleteCustomerBtn')?.addEventListener('click',async()=>{if(!confirm('Eliminar solo es posible si la ficha no tiene ventas, deuda ni Club. ¿Intentar eliminar?'))return;try{await DB.deleteCustomerSafe(customer.id);closeModal();await renderCustomers($('#globalSearch').value)}catch(e){alert(e.message)}});
+  }
+
+  async function openMergeCustomer(source){
+    const all=(await DB.customers('')).filter(x=>x.id!==source.id);
+    openModal(`<div class="section-title"><div><span class="eyebrow">UNIFICAR CLIENTE</span><h3>${esc(source.full_name)}</h3><p class="muted">Elegí la ficha definitiva. Las ventas, deudas y Club se trasladan al cliente seleccionado; la ficha origen queda archivada.</p></div><button class="modal-close modal-x">×</button></div><label>Buscar ficha destino<input id="mergeCustomerSearch" placeholder="Nombre, teléfono, Instagram…"></label><div id="mergeCustomerResults" class="merge-customer-list"></div><div id="mergeCustomerSummary" class="notice" style="margin-top:12px">Todavía no seleccionaste una ficha destino.</div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="confirmCustomerMerge" class="btn primary" disabled>Unificar fichas</button></div>`);
+    let target=null;
+    const renderList=()=>{const q=$('#mergeCustomerSearch').value.trim().toLowerCase();const rows=all.filter(x=>!q||[x.full_name,x.phone,x.instagram_username,x.member_code,x.customer_code].join(' ').toLowerCase().includes(q)).slice(0,60);$('#mergeCustomerResults').innerHTML=rows.map(x=>`<button class="merge-customer-row ${target?.id===x.id?'selected':''}" data-id="${x.id}"><span><b>${esc(x.full_name)}</b><small>${esc(x.phone||x.instagram_username||x.member_code||'Sin datos extra')}</small></span><span><b>${number(x.completed_sales||0)} compras</b><small>${Number(x.active_clubs||0)?'👑'.repeat(Number(x.active_clubs)):''}</small></span></button>`).join('')||'<div class="empty compact-empty">Sin coincidencias.</div>';document.querySelectorAll('.merge-customer-row').forEach(b=>b.addEventListener('click',()=>{target=all.find(x=>x.id===b.dataset.id);$('#confirmCustomerMerge').disabled=!target;$('#mergeCustomerSummary').innerHTML=target?`<b>Destino:</b> ${esc(target.full_name)} · ${number(target.completed_sales||0)} compras · ${number(target.active_clubs||0)} club(es)`:'Seleccioná destino';renderList()}));};
+    $('#mergeCustomerSearch').addEventListener('input',renderList);renderList();
+    $('#confirmCustomerMerge').addEventListener('click',async()=>{if(!target)return;if(!confirm(`¿Unificar ${source.full_name} dentro de ${target.full_name}? Esta operación preserva trazabilidad.`))return;const btn=$('#confirmCustomerMerge');btn.disabled=true;btn.textContent='Unificando…';try{await DB.mergeCustomers(target.id,source.id);closeModal();await renderCustomers($('#globalSearch').value);setTimeout(()=>openCustomer360(target.id),80)}catch(e){alert(e.message);btn.disabled=false;btn.textContent='Unificar fichas'}});
   }
 
 
@@ -404,7 +421,7 @@ El stock y el historial se conservan.`))return;
   function membershipCardHtml(m,data){
     const rules=data.rules.filter(r=>r.club_type===m.club_type),next=rules.find(r=>Number(r.milestone)>Number(m.points));
     const pct=next?Math.min(100,Math.round(Number(m.points)/Number(next.milestone)*100)):100;
-    return `<article class="club-membership card"><div class="club-membership-title"><span><small>${esc(clubLabel(m.club_type))}</small><b>${number(m.points)} puntos</b></span><button class="btn tiny primary add-club-point" data-club="${m.club_type}">+1 punto</button></div><div class="club-progress"><i style="width:${pct}%"></i></div><small>${next?`Próximo: ${esc(next.reward_name)} a los ${next.milestone} pts`:'Todas las metas configuradas alcanzadas'}</small><div class="club-reward-chips">${rules.map(r=>{const claim=data.claims.find(c=>c.club_type===m.club_type&&Number(c.milestone)===Number(r.milestone));const status=claim?.status==='delivered'?'Entregado':Number(m.points)>=Number(r.milestone)?'Desbloqueado':'Bloqueado';return`<span class="reward-chip ${status==='Entregado'?'done':status==='Desbloqueado'?'unlocked':''}"><b>${r.milestone}</b> ${esc(r.reward_name)} · ${status}</span>`}).join('')}</div></article>`;
+    return `<article class="club-membership card"><div class="club-membership-title"><span><small>${esc(clubLabel(m.club_type))}</small><b>${number(m.points)} puntos</b></span><div class="club-point-actions"><button class="btn tiny ghost adjust-club-points" data-membership="${m.id}">Ajustar</button><button class="btn tiny primary add-club-point" data-club="${m.club_type}">+1 punto</button></div></div><div class="club-progress"><i style="width:${pct}%"></i></div><small>${next?`Próximo: ${esc(next.reward_name)} a los ${next.milestone} pts`:'Todas las metas configuradas alcanzadas'}</small><div class="club-reward-chips">${rules.map(r=>{const claim=data.claims.find(c=>c.club_type===m.club_type&&Number(c.milestone)===Number(r.milestone));const status=claim?.status==='delivered'?'Entregado':Number(m.points)>=Number(r.milestone)?'Desbloqueado':'Bloqueado';return`<span class="reward-chip ${status==='Entregado'?'done':status==='Desbloqueado'?'unlocked':''}"><b>${r.milestone}</b> ${esc(r.reward_name)} · ${status}</span>`}).join('')}</div></article>`;
   }
 
   function bindCustomer360Actions(data,tab){
@@ -414,7 +431,14 @@ El stock y el historial se conservan.`))return;
     const publicLink=data.profile?`${location.origin}/club/${data.profile.access_token}`:null;
     $('#copyClubLinkBody')?.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(publicLink);alert('Enlace del Club copiado')}catch{prompt('Copiá este enlace:',publicLink)}});
     document.querySelectorAll('.add-club-point').forEach(b=>b.addEventListener('click',()=>openRegisterClubPoint(data,b.dataset.club)));
+    document.querySelectorAll('.adjust-club-points').forEach(b=>b.addEventListener('click',()=>openAdjustClubPoints(data,b.dataset.membership)));
     document.querySelectorAll('.deliver-club-reward').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Marcar este premio como entregado?'))return;const note=prompt('Nota opcional:','')||'';try{await DB.deliverClubReward(b.dataset.id,note);await openCustomer360(data.customer.id,'club')}catch(e){alert(e.message)}}));
+  }
+
+  function openAdjustClubPoints(data,membershipId){
+    const m=data.memberships.find(x=>x.id===membershipId);if(!m)return;
+    openModal(`<div class="section-title"><div><span class="eyebrow">${esc(clubLabel(m.club_type))}</span><h3>Ajustar puntos</h3><p class="muted">Corregí un valor erróneo sin borrar el historial. Los premios entregados nunca se eliminan.</p></div><button class="modal-close modal-x">×</button></div><div class="club-adjust-current"><small>Puntos actuales</small><b>${number(m.points)}</b></div><div class="form-grid"><label>Nuevo total de puntos<input id="clubNewPoints" type="number" min="0" step="1" value="${Number(m.points||0)}"></label><label>Motivo del ajuste<input id="clubAdjustReason" placeholder="Ej: punto cargado por error"></label></div><div class="notice" style="margin-top:12px">Si bajás de una meta, los premios pendientes que ya no correspondan vuelven a bloquearse. Los premios ya entregados permanecen registrados.</div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveClubAdjustment" class="btn primary">Guardar ajuste</button></div>`);
+    $('#saveClubAdjustment').addEventListener('click',async()=>{const pts=Number($('#clubNewPoints').value),reason=$('#clubAdjustReason').value.trim();if(!Number.isInteger(pts)||pts<0)return alert('Ingresá un total de puntos válido');if(!reason)return alert('Indicá el motivo del ajuste');if(!confirm(`Cambiar ${m.points} → ${pts} puntos en ${clubLabel(m.club_type)}?`))return;try{await DB.adjustClubPoints(m.id,pts,reason);closeModal();await openCustomer360(data.customer.id,'club')}catch(e){alert(e.message)}});
   }
 
   function openAddClubMembership(data){
@@ -485,7 +509,7 @@ El stock y el historial se conservan.`))return;
     content.innerHTML=`
       <div class="pdf-builder-head card">
         <div>
-          <span class="eyebrow">GENERADOR AUTOMÁTICO · 6.2</span>
+          <span class="eyebrow">GENERADOR AUTOMÁTICO · 6.5</span>
           <h3>PDF desde Stock Central</h3>
           <p class="muted">El PDF incluye solamente los productos que marques. Podés filtrar, seleccionar por categoría y exportar sin tocar el stock real.</p>
         </div>
@@ -500,6 +524,7 @@ El stock y el historial se conservan.`))return;
           <label>Categoría<select id="pdfCategory"><option value="">Todas</option>${cats.map(c=>`<option value="${esc(c)}" ${pdfCategory===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
           <label class="check"><input id="pdfOnlyStock" type="checkbox" ${pdfOnlyStock?'checked':''}> Solo productos con stock</label>
           <label class="check"><input id="pdfExactStock" type="checkbox"> Mostrar cantidad exacta</label>
+          <label>Precio mayorista<select id="pdfWholesaleTier"><option value="6" ${pdfWholesaleTier===6?'selected':''}>Mayorista 6+</option><option value="12" ${pdfWholesaleTier===12?'selected':''}>Mayorista 12+</option><option value="36" ${pdfWholesaleTier===36?'selected':''}>Mayorista 36+</option></select></label>
           <label>Título<input id="pdfTitle" value="CATÁLOGO IMPORTB2B"></label>
           <label>Subtítulo<input id="pdfSubtitle" value="Stock disponible"></label>
 
@@ -550,6 +575,7 @@ El stock y el historial se conservan.`))return;
     $('#pdfSearch').addEventListener('input',e=>{pdfSearch=e.target.value;$('#globalSearch').value=pdfSearch;clearTimeout(timer);timer=setTimeout(renderPdfBuilder,160)});
     $('#pdfCategory').addEventListener('change',e=>{pdfCategory=e.target.value;renderPdfBuilder()});
     $('#pdfOnlyStock').addEventListener('change',e=>{pdfOnlyStock=e.target.checked;renderPdfBuilder()});
+    $('#pdfWholesaleTier').addEventListener('change',e=>{pdfWholesaleTier=Number(e.target.value);});
     document.querySelectorAll('.pdf-product-check').forEach(x=>x.addEventListener('change',()=>{
       x.checked?pdfSelected.add(x.dataset.id):pdfSelected.delete(x.dataset.id);
       x.closest('.pdf-product-row')?.classList.toggle('selected',x.checked);
@@ -558,7 +584,7 @@ El stock y el historial se conservan.`))return;
     $('#pdfSelectAll').addEventListener('click',()=>{rows.forEach(x=>pdfSelected.add(x.id));renderPdfBuilder()});
     $('#pdfClear').addEventListener('click',()=>{pdfSelected.clear();renderPdfBuilder()});
     $('#pdfClient').addEventListener('click',()=>generateStockPdf(all.filter(x=>pdfSelected.has(x.id)),{mode:'client',exactStock:$('#pdfExactStock').checked,title:$('#pdfTitle').value.trim()||'CATÁLOGO IMPORTB2B',subtitle:$('#pdfSubtitle').value.trim()}));
-    $('#pdfReseller').addEventListener('click',()=>generateStockPdf(all.filter(x=>pdfSelected.has(x.id)),{mode:'reseller',exactStock:$('#pdfExactStock').checked,title:'CATÁLOGO MAYORISTA',subtitle:$('#pdfSubtitle').value.trim()}));
+    $('#pdfReseller').addEventListener('click',()=>generateStockPdf(all.filter(x=>pdfSelected.has(x.id)),{mode:'reseller',wholesaleTier:pdfWholesaleTier,exactStock:$('#pdfExactStock').checked,title:'CATÁLOGO MAYORISTA',subtitle:`Mayorista ${pdfWholesaleTier}+ · ${$('#pdfSubtitle').value.trim()}`}));
   }
 
   async function generateStockPdf(products,opts){
@@ -570,8 +596,7 @@ El stock y el historial se conservan.`))return;
 
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    let logo=null;
-    if(opts.mode==='client')logo=await loadPdfLogo('./assets/img/logo-importb2b-transparent.png').catch(()=>null);
+    const logo=await loadPdfLogo('./assets/img/logo-importb2b-transparent.png').catch(()=>null);
 
     drawPdfCover(doc,opts,usable.length,logo);
     for(let i=0;i<usable.length;i++){
@@ -579,7 +604,7 @@ El stock y el historial se conservan.`))return;
       await drawPdfProduct(doc,usable[i],opts,i+1,usable.length,logo);
     }
     const date=new Date().toISOString().slice(0,10);
-    doc.save(`${opts.mode==='client'?'IMPORTB2B':'Catalogo-Mayorista'}-${date}.pdf`);
+    doc.save(`${opts.mode==='client'?'IMPORTB2B':`IMPORTB2B-Mayorista-${opts.wholesaleTier||6}+`}-${date}.pdf`);
   }
 
   function pdfText(doc,text,x,y,size=10,style='normal',maxWidth=178){
@@ -598,7 +623,7 @@ El stock y el historial se conservan.`))return;
 
   function drawPdfCover(doc,opts,count,logo){
     doc.setFillColor(9,10,12);doc.rect(0,0,210,297,'F');
-    if(logo&&opts.mode==='client')addPdfLogo(doc,logo,105,30,82,42,{center:true});
+    if(logo)addPdfLogo(doc,logo,105,30,82,42,{center:true});
 
     doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(29);
     doc.text(opts.title||'CATÁLOGO IMPORTB2B',105,136,{align:'center'});
@@ -606,16 +631,14 @@ El stock y el historial se conservan.`))return;
     doc.setFont('helvetica','normal');doc.setFontSize(12);doc.setTextColor(205,209,214);
     doc.text(opts.subtitle||'Stock disponible',105,164,{align:'center'});
     doc.setFontSize(9);doc.setTextColor(130,137,144);doc.text(`${count} productos seleccionados · ${new Date().toLocaleDateString('es-AR')}`,105,178,{align:'center'});
-    if(opts.mode==='client'){
-      doc.setDrawColor(55,60,66);doc.line(62,265,148,265);
-      doc.setTextColor(245,245,245);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text('IMPORTB2B · STOCK ACTUALIZADO',105,275,{align:'center'});
-    }
+    doc.setDrawColor(55,60,66);doc.line(62,265,148,265);
+    doc.setTextColor(245,245,245);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text(opts.mode==='client'?'IMPORTB2B · STOCK ACTUALIZADO':`IMPORTB2B · MAYORISTA ${opts.wholesaleTier||6}+`,105,275,{align:'center'});
   }
 
   async function drawPdfProduct(doc,p,opts,index,total,logo){
     doc.setFillColor(15,17,19);doc.rect(0,0,210,297,'F');
 
-    if(opts.mode==='client'&&logo)addPdfLogo(doc,logo,16,10,38,14);
+    if(logo)addPdfLogo(doc,logo,16,10,38,14);
     doc.setTextColor(237,28,36);doc.setFontSize(8);doc.setFont('helvetica','bold');
     doc.text((p.category||'PRODUCTO').toUpperCase(),194,18,{align:'right'});
 
@@ -638,11 +661,13 @@ El stock y el historial se conservan.`))return;
 
     let y=170;
     doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
-    doc.text('VARIANTE',16,y);doc.text('STOCK',125,y);doc.text(opts.mode==='reseller'?'MAYORISTA':'PRECIO',194,y,{align:'right'});
+    doc.text('VARIANTE',16,y);doc.text('STOCK',125,y);doc.text(opts.mode==='reseller'?`MAYORISTA ${opts.wholesaleTier||6}+`:'PRECIO',194,y,{align:'right'});
     y+=4;doc.setDrawColor(65,68,72);doc.line(16,y,194,y);y+=8;
 
     for(const v of p.variants.slice(0,11)){
-      const price=opts.mode==='reseller'?Number(v.wholesale_price_ars||v.price_ars||0):Number(v.price_ars||0);
+      const tier=Number(opts.wholesaleTier||6);
+      const tierPrice=v.wholesale_tiers?.[`wholesale_${tier}_ars`];
+      const price=opts.mode==='reseller'?Number(tierPrice||v.wholesale_price_ars||v.price_ars||0):Number(v.price_ars||0);
       const av=Number(v.stock?.available||0);
       doc.setTextColor(235,237,239);doc.setFont('helvetica','normal');doc.setFontSize(8.5);
       doc.text(String(v.variant_name||'Única').slice(0,46),16,y);
@@ -698,52 +723,160 @@ El stock y el historial se conservan.`))return;
     const bmp=await createImageBitmap(blob);const max=1200,scale=Math.min(1,max/Math.max(bmp.width,bmp.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bmp.width*scale));canvas.height=Math.max(1,Math.round(bmp.height*scale));const ctx=canvas.getContext('2d');ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bmp,0,0,canvas.width,canvas.height);bmp.close?.();return canvas.toDataURL('image/jpeg',.9);
   }
 
-  /* -------------------- ORDERS -> STOCK -------------------- */
+  /* -------------------- FASE 6.5 · MAYORISTA -------------------- */
+  async function renderWholesale(){
+    const data=await DB.wholesaleData();
+    const cats=[...new Set(data.rows.map(x=>x.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+    let rows=data.rows;
+    if(wholesaleCategory)rows=rows.filter(x=>x.category===wholesaleCategory);
+    const term=String(wholesaleSearch||'').trim().toLowerCase();
+    if(term)rows=rows.filter(x=>[x.product_name,x.variant_name,x.sku,x.category].join(' ').toLowerCase().includes(term));
+    const marginMap=new Map((data.margins||[]).map(x=>[String(x.category).toLowerCase(),x]));
+    content.innerHTML=`<div class="section-title"><div><span class="eyebrow">MAYORISTA</span><h3>Calculadora de precios</h3><p class="muted">Los precios sugeridos parten del costo real de cada variante y del margen configurado por categoría. Podés sobrescribir un precio puntual.</p></div><span class="pill blue">6+ · 12+ · 36+</span></div>
+      <section class="card wholesale-margin-card"><div class="section-title"><div><span class="eyebrow">MÁRGENES</span><h3>Por categoría</h3></div><button id="saveWholesaleMargins" class="btn primary">Guardar márgenes</button></div><div class="table-wrap"><table class="table wholesale-margin-table"><thead><tr><th>Categoría</th><th>Minorista %</th><th>Mayorista 6 %</th><th>Mayorista 12 %</th><th>Mayorista 36 %</th></tr></thead><tbody>${cats.map(cat=>{const m=marginMap.get(cat.toLowerCase())||{};return`<tr data-margin-cat="${esc(cat)}"><td><b>${esc(cat)}</b></td><td><input data-field="retail" type="number" step="0.1" value="${Number(m.retail||0)}"></td><td><input data-field="wholesale_6" type="number" step="0.1" value="${Number(m.wholesale_6||0)}"></td><td><input data-field="wholesale_12" type="number" step="0.1" value="${Number(m.wholesale_12||0)}"></td><td><input data-field="wholesale_36" type="number" step="0.1" value="${Number(m.wholesale_36||0)}"></td></tr>`}).join('')}</tbody></table></div></section>
+      <section class="card" style="margin-top:14px"><div class="wholesale-toolbar"><input id="wholesaleSearch" value="${esc(wholesaleSearch)}" placeholder="Producto, variante o SKU…"><select id="wholesaleCategory"><option value="">Todas las categorías</option>${cats.map(c=>`<option value="${esc(c)}" ${wholesaleCategory===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div><div class="table-wrap"><table class="table wholesale-price-table"><thead><tr><th>Producto</th><th>Variante</th><th>Costo</th><th>Minorista</th><th>6+</th><th>12+</th><th>36+</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr data-wholesale-variant="${r.variant_id}"><td><b>${esc(r.product_name)}</b><br><small class="muted">${esc(r.category||'')}</small></td><td>${esc(r.variant_name||'Única')}<br><small class="muted">${esc(r.sku||'')}</small></td><td>${money(r.cost_ars)}</td><td>${money(r.retail_price_ars)}</td><td><input class="wh-price" data-tier="6" type="number" value="${Number(r.wholesale_6_ars||0)}"><small>${r.wholesale_6_manual?'Manual':'Margen'}</small></td><td><input class="wh-price" data-tier="12" type="number" value="${Number(r.wholesale_12_ars||0)}"><small>${r.wholesale_12_manual?'Manual':'Margen'}</small></td><td><input class="wh-price" data-tier="36" type="number" value="${Number(r.wholesale_36_ars||0)}"><small>${r.wholesale_36_manual?'Manual':'Margen'}</small></td><td><button class="btn tiny ghost save-wholesale-row">Guardar</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">No hay productos con este filtro.</td></tr>'}</tbody></table></div></section>`;
+    $('#wholesaleSearch')?.addEventListener('input',e=>{wholesaleSearch=e.target.value;$('#globalSearch').value=wholesaleSearch;clearTimeout(timer);timer=setTimeout(renderWholesale,160)});
+    $('#wholesaleCategory')?.addEventListener('change',e=>{wholesaleCategory=e.target.value;renderWholesale()});
+    $('#saveWholesaleMargins')?.addEventListener('click',async()=>{const btn=$('#saveWholesaleMargins');btn.disabled=true;try{const drafts=[...document.querySelectorAll('[data-margin-cat]')].map(tr=>({category:tr.dataset.marginCat,retail:tr.querySelector('[data-field="retail"]').value,wholesale_6:tr.querySelector('[data-field="wholesale_6"]').value,wholesale_12:tr.querySelector('[data-field="wholesale_12"]').value,wholesale_36:tr.querySelector('[data-field="wholesale_36"]').value}));await DB.saveMargins(drafts);await renderWholesale()}catch(e){alert(e.message);btn.disabled=false}});
+    document.querySelectorAll('.save-wholesale-row').forEach(b=>b.addEventListener('click',async()=>{const tr=b.closest('[data-wholesale-variant]');const vid=tr.dataset.wholesaleVariant;b.disabled=true;try{for(const inp of tr.querySelectorAll('.wh-price'))await DB.saveWholesalePrice(vid,Number(inp.dataset.tier),Number(inp.value||0));await renderWholesale()}catch(e){alert(e.message);b.disabled=false}}));
+  }
+
+  /* -------------------- FASE 6.5 · OPERACIONES / COMPRAS / TRACKING / GASTOS -------------------- */
   async function renderOrders(){
     const [rows,webAll]=await Promise.all([DB.recentOrders(),DB.webOrders('all')]);
     const webFiltered=webOrderStatusFilter==='all'?webAll:webAll.filter(x=>x.status===webOrderStatusFilter);
     const webPending=webAll.filter(x=>x.status==='pending').length;
     const purchaseHistorical=rows.filter(o=>o.items.length&&o.items.every(i=>i.stock_link_status==='historical')).length;
     const purchaseActive=rows.length-purchaseHistorical;
+    let extra=null;
+    if(operationsTab==='tracking')extra=await DB.trackingData();
+    if(operationsTab==='expenses')extra=await DB.expenses();
+
+    const body=operationsTab==='purchases'?`<div class="operations-actionbar"><button id="newPurchaseOrder" class="btn primary">+ Nuevo pedido</button></div>${renderPurchaseAccordions(rows)}`:
+      operationsTab==='tracking'?renderTrackingSection(rows,extra):
+      operationsTab==='expenses'?renderExpensesSection(extra,rows):renderWebOrderAccordions(webFiltered);
 
     content.innerHTML=`
       <div class="operations-head card">
-        <div class="section-title"><div><span class="eyebrow">OPERACIONES</span><h3>Compras y pedidos del catálogo</h3><p class="muted">Los registros históricos ya están incluidos en el stock migrado: se muestran como referencia y no requieren activación.</p></div></div>
+        <div class="section-title"><div><span class="eyebrow">OPERACIONES</span><h3>Compras y mercadería</h3><p class="muted">Pedido → seguimiento → retiro → recepción → stock. Los registros históricos conservan la leyenda “stock incluido”.</p></div></div>
         <div class="operation-stats"><span class="pill blue">${purchaseActive} compras activas</span><span class="pill">${purchaseHistorical} históricas</span><span class="pill yellow">${webPending} web pendientes</span></div>
-        <div class="operation-tabs"><button class="${operationsTab==='purchases'?'active':''}" data-operation-tab="purchases">Compras / Mercadería</button><button class="${operationsTab==='web'?'active':''}" data-operation-tab="web">Pedidos del catálogo ${webPending?`<b>${webPending}</b>`:''}</button></div>
-      </div>
-      <div id="operationsBody" style="margin-top:14px">${operationsTab==='purchases'?renderPurchaseAccordions(rows):renderWebOrderAccordions(webFiltered)}</div>`;
+        <div class="operation-tabs"><button class="${operationsTab==='purchases'?'active':''}" data-operation-tab="purchases">Compras / Mercadería</button><button class="${operationsTab==='tracking'?'active':''}" data-operation-tab="tracking">📦 Seguimiento</button><button class="${operationsTab==='expenses'?'active':''}" data-operation-tab="expenses">Gastos</button><button class="${operationsTab==='web'?'active':''}" data-operation-tab="web">Pedidos del catálogo ${webPending?`<b>${webPending}</b>`:''}</button></div>
+      </div><div id="operationsBody" style="margin-top:14px">${body}</div>`;
 
     document.querySelectorAll('[data-operation-tab]').forEach(b=>b.addEventListener('click',()=>{operationsTab=b.dataset.operationTab;renderOrders()}));
     bindOperationAccordions();
+    $('#newPurchaseOrder')?.addEventListener('click',openNewPurchaseOrder);
     document.querySelectorAll('.edit-allocation').forEach(b=>b.addEventListener('click',()=>openOrderAllocation(b.dataset.id,rows)));
     document.querySelectorAll('.receive-allocation').forEach(b=>b.addEventListener('click',async()=>{const remaining=Number(b.dataset.remaining);const q=prompt(`Quedan ${remaining} unidades por recibir. ¿Cuántas llegaron?`,String(remaining));if(q===null)return;const n=Number(q);if(!Number.isFinite(n)||n<=0||n>remaining)return alert('Cantidad inválida');const note=prompt('Nota de recepción:','Recepción de mercadería')||'';try{await DB.receiveOrderAllocation(b.dataset.id,n,note);await renderOrders()}catch(e){alert(e.message)}}));
+    document.querySelectorAll('.purchase-tracking').forEach(b=>b.addEventListener('click',()=>openAddTracking(Number(b.dataset.order),rows)));
+    document.querySelectorAll('.purchase-payment').forEach(b=>b.addEventListener('click',()=>openPurchasePayment(rows.find(x=>Number(x.id)===Number(b.dataset.order)))));
+    document.querySelectorAll('.purchase-expense').forEach(b=>b.addEventListener('click',()=>openNewExpense(rows,Number(b.dataset.order))));
     document.querySelectorAll('.open-web-order').forEach(b=>b.addEventListener('click',()=>openWebOrder(b.dataset.id)));
     $('#webOpsStatus')?.addEventListener('change',e=>{webOrderStatusFilter=e.target.value;renderOrders()});
+    $('#newExpense')?.addEventListener('click',()=>openNewExpense(rows));
+    document.querySelectorAll('.delete-expense').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Eliminar este gasto? Si generó un movimiento financiero también se revertirá.'))return;try{await DB.deleteExpense(b.dataset.id);await renderOrders()}catch(e){alert(e.message)}}));
+    $('#addTracking')?.addEventListener('click',()=>openAddTracking(null,rows));
+    document.querySelectorAll('.tracking-refresh').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;try{await DB.refreshShipment(b.dataset.id);await renderOrders()}catch(e){alert(e.message);b.disabled=false}}));
+    document.querySelectorAll('.tracking-register').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;try{await DB.registerShipment(b.dataset.id);await renderOrders()}catch(e){alert(e.message);b.disabled=false}}));
+    document.querySelectorAll('.tracking-picked').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Marcar la mercadería como retirada? Esto NO la suma todavía al stock.'))return;try{await DB.markShipmentPickedUp(b.dataset.id);await renderOrders()}catch(e){alert(e.message)}}));
+    document.querySelectorAll('.tracking-delete').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Eliminar este seguimiento y su historial?'))return;try{await DB.deleteShipment(b.dataset.id);await renderOrders()}catch(e){alert(e.message)}}));
+    document.querySelectorAll('.tracking-history-btn').forEach(b=>b.addEventListener('click',()=>document.querySelector(`#trackingHistory_${b.dataset.id}`)?.classList.toggle('hidden')));
   }
+
   function bindOperationAccordions(){
     document.querySelectorAll('.operation-accordion').forEach(d=>d.addEventListener('toggle',()=>{if(!d.open)return;document.querySelectorAll('.operation-accordion[open]').forEach(other=>{if(other!==d)other.open=false})}));
   }
+
+  function purchaseStatusPill(status){
+    const map={ordered:['Pedido',''],in_transit:['En viaje','blue'],ready_for_pickup:['Para retirar','green'],picked_up:['Retirado','purple'],receiving:['Recepción parcial','yellow'],received:['Recibido','green'],cancelled:['Cancelado','red']};
+    const x=map[status]||['En gestión',''];return`<span class="pill ${x[1]}">${x[0]}</span>`;
+  }
+
   function renderPurchaseAccordions(rows){
     if(!rows.length)return'<div class="card empty">Sin compras registradas.</div>';
     return `<div class="order-stack">${rows.map(o=>{
       const historical=o.items.length&&o.items.every(i=>i.stock_link_status==='historical');
-      const totalQty=o.items.reduce((a,i)=>a+Number(i.quantity||0),0);
-      const received=o.items.reduce((a,i)=>a+Number(i.received_quantity||0),0);
-      const shipText=o.shipment?.latest_checkpoint_description||o.shipment?.normalized_status||o.shipment?.carrier_name||'';
-      const status=historical?'<span class="pill yellow">Histórico · stock incluido</span>':o.shipment?.is_received?'<span class="pill green">Entregado</span>':shipText?`<span class="pill blue">${esc(shipText)}</span>`:'<span class="pill">En gestión</span>';
-      return `<details class="card order-card operation-accordion"><summary class="operation-summary"><div class="operation-summary-main"><span class="eyebrow">COMPRA #${esc(o.order_number??o.id)}</span><h3>${esc(o.order_date||'Sin fecha')}</h3><small>${number(o.total_units||totalQty)} unidades · USD ${number(o.investment_usd)}</small></div><div class="operation-summary-side">${status}<span class="accordion-chevron">⌄</span></div></summary><div class="operation-body">${historical?`<div class="notice good-notice historical-note">Esta compra es histórica y sus unidades ya forman parte del stock actual. Se conserva para trazabilidad.</div>`:`<div class="operation-progress"><span>Recibido ${number(received)} / ${number(totalQty)}</span><div><i style="width:${totalQty?Math.min(100,received/totalQty*100):0}%"></i></div></div>`}${o.items.map(i=>renderOrderItem(i)).join('')}</div></details>`
+      const totalQty=o.items.reduce((a,i)=>a+Number(i.quantity||0),0),received=o.items.reduce((a,i)=>a+Number(i.received_quantity||0),0);
+      const ship=o.shipment||null;
+      const status=historical?'<span class="pill yellow">Histórico · stock incluido</span>':ship?.normalized_status==='READY_FOR_PICKUP'?'<span class="pill green">PARA RETIRAR</span>':purchaseStatusPill(o.purchase_status||'ordered');
+      const pay=o.purchase_payment_amount_ars?`<span class="pill green">Pagado ${money(o.purchase_payment_amount_ars)} · ${esc(o.purchase_payment_holder||'')}</span>`:'<span class="pill">Pago no registrado</span>';
+      return `<details class="card order-card operation-accordion"><summary class="operation-summary"><div class="operation-summary-main"><span class="eyebrow">COMPRA #${esc(o.order_number??o.id)}</span><h3>${esc(o.provider||o.order_date||'Sin proveedor')}</h3><small>${esc(o.order_date||'')} · ${number(o.total_units||totalQty)} unidades · USD ${number(o.investment_usd)}</small></div><div class="operation-summary-side">${status}<span class="accordion-chevron">⌄</span></div></summary><div class="operation-body">${historical?`<div class="notice good-notice historical-note">Esta compra es histórica y sus unidades ya forman parte del stock actual. Se conserva para trazabilidad.</div>`:`<div class="purchase-summary-grid"><div><small>Mercadería</small><b>USD ${number(o.merchandise_usdt||0)}</b></div><div><small>Envío</small><b>USD ${number(o.shipping_usdt||0)}</b></div><div><small>Inversión</small><b>USD ${number(o.investment_usd||0)}</b></div><div><small>Recibido</small><b>${number(received)} / ${number(totalQty)}</b></div></div><div class="operation-progress"><span>Recepción de mercadería</span><div><i style="width:${totalQty?Math.min(100,received/totalQty*100):0}%"></i></div></div>`}${!historical?`<div class="purchase-actions"><button class="btn tiny ghost purchase-tracking" data-order="${o.id}">${ship?'📍 Seguimiento':'+ Seguimiento'}</button><button class="btn tiny ghost purchase-payment" data-order="${o.id}" ${o.purchase_payment_amount_ars?'disabled':''}>${o.purchase_payment_amount_ars?'Pago registrado':'Registrar pago'}</button><button class="btn tiny ghost purchase-expense" data-order="${o.id}">+ Gasto vinculado</button>${pay}</div>`:''}${ship?`<div class="tracking-inline-card"><span><b>${esc(ship.carrier_name||'Vía Cargo')}</b><small>Guía ${esc(ship.tracking_number||'')} · ${esc(ship.latest_checkpoint_description||ship.normalized_status||'Sin novedades')}</small></span>${ship.normalized_status==='READY_FOR_PICKUP'&&!ship.is_received?`<button class="btn tiny good tracking-picked" data-id="${ship.id}">Marcar retirado</button>`:''}</div>`:''}${o.items.map(i=>renderOrderItem(i)).join('')}</div></details>`;
     }).join('')}</div>`;
   }
+
   function renderWebOrderAccordions(rows){
     const filter=`<div class="toolbar operations-filter"><select id="webOpsStatus"><option value="pending" ${webOrderStatusFilter==='pending'?'selected':''}>Pendientes</option><option value="confirmed" ${webOrderStatusFilter==='confirmed'?'selected':''}>Confirmados</option><option value="cancelled" ${webOrderStatusFilter==='cancelled'?'selected':''}>Cancelados</option><option value="all" ${webOrderStatusFilter==='all'?'selected':''}>Todos</option></select></div>`;
     if(!rows.length)return `${filter}<div class="card empty">No hay pedidos del catálogo en este estado.</div>`;
     return `${filter}<div class="order-stack">${rows.map(o=>`<details class="card order-card operation-accordion web-operation"><summary class="operation-summary"><div class="operation-summary-main"><span class="eyebrow">${esc(o.order_code)}</span><h3>${esc(o.customer_name)}</h3><small>${safeDate(o.created_at)} · ${esc(o.customer_phone||'')}</small></div><div class="operation-summary-side"><strong>${money(o.total_ars)}</strong>${statusPill(o.status)}<span class="accordion-chevron">⌄</span></div></summary><div class="operation-body web-operation-body"><div class="operation-kv"><div><small>Entrega</small><b>${o.delivery_type==='shipping'?'Envío':'Retiro'}</b></div><div><small>Total</small><b>${money(o.total_ars)}</b></div><div><small>Estado</small>${statusPill(o.status)}</div>${o.delivery_address?`<div><small>Dirección</small><b>${esc(o.delivery_address)}</b></div>`:''}</div><div class="modal-actions"><button class="btn ${o.status==='pending'?'primary':'ghost'} open-web-order" data-id="${o.id}">${o.status==='pending'?'Gestionar pedido':'Ver detalle'}</button></div></div></details>`).join('')}</div>`;
   }
+
   function renderOrderItem(i){
     const hist=i.stock_link_status==='historical',alloc=i.allocations||[],rec=Number(i.received_quantity||0);
-    return `<div class="order-item"><div class="order-item-main"><div><b>${esc(i.product)}</b><br><small class="muted">${esc(i.category||'')} · ${number(i.quantity)} un. · costo ${money(i.cost_ars)}</small></div><span class="pill ${hist?'yellow':rec>=Number(i.quantity)?'green':alloc.length?'blue':''}">${hist?'Histórico · incluido':rec>=Number(i.quantity)?'Recibido':alloc.length?'Vinculado':'Pendiente'}</span></div>${alloc.length?`<div class="allocation-list">${alloc.map(a=>{const rem=Number(a.ordered_quantity)-Number(a.received_quantity);return`<div class="allocation-row"><span><b>${esc(a.product?.name||'Producto')}</b> · ${esc(a.variant?.variant_name||'Única')}<br><small class="muted">${number(a.received_quantity)} / ${number(a.ordered_quantity)} recibidas</small></span>${rem>0?`<button class="btn tiny good receive-allocation" data-id="${a.id}" data-remaining="${rem}">Recibir ${number(rem)}</button>`:'<span class="pill green">Completo</span>'}</div>`}).join('')}</div>`:''}<div class="order-item-actions">${hist?`<small class="historical-inline">✓ Ya incluido en el stock actual</small>`:`<button class="btn tiny ghost edit-allocation" data-id="${i.id}">${alloc.length?'Editar distribución':'Vincular / distribuir'}</button>`}</div></div>`;
+    return `<div class="order-item"><div class="order-item-main"><div><b>${esc(i.product)}</b><br><small class="muted">${esc(i.detail||'Única')} · ${esc(i.category||'')} · ${number(i.quantity)} un. · costo puesto ${money(i.cost_ars)}</small></div><span class="pill ${hist?'yellow':rec>=Number(i.quantity)?'green':alloc.length?'blue':''}">${hist?'Histórico · incluido':rec>=Number(i.quantity)?'Recibido':rec>0?'Parcial':alloc.length?'En camino':'Pendiente'}</span></div>${alloc.length?`<div class="allocation-list">${alloc.map(a=>{const rem=Number(a.ordered_quantity)-Number(a.received_quantity);return`<div class="allocation-row"><span><b>${esc(a.product?.name||'Producto')}</b> · ${esc(a.variant?.variant_name||'Única')}<br><small class="muted">${number(a.received_quantity)} / ${number(a.ordered_quantity)} recibidas</small></span>${rem>0?`<button class="btn tiny good receive-allocation" data-id="${a.id}" data-remaining="${rem}">Recibir ${number(rem)}</button>`:'<span class="pill green">Completo</span>'}</div>`}).join('')}</div>`:''}<div class="order-item-actions">${hist?`<small class="historical-inline">✓ Ya incluido en el stock actual</small>`:`<button class="btn tiny ghost edit-allocation" data-id="${i.id}">${alloc.length?'Editar distribución':'Vincular / distribuir'}</button>`}</div></div>`;
   }
+
+  function trackingStatusMeta(status,error=''){
+    if(error)return {label:'INCIDENCIA',cls:'red',rank:1};
+    const map={READY_FOR_PICKUP:{label:'PARA RETIRAR',cls:'green',rank:0},ARRIVED_AT_DISTRIBUTION_CENTER:{label:'CENTRO DE DISTRIBUCIÓN',cls:'yellow',rank:2},IN_TRANSIT:{label:'EN VIAJE',cls:'blue',rank:3},CARRIER_RECEIVED:{label:'INGRESADO A VÍA CARGO',cls:'yellow',rank:4},NO_UPDATES:{label:'SIN NOVEDADES',cls:'',rank:5},RECEIVED:{label:'RETIRADO',cls:'purple',rank:6}};
+    return map[status]||map.NO_UPDATES;
+  }
+
+  function renderTrackingSection(orders,data){
+    const shipments=[...(data?.shipments||[])].sort((a,b)=>trackingStatusMeta(a.normalized_status,a.sync_error).rank-trackingStatusMeta(b.normalized_status,b.sync_error).rank);
+    const events=data?.events||[], omap=new Map(orders.map(o=>[Number(o.id),o]));
+    const counts={transit:shipments.filter(x=>x.normalized_status==='IN_TRANSIT').length,center:shipments.filter(x=>x.normalized_status==='ARRIVED_AT_DISTRIBUTION_CENTER').length,ready:shipments.filter(x=>x.normalized_status==='READY_FOR_PICKUP'&&!x.is_received).length,received:shipments.filter(x=>x.is_received||x.normalized_status==='RECEIVED').length};
+    return `<div class="operations-actionbar"><button id="addTracking" class="btn primary">+ Agregar seguimiento</button></div>
+      <div class="tracking-kpis"><div class="card"><small>En viaje</small><b>${counts.transit}</b></div><div class="card"><small>En centro</small><b>${counts.center}</b></div><div class="card tracking-ready"><small>Para retirar</small><b>${counts.ready}</b></div><div class="card"><small>Retirados</small><b>${counts.received}</b></div></div>
+      <div class="tracking-grid">${shipments.map(s=>{const o=omap.get(Number(s.order_id)),meta=trackingStatusMeta(s.normalized_status,s.sync_error),evs=events.filter(e=>Number(e.shipment_id)===Number(s.id)).slice(0,15);return`<article class="card tracking-card ${s.normalized_status==='READY_FOR_PICKUP'&&!s.is_received?'ready':''}"><div class="tracking-card-head"><div><span class="eyebrow">${o?`PEDIDO #${esc(o.order_number)}`:'SEGUIMIENTO'}</span><h3>${esc(s.carrier_name||'Vía Cargo')}</h3><small>Guía ${esc(s.tracking_number||'')}</small></div><span class="pill ${meta.cls}">${meta.label}</span></div><div class="tracking-last">${s.latest_checkpoint_description?`<b>${esc(s.latest_checkpoint_description)}</b>`:'<b>Sin movimientos informados</b>'}${s.latest_checkpoint_location?`<span>📍 ${esc(s.latest_checkpoint_location)}</span>`:''}<small>${s.latest_checkpoint_at?safeDate(s.latest_checkpoint_at):'Todavía sin fecha de evento'}${s.last_sync_at?` · sync ${safeDate(s.last_sync_at)}`:''}</small>${s.sync_error?`<small class="error">${esc(s.sync_error)}</small>`:''}</div><div class="tracking-actions">${!s.tracking_registered?`<button class="btn tiny ghost tracking-register" data-id="${s.id}">Registrar 17TRACK</button>`:''}${!s.is_received?`<button class="btn tiny ghost tracking-refresh" data-id="${s.id}">↻ Actualizar</button>`:''}${s.normalized_status==='READY_FOR_PICKUP'&&!s.is_received?`<button class="btn tiny good tracking-picked" data-id="${s.id}">✓ Marcar retirado</button>`:''}<button class="btn tiny ghost tracking-history-btn" data-id="${s.id}">Historial</button><button class="btn tiny danger-btn tracking-delete" data-id="${s.id}">Eliminar</button></div><div id="trackingHistory_${s.id}" class="tracking-history hidden">${evs.map(e=>`<div class="tracking-event"><i></i><span><b>${esc(e.description_original||trackingStatusMeta(e.normalized_status).label)}</b><small>${esc(e.location_original||'')}${e.event_datetime?` · ${safeDate(e.event_datetime)}`:''}</small></span></div>`).join('')||'<div class="empty">Todavía no hay eventos guardados.</div>'}</div></article>`}).join('')||'<div class="card empty">No hay seguimientos registrados.</div>'}</div>`;
+  }
+
+  function renderExpensesSection(expenses,orders){
+    const omap=new Map(orders.map(o=>[Number(o.id),o])),total=(expenses||[]).reduce((a,x)=>a+Number(x.amount_ars||0),0);
+    return `<div class="operations-actionbar"><button id="newExpense" class="btn primary">+ Registrar gasto</button></div><div class="expense-summary"><div class="card"><small>Total gastos registrados</small><b>${money(total)}</b></div><div class="card"><small>Registros</small><b>${number(expenses?.length||0)}</b></div></div><div class="expense-list">${(expenses||[]).map(e=>{const o=omap.get(Number(e.order_id));return`<article class="card expense-row"><div><span class="eyebrow">${esc(e.expense_type||'GASTO')}</span><b>${esc(e.description||e.provider||'Sin detalle')}</b><small>${safeDate(e.expense_date)}${e.provider?` · ${esc(e.provider)}`:''}${o?` · Pedido #${esc(o.order_number)}`:''}</small></div><div class="expense-row-side"><strong>${money(e.amount_ars)}</strong>${e.payment_method?`<small>${esc(e.payment_method)} · ${esc(e.holder||'')}</small>`:'<small>Sin impacto financiero</small>'}<button class="btn tiny danger-btn delete-expense" data-id="${e.id}">Eliminar</button></div></article>`}).join('')||'<div class="card empty">No hay gastos registrados.</div>'}</div>`;
+  }
+
+  async function openNewPurchaseOrder(){
+    const [products,categories]=await Promise.all([DB.orderProductOptions(),DB.categories().catch(()=>[])]);
+    const cats=(categories?.length?categories:[...new Set(products.map(x=>x.category).filter(Boolean))]).sort((a,b)=>String(a).localeCompare(String(b),'es'));
+    const today=new Date().toISOString().slice(0,10),draft=[];
+    openModal(`<div class="section-title purchase-modal-head"><div><span class="eyebrow">NUEVA COMPRA</span><h3>Nuevo pedido de mercadería</h3><p class="muted">La mercadería queda en camino. El stock físico aumenta recién cuando registrás la recepción.</p></div><button class="modal-close">×</button></div>
+      <div class="purchase-builder">
+        <section class="purchase-step"><div class="purchase-step-title"><b>1</b><span><strong>Datos generales y envío</strong><small>El envío se distribuye automáticamente entre todas las unidades.</small></span></div><div class="purchase-form-grid"><label>Fecha<input id="poDate" type="date" value="${today}"></label><label>Cotización USDT<input id="poRate" type="number" step="0.01" value="1480"></label><label>Costo total del envío<input id="poShipping" type="number" step="0.01" value="0"></label><label>Moneda del envío<select id="poShippingCurrency"><option value="USDT">USDT</option><option value="ARS">ARS</option></select></label><label>Proveedor<input id="poProvider" placeholder="Proveedor / distribuidor"></label><label>Nota<input id="poNote" placeholder="Observaciones opcionales"></label></div><div id="poShippingInfo" class="purchase-info"></div></section>
+        <section class="purchase-step"><div class="purchase-step-title"><b>2</b><span><strong>Cargar productos</strong><small>Podés vincular un producto existente o crear uno nuevo desde este pedido.</small></span></div><div class="purchase-mode-row"><label>Tipo<select id="poItemMode"><option value="existing">Producto existente</option><option value="new">Producto nuevo</option></select></label></div><div id="poExistingFields" class="purchase-form-grid"><label>Producto<select id="poProduct"><option value="">Elegí un producto</option>${products.map(p=>`<option value="${p.id}">${esc(p.name)} · ${esc(p.category||'')}</option>`).join('')}</select></label><label>Variante<select id="poVariant"><option value="">Elegí una variante</option></select></label><label>Costo proveedor USDT / unidad<input id="poCostExisting" type="number" step="0.01" placeholder="Ej: 18"></label><label>Cantidad<input id="poQtyExisting" type="number" min="1" step="1" value="1"></label></div><div id="poNewFields" class="purchase-form-grid hidden"><label>Categoría<select id="poCategory">${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select></label><label>Producto<input id="poNewName" placeholder="Ej: Argentina 2006"></label><label>Detalle / variante<input id="poNewVariant" placeholder="Ej: Messi XL / 100 ml / Blue Razz"></label><label>SKU opcional<input id="poNewSku" placeholder="SKU"></label><label>Costo proveedor USDT / unidad<input id="poCostNew" type="number" step="0.01" placeholder="Ej: 18"></label><label>Cantidad<input id="poQtyNew" type="number" min="1" step="1" value="1"></label></div><div id="poSimilar" class="purchase-similar hidden"></div><button id="poAddItem" class="btn good">Agregar al pedido</button></section>
+        <section class="purchase-step"><div class="purchase-step-title"><b>3</b><span><strong>Pedido en carga</strong><small>Revisá productos, cantidades y costo puesto antes de finalizar.</small></span></div><div id="poDraft"></div><div id="poSummary" class="purchase-summary-cards"></div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="poFinalize" class="btn primary">Finalizar pedido</button></div></section>
+      </div>`);
+    const productMap=new Map(products.map(x=>[x.id,x]));
+    const el=id=>document.getElementById(id);
+    function currentCalc(){const rate=Number(el('poRate').value||0),shipIn=Number(el('poShipping').value||0),cur=el('poShippingCurrency').value,units=draft.reduce((a,x)=>a+Number(x.quantity||0),0),merch=draft.reduce((a,x)=>a+Number(x.supplier_usdt||0)*Number(x.quantity||0),0),shipUsdt=cur==='ARS'?(rate>0?shipIn/rate:0):shipIn,shipPer=units?shipUsdt/units:0;return{rate,shipIn,cur,units,merch,shipUsdt,shipPer,investment:merch+shipUsdt,ars:(merch+shipUsdt)*rate}}
+    function updateShipping(){const c=currentCalc();el('poShippingInfo').innerHTML=c.cur==='ARS'?`Envío ingresado: <b>${money(c.shipIn)}</b> · equivalente <b>USD ${number(c.shipUsdt)}</b>. ${c.units?`Distribución: <b>USD ${number(c.shipPer)} por unidad</b>.`:'Se distribuirá cuando cargues unidades.'}`:`Envío ingresado: <b>USD ${number(c.shipIn)}</b>. ${c.units?`Distribución: <b>USD ${number(c.shipPer)} por unidad</b>.`:'Se distribuirá cuando cargues unidades.'}`;renderDraft()}
+    function fillVariants(){const p=productMap.get(el('poProduct').value);el('poVariant').innerHTML='<option value="">Elegí una variante</option>'+(p?.variants||[]).map(v=>`<option value="${v.id}">${esc(v.variant_name||'Única')} · stock ${number(v.stock?.available||0)}</option>`).join('')}
+    function similar(){const name=String(el('poNewName').value||'').trim().toLowerCase(),cat=el('poCategory').value;if(name.length<3){el('poSimilar').classList.add('hidden');return}const hits=products.filter(p=>p.name.toLowerCase().includes(name)||name.includes(p.name.toLowerCase())).filter(p=>!cat||String(p.category||'').toLowerCase()===String(cat).toLowerCase()).slice(0,4);el('poSimilar').innerHTML=hits.length?`<b>¿Ya existe?</b> ${hits.map(p=>`<span>${esc(p.name)} · ${esc(p.category||'')}</span>`).join('')}`:'<span>No encontramos una coincidencia exacta en Central.</span>';el('poSimilar').classList.remove('hidden')}
+    function renderDraft(){const c=currentCalc();el('poDraft').innerHTML=draft.length?`<div class="table-wrap"><table class="table purchase-draft-table"><thead><tr><th>Producto</th><th>Variante</th><th>Cant.</th><th>Proveedor/u.</th><th>Envío/u.</th><th>Costo puesto/u.</th><th></th></tr></thead><tbody>${draft.map((x,i)=>{const landed=Number(x.supplier_usdt)+c.shipPer;return`<tr><td><b>${esc(x.product_name)}</b><br><small>${esc(x.category||'')}</small></td><td>${esc(x.variant_name||'Única')}</td><td>${number(x.quantity)}</td><td>USD ${number(x.supplier_usdt)}</td><td>USD ${number(c.shipPer)}</td><td><b>USD ${number(landed)}</b><br><small>${money(landed*c.rate)}</small></td><td><button class="btn tiny danger-btn po-remove" data-i="${i}">Eliminar</button></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty purchase-empty">No hay productos cargados.</div>';el('poSummary').innerHTML=`<div><small>Unidades</small><b>${number(c.units)}</b></div><div><small>Mercadería</small><b>USD ${number(c.merch)}</b></div><div><small>Envío</small><b>USD ${number(c.shipUsdt)}</b></div><div><small>Envío / unidad</small><b>USD ${number(c.shipPer)}</b></div><div class="primary"><small>Inversión total</small><b>USD ${number(c.investment)}</b></div><div><small>Equivalente ARS</small><b>${money(c.ars)}</b></div>`;document.querySelectorAll('.po-remove').forEach(b=>b.addEventListener('click',()=>{draft.splice(Number(b.dataset.i),1);updateShipping()}))}
+    el('poItemMode').addEventListener('change',()=>{const isNew=el('poItemMode').value==='new';el('poExistingFields').classList.toggle('hidden',isNew);el('poNewFields').classList.toggle('hidden',!isNew);el('poSimilar').classList.add('hidden')});el('poProduct').addEventListener('change',fillVariants);el('poNewName').addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(similar,180)});['poRate','poShipping'].forEach(id=>el(id).addEventListener('input',updateShipping));el('poShippingCurrency').addEventListener('change',updateShipping);
+    el('poAddItem').addEventListener('click',()=>{const mode=el('poItemMode').value;if(mode==='existing'){const p=productMap.get(el('poProduct').value),v=p?.variants.find(x=>x.id===el('poVariant').value),cost=Number(el('poCostExisting').value),qty=Number(el('poQtyExisting').value);if(!p||!v||!Number.isFinite(cost)||cost<0||!Number.isFinite(qty)||qty<=0)return alert('Completá producto, variante, costo y cantidad.');draft.push({variant_id:v.id,category:p.category,product_name:p.name,variant_name:v.variant_name,sku:v.sku,supplier_usdt:cost,quantity:qty});el('poCostExisting').value='';el('poQtyExisting').value='1'}else{const name=el('poNewName').value.trim(),variant=el('poNewVariant').value.trim()||'Única',cost=Number(el('poCostNew').value),qty=Number(el('poQtyNew').value);if(!name||!Number.isFinite(cost)||cost<0||!Number.isFinite(qty)||qty<=0)return alert('Completá nombre, costo y cantidad.');draft.push({variant_id:null,category:el('poCategory').value,product_name:name,variant_name:variant,sku:el('poNewSku').value.trim()||null,supplier_usdt:cost,quantity:qty});el('poNewName').value='';el('poNewVariant').value='';el('poNewSku').value='';el('poCostNew').value='';el('poQtyNew').value='1';el('poSimilar').classList.add('hidden')}updateShipping()});
+    el('poFinalize').addEventListener('click',async()=>{if(!draft.length)return alert('Cargá al menos un producto.');const rate=Number(el('poRate').value);if(!(rate>0))return alert('Ingresá una cotización USDT válida.');const btn=el('poFinalize');btn.disabled=true;try{const res=await DB.createPurchaseOrder({orderDate:el('poDate').value,usdtRate:rate,shippingAmount:Number(el('poShipping').value||0),shippingCurrency:el('poShippingCurrency').value,provider:el('poProvider').value.trim(),note:el('poNote').value.trim(),items:draft});closeModal();operationsTab='purchases';await renderOrders();alert(`Pedido #${res.order_number} guardado. ${res.total_units} unidades · USD ${number(res.investment_usdt)} invertidos.`)}catch(e){alert(e.message);btn.disabled=false}});
+    fillVariants();updateShipping();
+  }
+
+  async function openAddTracking(orderId,orders){
+    const eligible=orders.filter(o=>!(o.items.length&&o.items.every(i=>i.stock_link_status==='historical')));
+    openModal(`<div class="section-title"><div><span class="eyebrow">SEGUIMIENTO</span><h3>Agregar guía</h3><p class="muted">La guía se registra en 17TRACK desde Supabase; la clave privada nunca llega al navegador.</p></div><button class="modal-close">×</button></div><div class="form-grid"><label>Pedido<select id="trackOrder">${eligible.map(o=>`<option value="${o.id}" ${Number(orderId)===Number(o.id)?'selected':''}>Pedido #${esc(o.order_number)} · ${esc(o.provider||o.order_date||'')}</option>`).join('')}</select></label><label>Transportista<select id="trackCarrier"><option>Via Cargo</option></select></label><label class="wide">Número de seguimiento<input id="trackNumber" placeholder="Ej: 999037813885"></label></div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveTracking" class="btn primary">Guardar seguimiento</button></div>`);
+    $('#saveTracking').addEventListener('click',async()=>{const order=Number($('#trackOrder').value),tracking=$('#trackNumber').value.trim();if(!order||!tracking)return alert('Seleccioná el pedido e ingresá la guía.');const b=$('#saveTracking');b.disabled=true;try{const res=await DB.createShipment(order,tracking,$('#trackCarrier').value);if(res.register_error)alert('La guía quedó guardada, pero 17TRACK no pudo registrarla todavía. Podés reintentar desde Seguimiento.');else{try{await DB.refreshShipment(res.id)}catch{}}closeModal();operationsTab='tracking';await renderOrders()}catch(e){alert(e.message);b.disabled=false}});
+  }
+
+  function openPurchasePayment(order){
+    if(!order)return;const estimated=Number(order.investment_usd||0)*Number(order.usdt_rate_ars||0);
+    openModal(`<div class="section-title"><div><span class="eyebrow">PAGO DE COMPRA</span><h3>Pedido #${esc(order.order_number)}</h3><p class="muted">El egreso queda vinculado a esta compra y al titular que pagó.</p></div><button class="modal-close">×</button></div><div class="form-grid"><label id="purchasePayAmountLabel">Monto ARS<input id="purchasePayAmount" type="number" step="0.01" value="${Math.round(estimated||0)}"></label><label>Medio<select id="purchasePayMethod"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="usdt">USDT</option></select></label><label>Pagó<select id="purchasePayHolder"><option value="nahuel">Nahuel</option><option value="esteban">Esteban</option></select></label></div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="purchasePaySave" class="btn primary">Registrar pago</button></div>`);
+    $('#purchasePayMethod').addEventListener('change',e=>{const usdt=e.target.value==='usdt';$('#purchasePayAmountLabel').childNodes[0].nodeValue=usdt?'Monto USDT':'Monto ARS';$('#purchasePayAmount').value=usdt?Number(order.investment_usd||0).toFixed(2):Math.round(estimated||0)});
+    $('#purchasePaySave').addEventListener('click',async()=>{const b=$('#purchasePaySave');b.disabled=true;try{await DB.registerPurchasePayment(order.id,Number($('#purchasePayAmount').value),$('#purchasePayMethod').value,$('#purchasePayHolder').value);closeModal();await renderOrders()}catch(e){alert(e.message);b.disabled=false}})
+  }
+
+  function openNewExpense(orders,preOrderId=null){
+    const today=new Date().toISOString().slice(0,10);
+    openModal(`<div class="section-title"><div><span class="eyebrow">GASTOS</span><h3>Registrar gasto</h3><p class="muted">Podés vincularlo a una compra y, si fue pagado ahora, impactarlo también en Finanzas.</p></div><button class="modal-close">×</button></div><div class="form-grid expense-form"><label>Fecha<input id="expenseDate" type="date" value="${today}"></label><label>Tipo<select id="expenseType"><option>Materia prima</option><option>Envío</option><option>Impuesto</option><option>Logística</option><option>Proveedor</option><option>Servicio</option><option>Comisión</option><option>Publicidad</option><option>Otro</option></select></label><label>Proveedor<input id="expenseProvider"></label><label>Descripción<input id="expenseDescription"></label><label>Monto ARS<input id="expenseArs" type="number" step="0.01" value="0"></label><label>Monto USD / USDT opcional<input id="expenseUsd" type="number" step="0.01"></label><label>Cotización opcional<input id="expenseRate" type="number" step="0.01"></label><label>Vincular a compra<select id="expenseOrder"><option value="">Gasto general</option>${orders.map(o=>`<option value="${o.id}" ${Number(preOrderId)===Number(o.id)?'selected':''}>Pedido #${esc(o.order_number)} · ${esc(o.provider||o.order_date||'')}</option>`).join('')}</select></label></div><label class="check finance-expense-check"><input id="expenseFinance" type="checkbox"> También registrar como egreso en Finanzas</label><div id="expenseFinanceFields" class="form-grid hidden"><label>Medio<select id="expenseMethod"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option><option value="usdt">USDT</option></select></label><label>Pagó<select id="expenseHolder"><option value="nahuel">Nahuel</option><option value="esteban">Esteban</option></select></label></div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="expenseSave" class="btn primary">Guardar gasto</button></div>`);
+    $('#expenseFinance').addEventListener('change',e=>$('#expenseFinanceFields').classList.toggle('hidden',!e.target.checked));$('#expenseSave').addEventListener('click',async()=>{const b=$('#expenseSave');b.disabled=true;try{await DB.createExpense({date:$('#expenseDate').value,type:$('#expenseType').value,provider:$('#expenseProvider').value.trim(),description:$('#expenseDescription').value.trim(),amountArs:Number($('#expenseArs').value||0),amountUsd:$('#expenseUsd').value===''?null:Number($('#expenseUsd').value),dollarRate:$('#expenseRate').value===''?null:Number($('#expenseRate').value),orderId:$('#expenseOrder').value||null,paymentMethod:$('#expenseFinance').checked?$('#expenseMethod').value:null,holder:$('#expenseFinance').checked?$('#expenseHolder').value:null});closeModal();operationsTab='expenses';await renderOrders()}catch(e){alert(e.message);b.disabled=false}})
+  }
+
   async function openOrderAllocation(itemId,orders){
     const item=orders.flatMap(o=>o.items).find(i=>String(i.id)===String(itemId));if(!item)return;
     const products=await DB.orderProductOptions(); const existing=item.allocations||[],lockedProduct=existing.find(x=>Number(x.received_quantity)>0)?.product_id||null;
