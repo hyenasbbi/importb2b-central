@@ -24,3 +24,10 @@ Las fotos nuevas se procesan en el navegador antes de subir:
 
 ## Base de datos
 La migración `20260926_phase63_mobile_finance_media.sql` agrega los campos de miniaturas, estado de vinculación de stock y RPCs seguros para titulares, ventas fugaces, cancelaciones y confirmación de pedidos.
+
+## Fase 6.4
+Mejoras de orden responsive, carrito, Finanzas, navegación desde Inicio y coronas de Club.
+
+
+## Fase 6.5
+Compras y mercadería, Vía Cargo/17TRACK, gastos, mayorista, PDF mayorista y administración segura de clientes/Club. Ver `docs/PHASE65_STATUS.md`.
