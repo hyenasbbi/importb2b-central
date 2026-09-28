@@ -664,3 +664,9 @@ html::-webkit-scrollbar-button,body::-webkit-scrollbar-button,#content::-webkit-
 /* ==================== PHASE 6.8.1 · COST CONTROL ==================== */
 .stock-cost-danger{display:inline-flex;align-items:center;color:#ff4d55;font-weight:900}
 .stock-cost-danger::before{content:"!";display:inline-grid;place-items:center;width:16px;height:16px;margin-right:6px;border-radius:50%;background:rgba(255,49,56,.16);border:1px solid rgba(255,73,80,.35);font-size:10px}
+
+/* ==================== PHASE 6.8.2 · STOCK TOOL ALIGNMENT ==================== */
+.stock-commandbar .stock-command{display:inline-flex;align-items:center;justify-content:flex-start;gap:8px;height:44px;min-height:44px;padding:0 16px;line-height:1}
+.stock-commandbar .stock-command>span:not(.stock-tool-icon){display:inline-flex;align-items:center;line-height:1}
+.stock-commandbar .stock-tool-icon,.stock-commandbar .stock-folder-icon{display:block;flex:0 0 20px;width:20px;height:20px;margin:0}
+.stock-commandbar .stock-tool-icon{font-size:20px;line-height:20px;text-align:center}
