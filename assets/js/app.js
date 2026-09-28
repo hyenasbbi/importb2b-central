@@ -390,16 +390,57 @@
 
   /* -------------------- PRODUCTS -------------------- */
   async function renderProducts(q=''){
-    const currentCat=$('#categoryFilter')?.value||'', currentStock=$('#stockFilter')?.value||'all';
-    const [cats,products]=await Promise.all([DB.categories(),DB.products(q,currentCat,currentStock)]);
-    const categoryChips=['',...cats].map(c=>`<button type="button" class="stock-category-chip ${c===currentCat?'active':''}" data-stock-cat="${esc(c)}">${c?esc(c):'Todos'}</button>`).join('');
-    content.innerHTML=`<div class="stock-category-bar" aria-label="Categorías rápidas">${categoryChips}</div><div class="toolbar stock-toolbar"><input id="productSearch" value="${esc(q)}" placeholder="Nombre, SKU, categoría, variante…"><select id="categoryFilter"><option value="">Todas las categorías</option>${cats.map(c=>`<option value="${esc(c)}" ${c===currentCat?'selected':''}>${esc(c)}</option>`).join('')}</select><select id="stockFilter"><option value="all" ${currentStock==='all'?'selected':''}>Todo stock</option><option value="available" ${currentStock==='available'?'selected':''}>Con stock</option><option value="low" ${currentStock==='low'?'selected':''}>Stock bajo</option><option value="out" ${currentStock==='out'?'selected':''}>Sin stock</option><option value="transit" ${currentStock==='transit'?'selected':''}>En tránsito</option><option value="no_image" ${currentStock==='no_image'?'selected':''}>Sin foto</option></select></div><div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Categoría</th><th>Variantes</th><th>Disponible</th><th>Reservado</th><th>En tránsito</th><th>Precio</th><th></th></tr></thead><tbody>${products.map(p=>{const av=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0),res=p.variants.reduce((a,v)=>a+Number(v.stock.reserved||0),0),tr=p.variants.reduce((a,v)=>a+Number(v.stock.in_transit||0),0),prices=p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean);return`<tr><td><b>${esc(p.name)}</b> ${!p.thumbnail_url?'<span class="pill yellow stock-no-photo">SIN FOTO</span>':''}<br><small class="muted">${esc(p.sku||'Sin SKU')}</small></td><td>${esc(p.category||'—')}</td><td>${p.variants.length}</td><td><span class="pill ${av>0?'green':'red'}">${number(av)}</span></td><td>${number(res)}</td><td>${tr?`<span class="pill blue">${number(tr)}</span>`:'0'}</td><td>${prices.length?money(Math.min(...prices)):'—'}</td><td><button class="btn tiny ghost edit-product" data-id="${p.id}">Editar</button></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Sin resultados.</td></tr>'}</tbody></table></div>`;
-    $('#productSearch').addEventListener('input',e=>{const v=e.target.value;$('#globalSearch').value=v;clearTimeout(timer);timer=setTimeout(()=>renderProducts(v),140)});
-    $('#categoryFilter').addEventListener('change',()=>renderProducts($('#productSearch').value));
-    $('#stockFilter').addEventListener('change',()=>renderProducts($('#productSearch').value));
-    document.querySelectorAll('[data-stock-cat]').forEach(b=>b.addEventListener('click',()=>{$('#categoryFilter').value=b.dataset.stockCat||'';renderProducts($('#productSearch').value)}));
+    const currentStock=window.__stockFilter||'all', currentCat=window.__stockCategory||'';
+    const [cats,allProducts,products]=await Promise.all([DB.categoryRecords(),DB.products('',currentCat,currentStock),DB.products(q,currentCat,currentStock)]);
+    const noPhoto=allProducts.filter(p=>!p.thumbnail_url).length;
+    const low=allProducts.filter(p=>p.variants.some(v=>Number(v.stock.available||0)>0&&Number(v.stock.available||0)<=Number(v.stock_min||0))).length;
+    const out=allProducts.filter(p=>p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0)<=0).length;
+    content.innerHTML=`<div class="stock-commandbar">
+      <button id="stockFilterBtn" class="btn ghost stock-command">☷ <span>Filtro</span>${currentStock!=='all'?'<b class="filter-dot"></b>':''}</button>
+      <button id="stockCategoriesBtn" class="btn ghost stock-command">▱ <span>Categorías</span></button>
+      <div class="stock-command-spacer"></div>
+      <button id="newProductBtn" class="btn primary stock-add-product">＋ Producto</button>
+    </div>
+    <div class="stock-summary">
+      <div><b>${number(products.length)}</b><small>Productos visibles</small></div>
+      <div><b>${number(low)}</b><small>Stock bajo</small></div>
+      <div><b>${number(out)}</b><small>Sin stock</small></div>
+      <div><b>${number(noPhoto)}</b><small>Sin foto</small></div>
+      ${currentCat?`<button id="clearStockCategory" class="stock-active-category">Categoría: ${esc(currentCat)} ×</button>`:''}
+    </div>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Categoría</th><th>Variantes</th><th>Disponible</th><th>Reservado</th><th>En tránsito</th><th>Precio</th><th></th></tr></thead><tbody>${products.map(p=>{const av=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0),res=p.variants.reduce((a,v)=>a+Number(v.stock.reserved||0),0),tr=p.variants.reduce((a,v)=>a+Number(v.stock.in_transit||0),0),prices=p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean);return`<tr><td><b>${esc(p.name)}</b> ${!p.thumbnail_url?'<span class="pill yellow stock-no-photo">SIN FOTO</span>':''}<br><small class="muted">${esc(p.sku||'Sin SKU')}</small></td><td>${esc(p.category||'—')}</td><td>${p.variants.length}</td><td><span class="pill ${av>0?'green':'red'}">${number(av)}</span></td><td>${number(res)}</td><td>${tr?`<span class="pill blue">${number(tr)}</span>`:'0'}</td><td>${prices.length?money(Math.min(...prices)):'—'}</td><td><div class="stock-row-actions"><button class="btn tiny ghost duplicate-product" data-id="${p.id}" title="Duplicar producto">⧉</button><button class="btn tiny ghost edit-product" data-id="${p.id}">Editar</button></div></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Sin resultados.</td></tr>'}</tbody></table></div>`;
+    $('#stockFilterBtn').addEventListener('click',()=>openStockFilters());
+    $('#stockCategoriesBtn').addEventListener('click',()=>openCategoryManager());
+    $('#newProductBtn').addEventListener('click',()=>openNewProduct());
+    $('#clearStockCategory')?.addEventListener('click',()=>{window.__stockCategory='';renderProducts($('#globalSearch').value)});
     document.querySelectorAll('.edit-product').forEach(b=>b.addEventListener('click',()=>openProductEditor(b.dataset.id)));
+    document.querySelectorAll('.duplicate-product').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Duplicar este producto para usarlo como base? La copia quedará oculta del catálogo hasta que la revises.'))return;try{const p=await DB.duplicateProduct(b.dataset.id);await renderProducts($('#globalSearch').value);await openProductEditor(p.id)}catch(e){alert(e.message)}}));
   }
+
+  function openStockFilters(){
+    const current=window.__stockFilter||'all';
+    const filters=[['all','Todo stock'],['available','Con stock'],['low','Stock bajo'],['out','Sin stock'],['transit','En tránsito'],['no_image','Sin foto']];
+    openModal(`<div class="section-title"><div><span class="eyebrow">PRODUCTOS</span><h3>Filtrar</h3></div><button class="modal-close modal-x">×</button></div><div class="stock-filter-list">${filters.map(([v,l])=>`<button class="stock-filter-option ${current===v?'active':''}" data-stock-filter="${v}">${l}<span>›</span></button>`).join('')}</div>`);
+    document.querySelectorAll('[data-stock-filter]').forEach(b=>b.addEventListener('click',async()=>{window.__stockFilter=b.dataset.stockFilter;closeModal();await renderProducts($('#globalSearch').value)}));
+  }
+
+  async function openCategoryManager(){
+    const cats=await DB.categoryRecords();
+    openModal(`<div class="section-title"><div><span class="eyebrow">ORGANIZACIÓN</span><h3>Categorías</h3><small class="muted">El orden se usa como prioridad de categorías.</small></div><div class="category-head-actions"><button id="addCategoryBtn" class="btn primary tiny">＋</button><button class="modal-close modal-x">×</button></div></div><div class="category-manager-list">${cats.map((c,i)=>`<div class="category-manager-row"><button class="category-pick" data-pick-cat="${esc(c.name)}">${esc(c.name)}</button><div class="category-row-actions"><button class="btn tiny ghost cat-up" data-id="${c.id}" ${i===0?'disabled':''}>↑</button><button class="btn tiny ghost cat-down" data-id="${c.id}" ${i===cats.length-1?'disabled':''}>↓</button><button class="btn tiny ghost cat-edit" data-id="${c.id}" data-name="${esc(c.name)}">✎</button><button class="btn tiny danger-btn cat-delete" data-id="${c.id}" data-name="${esc(c.name)}">×</button></div></div>`).join('')}</div>`);
+    $('#addCategoryBtn').addEventListener('click',async()=>{const n=prompt('Nueva categoría:','');if(!n)return;try{await DB.createCategory(n);closeModal();await openCategoryManager()}catch(e){alert(e.message)}});
+    document.querySelectorAll('[data-pick-cat]').forEach(b=>b.addEventListener('click',async()=>{window.__stockCategory=b.dataset.pickCat;closeModal();await renderProducts($('#globalSearch').value)}));
+    document.querySelectorAll('.cat-edit').forEach(b=>b.addEventListener('click',async()=>{const n=prompt('Nuevo nombre:',b.dataset.name);if(!n||n===b.dataset.name)return;try{await DB.renameCategory(b.dataset.id,b.dataset.name,n);closeModal();await openCategoryManager()}catch(e){alert(e.message)}}));
+    document.querySelectorAll('.cat-delete').forEach(b=>b.addEventListener('click',async()=>{if(!confirm(`¿Eliminar la categoría "${b.dataset.name}"? Solo se permite si no tiene productos.`))return;try{await DB.deleteCategory(b.dataset.id,b.dataset.name);closeModal();await openCategoryManager()}catch(e){alert(e.message)}}));
+    document.querySelectorAll('.cat-up').forEach(b=>b.addEventListener('click',async()=>{await DB.moveCategory(b.dataset.id,-1);closeModal();await openCategoryManager()}));
+    document.querySelectorAll('.cat-down').forEach(b=>b.addEventListener('click',async()=>{await DB.moveCategory(b.dataset.id,1);closeModal();await openCategoryManager()}));
+  }
+
+  async function openNewProduct(){
+    const cats=await DB.categories();
+    openModal(`<div class="section-title"><div><span class="eyebrow">STOCK</span><h3>Nuevo producto</h3></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Nombre<input id="npName" placeholder="Nombre del producto"></label><label>Categoría<select id="npCategory">${cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></label><label>SKU general<input id="npSku" placeholder="Opcional"></label></div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="createProductBtn" class="btn primary">Crear y editar</button></div>`);
+    $('#createProductBtn').addEventListener('click',async()=>{const name=$('#npName').value.trim();if(!name)return alert('Ingresá un nombre');const btn=$('#createProductBtn');btn.disabled=true;try{const p=await DB.createProduct({name,category:$('#npCategory').value,sku:$('#npSku').value.trim()||null});closeModal();await renderProducts($('#globalSearch').value);await openProductEditor(p.id)}catch(e){alert(e.message)}finally{btn.disabled=false}});
+  }
+
   async function openProductEditor(productId){
     const [p,cats]=await Promise.all([DB.productDetail(productId),DB.categories()]);
     const vape=String(p.category||'').toLowerCase()==='vapers';
