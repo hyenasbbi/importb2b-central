@@ -141,6 +141,9 @@
       let r=await db.from('importb2b_categories').update({sort_order:sb}).eq('id',a.id);assert(r);
       r=await db.from('importb2b_categories').update({sort_order:sa}).eq('id',b.id);assert(r);
     },
+    async setCategoryOrder(ids){
+      for(let i=0;i<ids.length;i++){const r=await db.from('importb2b_categories').update({sort_order:i+1}).eq('id',ids[i]);assert(r);}
+    },
     async deleteCategory(id,name){
       const p=await db.from('importb2b_products').select('id',{count:'exact',head:true}).eq('active',true).eq('category',name);assert(p);
       if(Number(p.count||0)>0) throw new Error(`No se puede eliminar: hay ${p.count} producto(s) en esta categoría. Movelos primero.`);
