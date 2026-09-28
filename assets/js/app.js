@@ -203,7 +203,7 @@
     return {subtotal,shipping,discount,adjustment,total:Math.max(0,base+adjustment),method};
   }
   async function renderSell(){
-    const [cats,products,methods,customers,recent,pendingQuick]=await Promise.all([DB.categories(),DB.products('','','all'),DB.paymentMethods(),DB.customers(''),DB.recentSales(20),DB.pendingQuickSales()]);
+    const [cats,products,methods,customers,recent,pendingQuick]=await Promise.all([DB.categories(),DB.products('','','all'),DB.paymentMethods(),DB.customers(''),DB.recentSales(400),DB.pendingQuickSales()]);
     posProducts=products;posMethods=methods;posCustomers=customers;posRecentSales=recent;posQuickPending=pendingQuick;
     const currentCustomer=$('#posCustomer')?.value||'';
     const currentMethod=$('#posPayment')?.value||methods[0]?.id||'';
@@ -326,16 +326,66 @@
   async function openSaleDetail(id){
     try{
       const s=await DB.saleDetail(id);
-      openModal(`<div class="section-title"><div><span class="eyebrow">VENTA</span><h3 class="${s.status==='cancelled'?'sale-cancelled-row':''}">${esc(s.sale_code||'Detalle')}</h3><small class="muted">${safeDate(s.sold_at||s.created_at)} · ${esc(s.original_payment_method||'')}</small></div><button class="modal-close modal-x">×</button></div>${s.stock_link_status==='pending'?`<div class="notice">⚡ Venta fugaz: el dinero está registrado pero falta vincular el producto al stock.</div>`:''}<div class="receipt-lines">${(s.items||[]).map(i=>`<div><span>${number(i.quantity)}× ${esc(i.original_item_name)}</span><b>${money(i.line_total_ars)}</b></div>`).join('')||'<div class="empty">Sin productos vinculados.</div>'}</div><div class="order-total-lines"><div><span>Subtotal</span><b>${money(s.subtotal_ars)}</b></div><div><span>Descuento</span><b>-${money(s.discount_ars)}</b></div><div><span>Envío</span><b>${money(s.shipping_ars)}</b></div>${Number(s.fee_ars)?`<div><span>Ajuste de pago</span><b>${money(s.fee_ars)}</b></div>`:''}<div class="grand"><span>Total</span><b>${money(s.total_ars)}</b></div></div>${s.notes?`<div class="notice" style="margin-top:12px">${esc(s.notes)}</div>`:''}<div class="modal-actions"><button class="btn ghost modal-close">Cerrar</button>${s.status==='completed'&&s.stock_link_status==='pending'?`<button id="linkStockFromDetail" class="btn ghost">Vincular stock</button>`:''}${s.status==='completed'?`<button id="cancelSaleFromDetail" class="btn danger-btn">Anular venta</button>`:''}</div>`);
+      const historical=!!s.is_historical;
+      openModal(`<div class="section-title"><div><span class="eyebrow">${historical?'VENTA HISTÓRICA':'VENTA'}</span><h3 class="${s.status==='cancelled'?'sale-cancelled-row':''}">${esc(s.sale_code||'Detalle')} ${historical?'<span class="pill blue">HISTÓRICA</span>':''}</h3><small class="muted">${safeDate(s.sold_at||s.created_at)} · ${esc(s.original_payment_method||'')}</small></div><button class="modal-close modal-x">×</button></div>${historical?'<div class="notice good-notice">Registro histórico editable · No modifica stock ni saldos actuales de Finanzas.</div>':''}${s.stock_link_status==='pending'?`<div class="notice">⚡ Venta fugaz: el dinero está registrado pero falta vincular el producto al stock.</div>`:''}<div class="receipt-lines">${(s.items||[]).map(i=>`<div><span>${number(i.quantity)}× ${esc(i.original_item_name)}</span><b>${i.line_total_ars==null?'—':money(i.line_total_ars)}</b></div>`).join('')||'<div class="empty">Sin productos vinculados.</div>'}</div><div class="order-total-lines"><div><span>Subtotal</span><b>${money(s.subtotal_ars)}</b></div><div><span>Descuento</span><b>-${money(s.discount_ars)}</b></div><div><span>Envío</span><b>${money(s.shipping_ars)}</b></div>${Number(s.fee_ars)?`<div><span>Ajuste / tasa</span><b>${money(s.fee_ars)}</b></div>`:''}<div class="grand"><span>Total</span><b>${money(s.total_ars)}</b></div></div>${s.profit_ars!=null?`<div class="notice" style="margin-top:12px">Ganancia histórica: <b>${money(s.profit_ars)}</b></div>`:''}${s.notes?`<div class="notice" style="margin-top:12px">${esc(s.notes)}</div>`:''}<div class="modal-actions"><button class="btn ghost modal-close">Cerrar</button>${historical&&s.historical_editable?'<button id="editHistoricalSale" class="btn primary">Editar venta</button>':''}${!historical&&s.status==='completed'&&s.stock_link_status==='pending'?`<button id="linkStockFromDetail" class="btn ghost">Vincular stock</button>`:''}${!historical&&s.status==='completed'?`<button id="cancelSaleFromDetail" class="btn danger-btn">Anular venta</button>`:''}</div>`);
+      $('#editHistoricalSale')?.addEventListener('click',()=>openHistoricalSaleEditor(s));
       $('#linkStockFromDetail')?.addEventListener('click',()=>{closeModal();openQuickSaleStockLink(s.id)});
       $('#cancelSaleFromDetail')?.addEventListener('click',async()=>{const reason=prompt(`Motivo para anular ${s.sale_code}:`,'Error / devolución');if(reason===null)return;if(!confirm('Esto devolverá el stock y revertirá el efecto financiero. ¿Continuar?'))return;try{await DB.cancelSale(s.id,reason);closeModal();if(currentView==='finance')await renderFinance();else await renderSell()}catch(e){alert(e.message)}});
     }catch(e){alert(e.message)}
   }
 
+  function historicalDateInput(value){
+    if(!value)return '';
+    const d=new Date(value),pad=n=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function openHistoricalSaleEditor(sale){
+    const items=(sale.items||[]).map(i=>({name:i.original_item_name||'',quantity:Number(i.quantity||1)}));
+    const customerOptions=posCustomers.map(c=>`<option value="${c.id}" ${c.id===sale.customer_id?'selected':''}>${esc(c.full_name)}</option>`).join('');
+    openModal(`<div class="section-title"><div><span class="eyebrow">EDITAR HISTÓRICA</span><h3>${esc(sale.sale_code)}</h3><p class="muted">Los cambios actualizan historial y Estadísticas. Nunca mueven stock ni caja actual.</p></div><button class="modal-close modal-x">×</button></div>
+      <div class="form-grid">
+        <label>Fecha y hora<input id="hsDate" type="datetime-local" value="${historicalDateInput(sale.sold_at)}"></label>
+        <label>Cliente<select id="hsCustomer"><option value="">Consumidor final</option>${customerOptions}</select></label>
+        <label>Subtotal<input id="hsSubtotal" type="number" min="0" step="0.01" value="${Number(sale.subtotal_ars||0)}"></label>
+        <label>Descuento<input id="hsDiscount" type="number" min="0" step="0.01" value="${Number(sale.discount_ars||0)}"></label>
+        <label>Tasa / ajuste<input id="hsFee" type="number" min="0" step="0.01" value="${Number(sale.fee_ars||0)}"></label>
+        <label>Envío<input id="hsShipping" type="number" min="0" step="0.01" value="${Number(sale.shipping_ars||0)}"></label>
+        <label>Total<input id="hsTotal" type="number" min="0" step="0.01" value="${Number(sale.total_ars||0)}"></label>
+        <label>Ganancia<input id="hsProfit" type="number" step="0.01" value="${sale.profit_ars==null?'':Number(sale.profit_ars)}"></label>
+        <label>Forma de pago<input id="hsPayment" value="${esc(sale.original_payment_method||'')}"></label>
+        <label>Vendedor<input id="hsSeller" value="${esc(sale.seller_name||'')}"></label>
+      </div>
+      <label style="margin-top:12px">Observación<textarea id="hsNotes" rows="2">${esc(sale.notes||'')}</textarea></label>
+      <div class="section-title" style="margin-top:16px"><div><span class="eyebrow">PRODUCTOS</span><h3>Detalle original</h3></div><button id="hsAddItem" class="btn tiny ghost" type="button">+ Producto</button></div>
+      <div id="hsItems" class="list"></div>
+      <div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="hsSave" class="btn primary">Guardar cambios</button></div>`);
+
+    const draw=()=>{
+      const box=$('#hsItems');box.innerHTML=items.map((x,i)=>`<div class="row historical-item-row" data-i="${i}"><input class="hs-item-name" value="${esc(x.name)}" placeholder="Descripción del producto"><input class="hs-item-qty" type="number" min="0.01" step="0.01" value="${x.quantity}" style="max-width:90px"><button class="btn tiny danger-btn hs-remove-item" type="button">×</button></div>`).join('')||'<div class="empty compact-empty">Sin productos.</div>';
+      box.querySelectorAll('.historical-item-row').forEach(row=>{
+        const i=Number(row.dataset.i);
+        row.querySelector('.hs-item-name').addEventListener('input',e=>items[i].name=e.target.value);
+        row.querySelector('.hs-item-qty').addEventListener('input',e=>items[i].quantity=Number(e.target.value||1));
+        row.querySelector('.hs-remove-item').addEventListener('click',()=>{items.splice(i,1);draw()});
+      });
+    };
+    draw();
+    $('#hsAddItem').addEventListener('click',()=>{items.push({name:'',quantity:1});draw()});
+    $('#hsSave').addEventListener('click',async()=>{
+      const soldAt=$('#hsDate').value;if(!soldAt)return alert('Ingresá fecha y hora');
+      const payload={id:sale.id,soldAt:new Date(soldAt).toISOString(),customerId:$('#hsCustomer').value||null,subtotal:$('#hsSubtotal').value,discount:$('#hsDiscount').value,fee:$('#hsFee').value,shipping:$('#hsShipping').value,total:$('#hsTotal').value,profit:$('#hsProfit').value,paymentMethod:$('#hsPayment').value.trim(),sellerName:$('#hsSeller').value.trim(),notes:$('#hsNotes').value.trim(),items:items.filter(x=>x.name.trim()).map(x=>({name:x.name.trim(),quantity:Number(x.quantity||1)}))};
+      if(Number(payload.total)<0)return alert('El total no puede ser negativo');
+      const btn=$('#hsSave');btn.disabled=true;btn.textContent='Guardando…';
+      try{await DB.updateHistoricalSale(payload);closeModal();await renderSell();const updated=posRecentSales.find(x=>x.id===sale.id);if(updated)await openSaleDetail(updated.id)}catch(e){alert(e.message);btn.disabled=false;btn.textContent='Guardar cambios'}
+    });
+  }
+
   function renderRecentSales(){
     const el=$('#recentSales');if(!el)return;
-    el.innerHTML=`<div class="table-wrap"><table class="table"><thead><tr><th>Venta</th><th>Fecha</th><th>Cliente</th><th>Pago</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody>${posRecentSales.map(s=>`<tr class="${s.status==='cancelled'?'sale-cancelled-row':''}"><td><button class="btn tiny ghost open-recent-sale" data-id="${s.id}">${esc(s.sale_code)}</button>${s.stock_link_status==='pending'?` <span class="pill stock-pending-pill">Stock pendiente</span>`:''}</td><td>${safeDate(s.sold_at)}</td><td>${esc(s.customer?.full_name||'Consumidor final')}</td><td>${esc(s.payments?.[0]?.method?.name||s.original_payment_method||'—')}</td><td>${money(s.total_ars)}</td><td>${statusPill(s.status)}</td><td>${s.status==='completed'?(s.stock_link_status==='pending'?`<button class="btn tiny ghost link-quick-sale" data-id="${s.id}">Vincular</button> `:'')+`<button class="btn tiny danger-btn cancel-sale" data-id="${s.id}" data-code="${esc(s.sale_code)}">Anular</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Aún no hay ventas en Central.</td></tr>'}</tbody></table></div>`;
+    el.innerHTML=`<div class="table-wrap"><table class="table"><thead><tr><th>Venta</th><th>Fecha</th><th>Cliente</th><th>Pago</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody>${posRecentSales.map(s=>`<tr class="${s.status==='cancelled'?'sale-cancelled-row':''}"><td><button class="btn tiny ghost open-recent-sale" data-id="${s.id}">${esc(s.sale_code)}</button>${s.is_historical?' <span class="pill blue">HISTÓRICA</span>':''}${s.stock_link_status==='pending'?` <span class="pill stock-pending-pill">Stock pendiente</span>`:''}</td><td>${safeDate(s.sold_at)}</td><td>${esc(s.customer?.full_name||'Consumidor final')}</td><td>${esc(s.payments?.[0]?.method?.name||s.original_payment_method||'—')}</td><td>${money(s.total_ars)}</td><td>${statusPill(s.status)}</td><td>${s.is_historical?'<button class="btn tiny primary edit-historical-sale" data-id="'+s.id+'">Editar</button>':s.status==='completed'?(s.stock_link_status==='pending'?`<button class="btn tiny ghost link-quick-sale" data-id="${s.id}">Vincular</button> `:'')+`<button class="btn tiny danger-btn cancel-sale" data-id="${s.id}" data-code="${esc(s.sale_code)}">Anular</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Aún no hay ventas en Central.</td></tr>'}</tbody></table></div>`;
     el.querySelectorAll('.open-recent-sale').forEach(b=>b.addEventListener('click',()=>openSaleDetail(b.dataset.id)));
+    el.querySelectorAll('.edit-historical-sale').forEach(b=>b.addEventListener('click',async()=>{try{const sale=await DB.saleDetail(b.dataset.id);openHistoricalSaleEditor(sale)}catch(e){alert(e.message)}}));
     el.querySelectorAll('.link-quick-sale').forEach(b=>b.addEventListener('click',()=>openQuickSaleStockLink(b.dataset.id)));
     el.querySelectorAll('.cancel-sale').forEach(b=>b.addEventListener('click',async()=>{const reason=prompt(`Motivo para anular ${b.dataset.code}:`,'Error / devolución');if(reason===null)return;if(!confirm('Esto devolverá el stock vinculado y revertirá el dinero en Finanzas. La venta seguirá visible como CANCELADA. ¿Continuar?'))return;try{await DB.cancelSale(b.dataset.id,reason);await renderSell()}catch(e){alert(e.message)}}));
   }
