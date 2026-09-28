@@ -34,6 +34,9 @@
   let wholesaleSearch='';
   let wholesaleCategory='';
   let statsDays=30;
+  let stockSort={key:'',dir:0};
+  let customerFilter='all';
+  let customerSort={key:'',dir:0};
 
   const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n||0));
   const number=n=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(Number(n||0));
@@ -391,54 +394,57 @@
   /* -------------------- PRODUCTS -------------------- */
   async function renderProducts(q=''){
     const currentStock=window.__stockFilter||'all', currentCat=window.__stockCategory||'';
-    const [cats,allProducts,products]=await Promise.all([DB.categoryRecords(),DB.products('',currentCat,currentStock),DB.products(q,currentCat,currentStock)]);
-    const noPhoto=allProducts.filter(p=>!p.thumbnail_url).length;
-    const low=allProducts.filter(p=>p.variants.some(v=>Number(v.stock.available||0)>0&&Number(v.stock.available||0)<=Number(v.stock_min||0))).length;
-    const out=allProducts.filter(p=>p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0)<=0).length;
+    const [cats,baseRows]=await Promise.all([DB.categoryRecords(),DB.products(q,currentCat,currentStock)]);
+    let products=[...baseRows];
+    if(stockSort.dir){
+      const val=(p,key)=>key==='available'?p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0):key==='variants'?p.variants.length:key==='price'?Math.min(...p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean),0):String(p.name||'').toLowerCase();
+      products.sort((a,b)=>{const x=val(a,stockSort.key),y=val(b,stockSort.key);return (typeof x==='string'?x.localeCompare(y):x-y)*stockSort.dir});
+    } else products.sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'es',{sensitivity:'base'}));
+    const all=await DB.products('','','all');
+    const totalStock=all.reduce((n,p)=>n+p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0),0);
+    const noPhoto=all.filter(p=>!p.thumbnail_url).length;
+    const out=all.filter(p=>p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0)<=0).length;
+    const sortHead=(key,label)=>`<button class="stock-sort-head ${stockSort.key===key&&stockSort.dir?'active':''}" data-stock-sort="${key}">${label}<span>${stockSort.key===key&&stockSort.dir?(stockSort.dir===1?'↑':'↓'):'↕'}</span></button>`;
     content.innerHTML=`<div class="stock-commandbar">
-      <button id="stockFilterBtn" class="btn ghost stock-command">☷ <span>Filtro</span>${currentStock!=='all'?'<b class="filter-dot"></b>':''}</button>
-      <button id="stockCategoriesBtn" class="btn ghost stock-command">▱ <span>Categorías</span></button>
-      <div class="stock-command-spacer"></div>
-      <button id="newProductBtn" class="btn primary stock-add-product">＋ Producto</button>
+      <button id="stockFilterBtn" class="btn ghost stock-command"><span class="stock-tool-icon">≡</span><span>Filtro</span>${currentStock!=='all'?'<b class="filter-dot"></b>':''}</button>
+      <button id="stockCategoriesBtn" class="btn ghost stock-command"><svg class="stock-folder-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5h6l2 2h9v10a2 2 0 0 1-2 2h-15z"/><path d="M3.5 8.5v-3a2 2 0 0 1 2-2h4l2 2h5"/></svg><span>Categorías</span></button>
+      <div class="stock-command-spacer"></div><button id="newProductBtn" class="btn primary stock-add-product">＋ Producto</button>
     </div>
     <div class="stock-summary">
-      <div><b>${number(products.length)}</b><small>Productos visibles</small></div>
-      <div><b>${number(low)}</b><small>Stock bajo</small></div>
-      <div><b>${number(out)}</b><small>Sin stock</small></div>
-      <div><b>${number(noPhoto)}</b><small>Sin foto</small></div>
+      <button class="stock-stat blue ${currentStock==='all'?'active':''}" data-summary-filter="all"><b>${number(all.length)}</b><small>Productos visibles</small></button>
+      <button class="stock-stat green" data-summary-filter="available"><b>${number(totalStock)}</b><small>Stock total</small></button>
+      <button class="stock-stat red ${currentStock==='out'?'active':''}" data-summary-filter="out"><b>${number(out)}</b><small>Sin stock</small></button>
+      <button class="stock-stat orange ${currentStock==='no_image'?'active':''}" data-summary-filter="no_image"><b>${number(noPhoto)}</b><small>Sin foto</small></button>
       ${currentCat?`<button id="clearStockCategory" class="stock-active-category">Categoría: ${esc(currentCat)} ×</button>`:''}
     </div>
-    <div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Categoría</th><th>Variantes</th><th>Disponible</th><th>Reservado</th><th>En tránsito</th><th>Precio</th><th></th></tr></thead><tbody>${products.map(p=>{const av=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0),res=p.variants.reduce((a,v)=>a+Number(v.stock.reserved||0),0),tr=p.variants.reduce((a,v)=>a+Number(v.stock.in_transit||0),0),prices=p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean);return`<tr><td><b>${esc(p.name)}</b> ${!p.thumbnail_url?'<span class="pill yellow stock-no-photo">SIN FOTO</span>':''}<br><small class="muted">${esc(p.sku||'Sin SKU')}</small></td><td>${esc(p.category||'—')}</td><td>${p.variants.length}</td><td><span class="pill ${av>0?'green':'red'}">${number(av)}</span></td><td>${number(res)}</td><td>${tr?`<span class="pill blue">${number(tr)}</span>`:'0'}</td><td>${prices.length?money(Math.min(...prices)):'—'}</td><td><div class="stock-row-actions"><button class="btn tiny ghost duplicate-product" data-id="${p.id}" title="Duplicar producto">⧉</button><button class="btn tiny ghost edit-product" data-id="${p.id}">Editar</button></div></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Sin resultados.</td></tr>'}</tbody></table></div>`;
-    $('#stockFilterBtn').addEventListener('click',()=>openStockFilters());
-    $('#stockCategoriesBtn').addEventListener('click',()=>openCategoryManager());
-    $('#newProductBtn').addEventListener('click',()=>openNewProduct());
+    <div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Categoría</th><th>${sortHead('variants','Variantes')}</th><th>${sortHead('available','Disponible')}</th><th>Reservado</th><th>En tránsito</th><th>${sortHead('price','Precio')}</th><th></th></tr></thead><tbody>${products.map(p=>{const av=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0),res=p.variants.reduce((a,v)=>a+Number(v.stock.reserved||0),0),tr=p.variants.reduce((a,v)=>a+Number(v.stock.in_transit||0),0),prices=p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean);return`<tr><td><b>${esc(p.name)}</b> ${!p.thumbnail_url?'<span class="pill yellow stock-no-photo">SIN FOTO</span>':''}<br><small class="muted">${esc(p.sku||'Sin SKU')}</small></td><td>${esc(p.category||'—')}</td><td>${p.variants.length}</td><td><span class="pill ${av>0?'green':'red'}">${number(av)}</span></td><td>${number(res)}</td><td>${tr?`<span class="pill blue">${number(tr)}</span>`:'0'}</td><td>${prices.length?money(Math.min(...prices)):'—'}</td><td><div class="stock-row-actions"><button class="btn tiny ghost duplicate-product" data-id="${p.id}" title="Duplicar producto">⧉</button><button class="btn tiny ghost edit-product" data-id="${p.id}">Editar</button></div></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Sin resultados.</td></tr>'}</tbody></table></div>`;
+    $('#stockFilterBtn').addEventListener('click',()=>openStockFilters());$('#stockCategoriesBtn').addEventListener('click',()=>openCategoryManager());$('#newProductBtn').addEventListener('click',()=>openNewProduct());
     $('#clearStockCategory')?.addEventListener('click',()=>{window.__stockCategory='';renderProducts($('#globalSearch').value)});
+    document.querySelectorAll('[data-summary-filter]').forEach(b=>b.addEventListener('click',()=>{window.__stockFilter=b.dataset.summaryFilter;renderProducts($('#globalSearch').value)}));
+    document.querySelectorAll('[data-stock-sort]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.stockSort;if(stockSort.key!==k)stockSort={key:k,dir:-1};else if(stockSort.dir===-1)stockSort.dir=1;else stockSort={key:'',dir:0};renderProducts($('#globalSearch').value)}));
     document.querySelectorAll('.edit-product').forEach(b=>b.addEventListener('click',()=>openProductEditor(b.dataset.id)));
     document.querySelectorAll('.duplicate-product').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Duplicar este producto para usarlo como base? La copia quedará oculta del catálogo hasta que la revises.'))return;try{const p=await DB.duplicateProduct(b.dataset.id);await renderProducts($('#globalSearch').value);await openProductEditor(p.id)}catch(e){alert(e.message)}}));
   }
 
   function openStockFilters(){
-    const current=window.__stockFilter||'all';
-    const filters=[['all','Todo stock'],['available','Con stock'],['low','Stock bajo'],['out','Sin stock'],['transit','En tránsito'],['no_image','Sin foto']];
+    const current=window.__stockFilter||'all',filters=[['all','Todo stock'],['available','Con stock'],['low','Stock bajo'],['out','Sin stock'],['transit','En tránsito'],['no_image','Sin foto']];
     openModal(`<div class="section-title"><div><span class="eyebrow">PRODUCTOS</span><h3>Filtrar</h3></div><button class="modal-close modal-x">×</button></div><div class="stock-filter-list">${filters.map(([v,l])=>`<button class="stock-filter-option ${current===v?'active':''}" data-stock-filter="${v}">${l}<span>›</span></button>`).join('')}</div>`);
     document.querySelectorAll('[data-stock-filter]').forEach(b=>b.addEventListener('click',async()=>{window.__stockFilter=b.dataset.stockFilter;closeModal();await renderProducts($('#globalSearch').value)}));
   }
 
   async function openCategoryManager(){
     const cats=await DB.categoryRecords();
-    openModal(`<div class="section-title"><div><span class="eyebrow">ORGANIZACIÓN</span><h3>Categorías</h3><small class="muted">El orden se usa como prioridad de categorías.</small></div><div class="category-head-actions"><button id="addCategoryBtn" class="btn primary tiny">＋</button><button class="modal-close modal-x">×</button></div></div><div class="category-manager-list">${cats.map((c,i)=>`<div class="category-manager-row"><button class="category-pick" data-pick-cat="${esc(c.name)}">${esc(c.name)}</button><div class="category-row-actions"><button class="btn tiny ghost cat-up" data-id="${c.id}" ${i===0?'disabled':''}>↑</button><button class="btn tiny ghost cat-down" data-id="${c.id}" ${i===cats.length-1?'disabled':''}>↓</button><button class="btn tiny ghost cat-edit" data-id="${c.id}" data-name="${esc(c.name)}">✎</button><button class="btn tiny danger-btn cat-delete" data-id="${c.id}" data-name="${esc(c.name)}">×</button></div></div>`).join('')}</div>`);
+    openModal(`<div class="section-title category-manager-head"><div><span class="eyebrow">ORGANIZACIÓN</span><h3>Categorías</h3><small class="muted">En PC mantené presionado y arrastrá para definir la prioridad. Ese orden se usa en el catálogo.</small></div><button class="modal-close modal-x">×</button></div><div class="category-manager-list">${cats.map(c=>`<div class="category-manager-row" draggable="true" data-cat-id="${c.id}"><span class="category-drag" title="Arrastrar">⋮⋮</span><button class="category-pick" data-pick-cat="${esc(c.name)}">${esc(c.name)}</button><div class="category-row-actions"><button class="btn tiny ghost cat-edit" data-id="${c.id}" data-name="${esc(c.name)}" title="Editar nombre">✎</button><button class="btn tiny danger-btn cat-delete" data-id="${c.id}" data-name="${esc(c.name)}" title="Eliminar">×</button></div></div>`).join('')}</div><div class="category-manager-footer"><button id="addCategoryBtn" class="btn primary">＋ Nueva categoría</button></div>`);
     $('#addCategoryBtn').addEventListener('click',async()=>{const n=prompt('Nueva categoría:','');if(!n)return;try{await DB.createCategory(n);closeModal();await openCategoryManager()}catch(e){alert(e.message)}});
     document.querySelectorAll('[data-pick-cat]').forEach(b=>b.addEventListener('click',async()=>{window.__stockCategory=b.dataset.pickCat;closeModal();await renderProducts($('#globalSearch').value)}));
     document.querySelectorAll('.cat-edit').forEach(b=>b.addEventListener('click',async()=>{const n=prompt('Nuevo nombre:',b.dataset.name);if(!n||n===b.dataset.name)return;try{await DB.renameCategory(b.dataset.id,b.dataset.name,n);closeModal();await openCategoryManager()}catch(e){alert(e.message)}}));
     document.querySelectorAll('.cat-delete').forEach(b=>b.addEventListener('click',async()=>{if(!confirm(`¿Eliminar la categoría "${b.dataset.name}"? Solo se permite si no tiene productos.`))return;try{await DB.deleteCategory(b.dataset.id,b.dataset.name);closeModal();await openCategoryManager()}catch(e){alert(e.message)}}));
-    document.querySelectorAll('.cat-up').forEach(b=>b.addEventListener('click',async()=>{await DB.moveCategory(b.dataset.id,-1);closeModal();await openCategoryManager()}));
-    document.querySelectorAll('.cat-down').forEach(b=>b.addEventListener('click',async()=>{await DB.moveCategory(b.dataset.id,1);closeModal();await openCategoryManager()}));
+    const list=document.querySelector('.category-manager-list');let dragged=null;
+    list.querySelectorAll('.category-manager-row').forEach(row=>{row.addEventListener('dragstart',()=>{dragged=row;row.classList.add('dragging')});row.addEventListener('dragend',async()=>{row.classList.remove('dragging');dragged=null;const ids=[...list.querySelectorAll('.category-manager-row')].map(x=>x.dataset.catId);try{await DB.setCategoryOrder(ids)}catch(e){alert(e.message)}});row.addEventListener('dragover',e=>{e.preventDefault();if(!dragged||dragged===row)return;const r=row.getBoundingClientRect();list.insertBefore(dragged,e.clientY<r.top+r.height/2?row:row.nextSibling)})});
   }
 
   async function openNewProduct(){
-    const cats=await DB.categories();
-    openModal(`<div class="section-title"><div><span class="eyebrow">STOCK</span><h3>Nuevo producto</h3></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Nombre<input id="npName" placeholder="Nombre del producto"></label><label>Categoría<select id="npCategory">${cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></label><label>SKU general<input id="npSku" placeholder="Opcional"></label></div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="createProductBtn" class="btn primary">Crear y editar</button></div>`);
-    $('#createProductBtn').addEventListener('click',async()=>{const name=$('#npName').value.trim();if(!name)return alert('Ingresá un nombre');const btn=$('#createProductBtn');btn.disabled=true;try{const p=await DB.createProduct({name,category:$('#npCategory').value,sku:$('#npSku').value.trim()||null});closeModal();await renderProducts($('#globalSearch').value);await openProductEditor(p.id)}catch(e){alert(e.message)}finally{btn.disabled=false}});
+    const cats=await DB.categories();openModal(`<div class="section-title"><div><span class="eyebrow">STOCK</span><h3>Nuevo producto</h3></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Nombre<input id="npName" placeholder="Nombre del producto"></label><label>Categoría<select id="npCategory">${cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></label><label>SKU general<input id="npSku" placeholder="Opcional"></label></div><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="createProductBtn" class="btn primary">Crear y editar</button></div>`);$('#createProductBtn').addEventListener('click',async()=>{const name=$('#npName').value.trim();if(!name)return alert('Ingresá un nombre');const btn=$('#createProductBtn');btn.disabled=true;try{const p=await DB.createProduct({name,category:$('#npCategory').value,sku:$('#npSku').value.trim()||null});closeModal();await renderProducts($('#globalSearch').value);await openProductEditor(p.id)}catch(e){alert(e.message)}finally{btn.disabled=false}});
   }
 
   async function openProductEditor(productId){
@@ -504,12 +510,25 @@ El stock y el historial se conservan.`))return;
 
   /* -------------------- CUSTOMERS -------------------- */
   async function renderCustomers(q=''){
-    const rows=await DB.customers(q);
-    content.innerHTML=`<div class="module-switch"><button class="active" data-combined-view="customers">Clientes</button><button data-combined-view="club">Club</button></div><div class="section-title"><div><span class="eyebrow">CLIENTE 360°</span><h3>Clientes</h3><p class="muted">Ventas, deuda, Club y datos personales en una sola ficha.</p></div><button id="addCustomer" class="btn primary">+ Cliente</button></div><div class="toolbar"><input id="customerSearch" value="${esc(q)}" placeholder="Buscar por nombre, teléfono, Instagram o código…"></div><div class="table-wrap"><table class="table"><thead><tr><th>Cliente</th><th>Compras</th><th>Total gastado</th><th>A cobrar</th><th class="club-crown-head">Club</th><th>Última compra</th><th></th></tr></thead><tbody>${rows.map(c=>`<tr><td><b>${esc(c.full_name)}</b><br><small class="muted">${esc(c.member_code||c.customer_code||c.source||'')}</small></td><td>${number(c.completed_sales)}</td><td>${money(c.total_spent_ars)}</td><td>${Number(c.pending_receivable_ars)>0?`<span class="pill yellow">${money(c.pending_receivable_ars)}</span>`:'—'}</td><td class="club-crown-cell">${Number(c.active_clubs)>0?`<span class="club-crowns" title="${number(c.active_clubs)} club${Number(c.active_clubs)===1?'':'es'}">${'👑'.repeat(Math.max(1,Number(c.active_clubs)||1))}</span>`:'<span class="club-none">—</span>'}</td><td>${c.last_sale_at?safeDate(c.last_sale_at):'—'}</td><td><button class="btn tiny ghost open-customer360" data-id="${c.id}">Abrir ficha</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">Sin clientes.</td></tr>'}</tbody></table></div>`;
+    const all=await DB.customers(q);let rows=[...all];
+    if(customerFilter==='receivable')rows=rows.filter(c=>Number(c.pending_receivable_ars)>0);
+    if(customerFilter==='club')rows=rows.filter(c=>Number(c.active_clubs)>0);
+    if(customerFilter==='buyers')rows=rows.filter(c=>Number(c.completed_sales)>0);
+    if(customerSort.dir){const k=customerSort.key;rows.sort((a,b)=>(Number(a[k]||0)-Number(b[k]||0))*customerSort.dir)}
+    const totalSpent=all.reduce((a,c)=>a+Number(c.total_spent_ars||0),0),receivable=all.reduce((a,c)=>a+Number(c.pending_receivable_ars||0),0),clubCount=all.filter(c=>Number(c.active_clubs)>0).length;
+    const sh=(key,label)=>`<button class="stock-sort-head ${customerSort.key===key&&customerSort.dir?'active':''}" data-customer-sort="${key}">${label}<span>${customerSort.key===key&&customerSort.dir?(customerSort.dir===1?'↑':'↓'):'↕'}</span></button>`;
+    content.innerHTML=`<div class="module-switch"><button class="active" data-combined-view="customers">Clientes</button><button data-combined-view="club">Club</button></div><div class="section-title"><div><span class="eyebrow">CLIENTE 360°</span><h3>Clientes</h3><p class="muted">Ventas, deuda, Club y datos personales en una sola ficha.</p></div><button id="addCustomer" class="btn primary">+ Cliente</button></div>
+    <div class="customer-summary">
+      <button data-customer-filter="all" class="${customerFilter==='all'?'active':''}"><b>${number(all.length)}</b><small>Todos</small></button>
+      <button data-customer-filter="buyers" class="${customerFilter==='buyers'?'active':''}"><b>${money(totalSpent)}</b><small>Total gastado</small></button>
+      <button data-customer-filter="receivable" class="${customerFilter==='receivable'?'active':''}"><b>${money(receivable)}</b><small>A cobrar</small></button>
+      <button data-customer-filter="club" class="${customerFilter==='club'?'active':''}"><b>${number(clubCount)}</b><small>Con Club</small></button>
+    </div>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Cliente</th><th>${sh('completed_sales','Compras')}</th><th>${sh('total_spent_ars','Total gastado')}</th><th>${sh('pending_receivable_ars','A cobrar')}</th><th class="club-crown-head">Club</th><th>Última compra</th><th></th></tr></thead><tbody>${rows.map(c=>`<tr><td><b>${esc(c.full_name)}</b><br><small class="muted">${esc(c.member_code||c.customer_code||c.source||'')}</small></td><td>${number(c.completed_sales)}</td><td>${money(c.total_spent_ars)}</td><td>${Number(c.pending_receivable_ars)>0?`<span class="pill yellow">${money(c.pending_receivable_ars)}</span>`:'—'}</td><td class="club-crown-cell">${Number(c.active_clubs)>0?`<span class="club-crowns" title="${number(c.active_clubs)} club(es)">${'👑'.repeat(Math.max(1,Number(c.active_clubs)||1))}</span>`:'<span class="club-none">—</span>'}</td><td>${c.last_sale_at?safeDate(c.last_sale_at):'—'}</td><td><button class="btn tiny ghost open-customer360" data-id="${c.id}">Abrir ficha</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">Sin clientes.</td></tr>'}</tbody></table></div>`;
     document.querySelectorAll('[data-combined-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.combinedView)));
-    $('#customerSearch').addEventListener('input',e=>{const v=e.target.value;$('#globalSearch').value=v;clearTimeout(timer);timer=setTimeout(()=>renderCustomers(v),150)});
-    $('#addCustomer').addEventListener('click',()=>openCustomerEditor());
-    document.querySelectorAll('.open-customer360').forEach(b=>b.addEventListener('click',()=>openCustomer360(b.dataset.id)));
+    document.querySelectorAll('[data-customer-filter]').forEach(b=>b.addEventListener('click',()=>{customerFilter=b.dataset.customerFilter;renderCustomers($('#globalSearch').value)}));
+    document.querySelectorAll('[data-customer-sort]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.customerSort;if(customerSort.key!==k)customerSort={key:k,dir:-1};else if(customerSort.dir===-1)customerSort.dir=1;else customerSort={key:'',dir:0};renderCustomers($('#globalSearch').value)}));
+    $('#addCustomer').addEventListener('click',()=>openCustomerEditor());document.querySelectorAll('.open-customer360').forEach(b=>b.addEventListener('click',()=>openCustomer360(b.dataset.id)));
   }
   function openCustomerEditor(customer=null,fromPos=false){
     openModal(`<div class="section-title"><div><span class="eyebrow">CLIENTE</span><h3>${customer?'Editar':'Nuevo'} cliente</h3></div><button class="modal-close">×</button></div><div class="form-grid"><label>Nombre<input id="cuName" value="${esc(customer?.full_name||'')}"></label><label>Teléfono<input id="cuPhone" value="${esc(customer?.phone||'')}"></label><label>Email<input id="cuEmail" type="email" value="${esc(customer?.email||'')}"></label><label>Instagram<input id="cuInstagram" value="${esc(customer?.instagram_username||'')}"></label><label>Dirección<input id="cuAddress" value="${esc(customer?.address||'')}"></label><label>Documento<input id="cuDoc" value="${esc(customer?.document_number||'')}"></label></div><label style="margin-top:12px">Notas<textarea id="cuNotes" rows="3">${esc(customer?.notes||'')}</textarea></label>${customer?`<section class="customer-admin-zone"><div><span class="eyebrow">ADMINISTRACIÓN</span><h4>Gestionar ficha</h4><p class="muted">Unificá duplicados o retiralos de la base activa sin romper ventas, deuda ni Club.</p></div><div class="customer-admin-actions"><button id="mergeCustomerBtn" class="btn ghost">Unificar cliente</button><button id="archiveCustomerBtn" class="btn ghost">Archivar</button><button id="deleteCustomerBtn" class="btn danger-btn">Eliminar</button></div></section>`:''}<div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveCustomer" class="btn primary">Guardar cliente</button></div>`);
