@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#070809">
   <title>IMPORTB2B Central</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./assets/css/app.css?v=6.6.1">
+  <link rel="stylesheet" href="./assets/css/app.css?v=6.6.2">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -42,17 +42,17 @@
         </div>
       </div>
       <nav id="nav">
-        <button data-view="dashboard" data-nav-label="Inicio" class="active">Inicio</button>
-        <button data-view="sell" data-nav-label="Vender">Vender</button>
-        <button data-view="products" data-nav-label="Stock">Productos / Stock</button>
-        <button data-view="orders" data-nav-label="Operaciones">Operaciones</button>
-        <button data-view="finance" data-nav-label="Caja / Finanzas">Finanzas</button>
-        <button data-view="wholesale" data-nav-label="Mayorista / PDF">Mayorista / PDF Catálogos</button>
-        <button data-view="customers" data-nav-label="Clientes / Club">Clientes / Club</button>
-        <button data-view="catalog" data-nav-label="Catálogo / Web">Catálogo / Web</button>
-        <button data-view="stats" data-nav-label="Estadísticas">Estadísticas</button>
-        <button data-view="users" data-nav-label="Usuarios">Usuarios</button>
-        <button data-view="settings" data-nav-label="Configuración">Configuración</button>
+        <button data-view="dashboard" data-nav-label="Inicio" class="active"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.8l8.5 6.7v9a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/></svg><span class="nav-label">Inicio</span></button>
+        <button data-view="sell" data-nav-label="Vender"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h2l2.1 9.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 1.9-1.4L21 8H6"/><circle cx="10" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/></svg><span class="nav-label">Vender</span></button>
+        <button data-view="products" data-nav-label="Stock"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4-8 4z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg><span class="nav-label">Productos / Stock</span></button>
+        <button data-view="orders" data-nav-label="Operaciones"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg><span class="nav-label">Operaciones</span></button>
+        <button data-view="finance" data-nav-label="Caja / Finanzas"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2.8" width="16" height="18.4" rx="2.2"/><path d="M7.5 6.5h9v3h-9zM8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01M16 17h.01"/></svg><span class="nav-label">Finanzas</span></button>
+        <button data-view="wholesale" data-nav-label="Mayorista / PDF"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.8h9l4 4V21H6z"/><path d="M15 2.8V7h4M9 11h7M9 15h7M9 19h5"/></svg><span class="nav-label">Mayorista / PDF Catálogos</span></button>
+        <button data-view="customers" data-nav-label="Clientes / Club"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c.4-4 2.2-6 5.5-6s5.1 2 5.5 6M16 9a2.5 2.5 0 1 1 0 5M16 15c2.7 0 4.2 1.7 4.5 5"/></svg><span class="nav-label">Clientes / Club</span></button>
+        <button data-view="catalog" data-nav-label="Catálogo / Web"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9S14.5 18.4 12 21M12 3C9.5 5.6 8.2 8.6 8.2 12S9.5 18.4 12 21"/></svg><span class="nav-label">Catálogo / Web</span></button>
+        <button data-view="stats" data-nav-label="Estadísticas"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10h3v10M10.5 20V4h3v16M16 20v-7h3v7"/></svg><span class="nav-label">Estadísticas</span></button>
+        <button data-view="users" data-nav-label="Usuarios"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.3"/><path d="M3.5 20c.4-4 2.2-6 5.5-6s5.1 2 5.5 6M14.5 15c3.6-.4 5.5 1.3 6 5"/></svg><span class="nav-label">Usuarios</span></button>
+        <button data-view="settings" data-nav-label="Configuración"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"/></svg><span class="nav-label">Configuración</span></button>
       </nav>
       <button id="logoutBtn" class="logout">Cerrar sesión</button>
     </aside>
@@ -73,9 +73,9 @@
     </main>
   </div>
 
-  <script src="./assets/js/config.js?v=6.6.1"></script>
-  <script src="./assets/js/db.js?v=6.6.1"></script>
-  <script src="./assets/js/importer.js?v=6.6.1"></script>
-  <script src="./assets/js/app.js?v=6.6.1"></script>
+  <script src="./assets/js/config.js?v=6.6.2"></script>
+  <script src="./assets/js/db.js?v=6.6.2"></script>
+  <script src="./assets/js/importer.js?v=6.6.2"></script>
+  <script src="./assets/js/app.js?v=6.6.2"></script>
 </body>
 </html>
