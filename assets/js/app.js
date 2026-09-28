@@ -392,9 +392,12 @@
   async function renderProducts(q=''){
     const currentCat=$('#categoryFilter')?.value||'', currentStock=$('#stockFilter')?.value||'all';
     const [cats,products]=await Promise.all([DB.categories(),DB.products(q,currentCat,currentStock)]);
-    content.innerHTML=`<div class="toolbar"><input id="productSearch" value="${esc(q)}" placeholder="Nombre, SKU, categoría, variante…"><select id="categoryFilter"><option value="">Todas las categorías</option>${cats.map(c=>`<option value="${esc(c)}" ${c===currentCat?'selected':''}>${esc(c)}</option>`).join('')}</select><select id="stockFilter"><option value="all" ${currentStock==='all'?'selected':''}>Todo stock</option><option value="available" ${currentStock==='available'?'selected':''}>Con stock</option><option value="low" ${currentStock==='low'?'selected':''}>Stock bajo</option><option value="out" ${currentStock==='out'?'selected':''}>Sin stock</option><option value="transit" ${currentStock==='transit'?'selected':''}>En tránsito</option></select></div><div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Categoría</th><th>Variantes</th><th>Disponible</th><th>Reservado</th><th>En tránsito</th><th>Precio</th><th></th></tr></thead><tbody>${products.map(p=>{const av=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0),res=p.variants.reduce((a,v)=>a+Number(v.stock.reserved||0),0),tr=p.variants.reduce((a,v)=>a+Number(v.stock.in_transit||0),0),prices=p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean);return`<tr><td><b>${esc(p.name)}</b><br><small class="muted">${esc(p.sku||'Sin SKU')}</small></td><td>${esc(p.category||'—')}</td><td>${p.variants.length}</td><td><span class="pill ${av>0?'green':'red'}">${number(av)}</span></td><td>${number(res)}</td><td>${tr?`<span class="pill blue">${number(tr)}</span>`:'0'}</td><td>${prices.length?money(Math.min(...prices)):'—'}</td><td><button class="btn tiny ghost edit-product" data-id="${p.id}">Editar</button></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Sin resultados.</td></tr>'}</tbody></table></div>`;
+    const categoryChips=['',...cats].map(c=>`<button type="button" class="stock-category-chip ${c===currentCat?'active':''}" data-stock-cat="${esc(c)}">${c?esc(c):'Todos'}</button>`).join('');
+    content.innerHTML=`<div class="stock-category-bar" aria-label="Categorías rápidas">${categoryChips}</div><div class="toolbar stock-toolbar"><input id="productSearch" value="${esc(q)}" placeholder="Nombre, SKU, categoría, variante…"><select id="categoryFilter"><option value="">Todas las categorías</option>${cats.map(c=>`<option value="${esc(c)}" ${c===currentCat?'selected':''}>${esc(c)}</option>`).join('')}</select><select id="stockFilter"><option value="all" ${currentStock==='all'?'selected':''}>Todo stock</option><option value="available" ${currentStock==='available'?'selected':''}>Con stock</option><option value="low" ${currentStock==='low'?'selected':''}>Stock bajo</option><option value="out" ${currentStock==='out'?'selected':''}>Sin stock</option><option value="transit" ${currentStock==='transit'?'selected':''}>En tránsito</option><option value="no_image" ${currentStock==='no_image'?'selected':''}>Sin foto</option></select></div><div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Categoría</th><th>Variantes</th><th>Disponible</th><th>Reservado</th><th>En tránsito</th><th>Precio</th><th></th></tr></thead><tbody>${products.map(p=>{const av=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0),res=p.variants.reduce((a,v)=>a+Number(v.stock.reserved||0),0),tr=p.variants.reduce((a,v)=>a+Number(v.stock.in_transit||0),0),prices=p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean);return`<tr><td><b>${esc(p.name)}</b> ${!p.thumbnail_url?'<span class="pill yellow stock-no-photo">SIN FOTO</span>':''}<br><small class="muted">${esc(p.sku||'Sin SKU')}</small></td><td>${esc(p.category||'—')}</td><td>${p.variants.length}</td><td><span class="pill ${av>0?'green':'red'}">${number(av)}</span></td><td>${number(res)}</td><td>${tr?`<span class="pill blue">${number(tr)}</span>`:'0'}</td><td>${prices.length?money(Math.min(...prices)):'—'}</td><td><button class="btn tiny ghost edit-product" data-id="${p.id}">Editar</button></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Sin resultados.</td></tr>'}</tbody></table></div>`;
     $('#productSearch').addEventListener('input',e=>{const v=e.target.value;$('#globalSearch').value=v;clearTimeout(timer);timer=setTimeout(()=>renderProducts(v),140)});
-    $('#categoryFilter').addEventListener('change',()=>renderProducts($('#productSearch').value));$('#stockFilter').addEventListener('change',()=>renderProducts($('#productSearch').value));
+    $('#categoryFilter').addEventListener('change',()=>renderProducts($('#productSearch').value));
+    $('#stockFilter').addEventListener('change',()=>renderProducts($('#productSearch').value));
+    document.querySelectorAll('[data-stock-cat]').forEach(b=>b.addEventListener('click',()=>{$('#categoryFilter').value=b.dataset.stockCat||'';renderProducts($('#productSearch').value)}));
     document.querySelectorAll('.edit-product').forEach(b=>b.addEventListener('click',()=>openProductEditor(b.dataset.id)));
   }
   async function openProductEditor(productId){
@@ -1200,6 +1203,20 @@ El stock y el historial se conservan.`))return;
     modal.remove();
     unlockPageScroll('modal');
   }
+
+  // Global desktop shortcut: Escape closes only the top-most transient UI.
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Escape'||e.defaultPrevented)return;
+    if(document.querySelector('#modalLayer')){
+      e.preventDefault();closeModal();return;
+    }
+    if($('#posCartDrawer')?.classList.contains('open')){
+      e.preventDefault();closeCartDrawer();return;
+    }
+    if(document.querySelector('.sidebar')?.classList.contains('open')){
+      e.preventDefault();closeMobileMenu();return;
+    }
+  });
 
   start();
 })();
