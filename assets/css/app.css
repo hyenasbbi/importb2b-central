@@ -547,3 +547,15 @@ main,#content,.card,.table-wrap{min-width:0}
   .section-title h3{font-size:22px}
   .table th,.table td{padding:10px}
 }
+
+/* ==================== PHASE 6.6.1 · STOCK WORKFLOW ==================== */
+.stock-category-bar{display:flex;gap:8px;overflow-x:auto;scrollbar-width:thin;padding:2px 0 12px;margin-bottom:2px}
+.stock-category-chip{flex:0 0 auto;border:1px solid #293038;background:#0b0e11;color:#bcc4ce;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:850;cursor:pointer;white-space:nowrap}
+.stock-category-chip:hover{border-color:#424b55;background:#12161a;color:#fff}
+.stock-category-chip.active{background:#2a0c10;border-color:rgba(255,49,56,.55);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.stock-no-photo{margin-left:7px;vertical-align:middle;font-size:9px;padding:4px 7px}
+@media(max-width:760px){
+  .stock-category-bar{margin-inline:-2px;padding-bottom:10px}
+  .stock-category-chip{padding:9px 12px}
+  .stock-toolbar{gap:8px}
+}
