@@ -670,3 +670,32 @@ html::-webkit-scrollbar-button,body::-webkit-scrollbar-button,#content::-webkit-
 .stock-commandbar .stock-command>span:not(.stock-tool-icon){display:inline-flex;align-items:center;line-height:1}
 .stock-commandbar .stock-tool-icon,.stock-commandbar .stock-folder-icon{display:block;flex:0 0 20px;width:20px;height:20px;margin:0}
 .stock-commandbar .stock-tool-icon{font-size:20px;line-height:20px;text-align:center}
+
+
+/* ==================== PHASE 6.8.3 · POS LIST ALIGNMENT ==================== */
+/* Header and every sale row share exactly the same grid, padding and alignment. */
+.pos-product-grid.list-view{--pos-list-cols:78px minmax(240px,2.2fr) minmax(150px,1.15fr) minmax(135px,1fr) minmax(125px,.85fr) minmax(110px,.75fr)}
+.pos-list-head{grid-template-columns:var(--pos-list-cols)}
+.list-view .pos-product-card-v63{grid-template-columns:var(--pos-list-cols)!important;min-height:88px}
+.pos-list-head>*,
+.list-view .pos-product-main,
+.list-view .pos-product-category,
+.list-view .pos-product-variant,
+.list-view .pos-product-price,
+.list-view .pos-product-stock{padding:14px 18px!important;box-sizing:border-box}
+.pos-list-head>*{display:flex;align-items:center;min-height:44px}
+.list-view .pos-product-main,
+.list-view .pos-product-category,
+.list-view .pos-product-variant,
+.list-view .pos-product-price,
+.list-view .pos-product-stock{height:100%;display:flex;align-items:center}
+.list-view .pos-product-main{flex-direction:column;align-items:flex-start;justify-content:center;gap:5px}
+.pos-list-head>*:nth-child(5),.pos-list-head>*:nth-child(6){justify-content:flex-end;text-align:right}
+.list-view .pos-product-price,.list-view .pos-product-stock{justify-content:flex-end;text-align:right}
+.list-view .pos-product-photo{width:78px;height:100%;min-height:88px}
+@media(max-width:1180px){
+ .pos-product-grid.list-view{--pos-list-cols:72px minmax(220px,2fr) minmax(135px,1fr) minmax(110px,.85fr) minmax(100px,.75fr)}
+ .list-view .pos-product-card-v63{grid-template-columns:var(--pos-list-cols)!important}
+ .pos-list-head{grid-template-columns:var(--pos-list-cols)}
+ .list-view .pos-product-variant{display:none}
+}
