@@ -660,3 +660,7 @@ html::-webkit-scrollbar-button,body::-webkit-scrollbar-button,#content::-webkit-
 .customer-summary button:hover,.customer-summary button.active{border-color:rgba(255,49,56,.55);background:#180d10}
 .customer-summary b{display:block;font-size:17px}.customer-summary small{display:block;color:var(--muted);margin-top:4px}
 @media(max-width:760px){.stock-summary{overflow-x:auto}.stock-stat{flex:0 0 145px}.customer-summary{grid-template-columns:1fr 1fr}}
+
+/* ==================== PHASE 6.8.1 · COST CONTROL ==================== */
+.stock-cost-danger{display:inline-flex;align-items:center;color:#ff4d55;font-weight:900}
+.stock-cost-danger::before{content:"!";display:inline-grid;place-items:center;width:16px;height:16px;margin-right:6px;border-radius:50%;background:rgba(255,49,56,.16);border:1px solid rgba(255,73,80,.35);font-size:10px}
