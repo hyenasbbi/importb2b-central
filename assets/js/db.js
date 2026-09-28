@@ -384,7 +384,7 @@
     async pendingQuickSales(){ const r=await db.from('importb2b_sales').select('id,sale_code,total_ars,original_payment_method,notes,sold_at,stock_link_status').eq('status','completed').eq('stock_link_status','pending').order('sold_at',{ascending:false}).limit(100);assert(r);return r.data||[]; },
     async linkQuickSaleItem(saleId,variantId,quantity=1){ const r=await db.rpc('importb2b_link_quick_sale_item',{p_sale_id:saleId,p_variant_id:variantId,p_quantity:Number(quantity)});assert(r);return r.data; },
     async recentSales(limit=20){
-      const sr=await db.from('importb2b_sales').select('id,sale_code,status,customer_id,subtotal_ars,discount_ars,fee_ars,shipping_ars,total_ars,profit_ars,original_payment_method,notes,seller_name,source,stock_link_status,sold_at,created_at').order('sold_at',{ascending:false}).limit(limit); assert(sr);
+      const sr=await db.from('importb2b_sales').select('id,sale_code,status,customer_id,subtotal_ars,discount_ars,fee_ars,shipping_ars,total_ars,profit_ars,original_payment_method,notes,seller_name,source,source_id,is_historical,historical_editable,stock_link_status,sold_at,created_at').order('sold_at',{ascending:false}).limit(limit); assert(sr);
       const sales=sr.data||[], ids=sales.map(x=>x.id), customerIds=[...new Set(sales.map(x=>x.customer_id).filter(Boolean))];
       let customers=[],payments=[];
       if(customerIds.length){ const r=await db.from('importb2b_customers').select('id,full_name,phone').in('id',customerIds); assert(r); customers=r.data||[]; }
@@ -400,6 +400,23 @@
         db.from('importb2b_sales').select('*').eq('id',id).single(),
         db.from('importb2b_sale_items').select('*').eq('sale_id',id).order('created_at')
       ]); assert(s); assert(i); return {...s.data,items:i.data||[]};
+    },
+    async updateHistoricalSale(payload){
+      const r=await db.rpc('importb2b_update_historical_sale',{
+        p_sale_id:payload.id,
+        p_sold_at:payload.soldAt,
+        p_customer_id:payload.customerId||null,
+        p_subtotal_ars:Number(payload.subtotal||0),
+        p_discount_ars:Number(payload.discount||0),
+        p_fee_ars:Number(payload.fee||0),
+        p_shipping_ars:Number(payload.shipping||0),
+        p_total_ars:Number(payload.total||0),
+        p_profit_ars:payload.profit===''||payload.profit==null?null:Number(payload.profit),
+        p_payment_method:payload.paymentMethod||null,
+        p_seller_name:payload.sellerName||null,
+        p_notes:payload.notes||null,
+        p_items:payload.items||[]
+      });assert(r);return r.data;
     },
     async cancelSale(id,reason=''){ const r=await db.rpc('importb2b_cancel_sale',{p_sale_id:id,p_reason:reason||null}); assert(r); return r.data; },
 
