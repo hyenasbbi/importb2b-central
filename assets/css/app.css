@@ -597,3 +597,35 @@ main,#content,.card,.table-wrap{min-width:0}
   .sidebar nav{padding-right:5px}
   .sidebar nav::-webkit-scrollbar{width:4px}
 }
+
+
+/* ==================== PHASE 6.7 · STOCK WORKSPACE ==================== */
+.stock-commandbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px;border:1px solid var(--line);border-radius:16px;background:#0d1013}
+.stock-command-spacer{flex:1}
+.stock-command{min-height:42px;padding-inline:15px}
+.stock-add-product{min-height:42px;padding-inline:18px}
+.filter-dot{width:7px;height:7px;border-radius:50%;background:var(--red);margin-left:4px}
+.stock-summary{display:flex;align-items:stretch;gap:1px;margin-bottom:14px;border:1px solid var(--line);border-radius:15px;overflow:hidden;background:var(--line)}
+.stock-summary>div{min-width:135px;padding:11px 15px;background:#0b0e11}
+.stock-summary b{display:block;font-size:16px}
+.stock-summary small{display:block;color:var(--muted);margin-top:3px}
+.stock-active-category{border:0;background:#2a0c10;color:#fff;padding:0 16px;font-weight:800;cursor:pointer}
+.stock-row-actions{display:flex;justify-content:flex-end;gap:6px}
+.stock-filter-list{display:grid;gap:7px;margin-top:14px}
+.stock-filter-option{display:flex;justify-content:space-between;align-items:center;width:100%;border:1px solid var(--line);border-radius:13px;background:#0b0e11;color:#fff;padding:14px 16px;text-align:left;font-weight:800;cursor:pointer}
+.stock-filter-option:hover,.stock-filter-option.active{border-color:rgba(255,49,56,.55);background:#260c10}
+.category-head-actions,.category-row-actions{display:flex;align-items:center;gap:6px}
+.category-manager-list{display:grid;margin-top:14px;border:1px solid var(--line);border-radius:15px;overflow:hidden}
+.category-manager-row{display:flex;align-items:center;gap:10px;min-height:58px;padding:8px 10px 8px 16px;background:#0b0e11;border-bottom:1px solid var(--line)}
+.category-manager-row:last-child{border-bottom:0}
+.category-pick{flex:1;border:0;background:transparent;color:#fff;text-align:left;font-size:14px;font-weight:800;cursor:pointer;padding:10px 0}
+.category-row-actions .btn{min-width:36px}
+@media(max-width:760px){
+ .stock-commandbar{flex-wrap:wrap}
+ .stock-command-spacer{display:none}
+ .stock-command,.stock-add-product{flex:1}
+ .stock-summary{overflow-x:auto}
+ .stock-summary>div{min-width:120px}
+ .category-manager-row{align-items:flex-start}
+ .category-row-actions{flex-wrap:wrap;justify-content:flex-end}
+}
