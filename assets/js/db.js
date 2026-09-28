@@ -152,6 +152,7 @@
         if(stockFilter==='out') return av<=0;
         if(stockFilter==='transit') return tr>0;
         if(stockFilter==='low') return p.variants.some(v=>Number(v.stock.available||0)>0 && Number(v.stock.available||0)<=Number(v.stock_min||0));
+        if(stockFilter==='no_image') return !p.thumbnail_url;
         return true;
       });
       return out;
