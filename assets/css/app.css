@@ -629,3 +629,34 @@ main,#content,.card,.table-wrap{min-width:0}
  .category-manager-row{align-items:flex-start}
  .category-row-actions{flex-wrap:wrap;justify-content:flex-end}
 }
+
+
+/* ==================== PHASE 6.8 · INTERACTIVE WORKSPACE ==================== */
+/* One scrollbar language across the whole app */
+html,body,#content,.table-wrap,.modal,.sidebar nav,.category-manager-list{scrollbar-width:thin;scrollbar-color:#353c44 transparent}
+html::-webkit-scrollbar,body::-webkit-scrollbar,#content::-webkit-scrollbar,.table-wrap::-webkit-scrollbar,.modal::-webkit-scrollbar,.sidebar nav::-webkit-scrollbar,.category-manager-list::-webkit-scrollbar{width:5px;height:5px}
+html::-webkit-scrollbar-track,body::-webkit-scrollbar-track,#content::-webkit-scrollbar-track,.table-wrap::-webkit-scrollbar-track,.modal::-webkit-scrollbar-track,.sidebar nav::-webkit-scrollbar-track,.category-manager-list::-webkit-scrollbar-track{background:transparent}
+html::-webkit-scrollbar-thumb,body::-webkit-scrollbar-thumb,#content::-webkit-scrollbar-thumb,.table-wrap::-webkit-scrollbar-thumb,.modal::-webkit-scrollbar-thumb,.sidebar nav::-webkit-scrollbar-thumb,.category-manager-list::-webkit-scrollbar-thumb{background:#353c44;border-radius:999px}
+html::-webkit-scrollbar-button,body::-webkit-scrollbar-button,#content::-webkit-scrollbar-button,.table-wrap::-webkit-scrollbar-button,.modal::-webkit-scrollbar-button,.sidebar nav::-webkit-scrollbar-button,.category-manager-list::-webkit-scrollbar-button{display:none;width:0;height:0}
+
+.stock-folder-icon{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.stock-tool-icon{font-size:20px;line-height:1}
+.stock-summary{background:transparent;gap:8px;border:0;overflow:visible}
+.stock-stat{flex:1;min-width:150px;border:1px solid transparent;border-radius:14px;padding:13px 16px;text-align:left;color:#fff;cursor:pointer;transition:.15s ease}
+.stock-stat b{font-size:19px}.stock-stat small{display:block;margin-top:4px;color:rgba(255,255,255,.72)}
+.stock-stat.blue{background:rgba(0,85,255,.15);border-color:rgba(38,110,255,.28)}
+.stock-stat.green{background:rgba(32,190,110,.13);border-color:rgba(49,207,129,.25)}
+.stock-stat.red{background:rgba(255,49,56,.13);border-color:rgba(255,70,75,.26)}
+.stock-stat.orange{background:rgba(255,158,67,.14);border-color:rgba(255,174,91,.28)}
+.stock-stat:hover,.stock-stat.active{transform:translateY(-1px);border-color:currentColor;filter:brightness(1.14)}
+.stock-sort-head{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;padding:0;cursor:pointer}
+.stock-sort-head span{font-size:11px;color:var(--muted)}.stock-sort-head.active span{color:#fff}
+.category-manager-head .modal-x{align-self:flex-start}
+.category-manager-footer{display:flex;justify-content:flex-start;margin-top:14px}
+.category-manager-row{cursor:grab;user-select:none}.category-manager-row:active{cursor:grabbing}.category-manager-row.dragging{opacity:.42;background:#161c22}
+.category-drag{color:#66717d;font-weight:900;letter-spacing:-3px;padding-right:5px;cursor:grab}
+.customer-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0 14px}
+.customer-summary button{border:1px solid var(--line);border-radius:14px;background:#0d1013;color:#fff;padding:13px 15px;text-align:left;cursor:pointer}
+.customer-summary button:hover,.customer-summary button.active{border-color:rgba(255,49,56,.55);background:#180d10}
+.customer-summary b{display:block;font-size:17px}.customer-summary small{display:block;color:var(--muted);margin-top:4px}
+@media(max-width:760px){.stock-summary{overflow-x:auto}.stock-stat{flex:0 0 145px}.customer-summary{grid-template-columns:1fr 1fr}}
