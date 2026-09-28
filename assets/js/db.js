@@ -117,9 +117,48 @@
       };
     },
 
+    async categoryRecords(){
+      const r=await db.from('importb2b_categories').select('*').eq('active',true).order('sort_order').order('name');
+      assert(r); return r.data||[];
+    },
     async categories(){
-      const r=await db.from('importb2b_categories').select('name').eq('active',true).order('sort_order').order('name');
-      assert(r); return (r.data||[]).map(x=>x.name);
+      return (await this.categoryRecords()).map(x=>x.name);
+    },
+    async renameCategory(id,oldName,newName){
+      newName=String(newName||'').trim(); if(!newName) throw new Error('El nombre no puede quedar vacío');
+      let r=await db.from('importb2b_categories').update({name:newName}).eq('id',id); assert(r);
+      r=await db.from('importb2b_products').update({category:newName}).eq('category',oldName); assert(r);
+    },
+    async createCategory(name){
+      name=String(name||'').trim(); if(!name) throw new Error('Ingresá un nombre');
+      const u=await authUser(), rows=await this.categoryRecords(), sort=rows.length?Math.max(...rows.map(x=>Number(x.sort_order||0)))+1:1;
+      const r=await db.from('importb2b_categories').insert({owner_id:u.id,name,active:true,sort_order:sort}).select().single(); assert(r); return r.data;
+    },
+    async moveCategory(id,direction){
+      const rows=await this.categoryRecords(), i=rows.findIndex(x=>String(x.id)===String(id)), j=i+direction;
+      if(i<0||j<0||j>=rows.length)return;
+      const a=rows[i],b=rows[j],sa=Number(a.sort_order??i),sb=Number(b.sort_order??j);
+      let r=await db.from('importb2b_categories').update({sort_order:sb}).eq('id',a.id);assert(r);
+      r=await db.from('importb2b_categories').update({sort_order:sa}).eq('id',b.id);assert(r);
+    },
+    async deleteCategory(id,name){
+      const p=await db.from('importb2b_products').select('id',{count:'exact',head:true}).eq('active',true).eq('category',name);assert(p);
+      if(Number(p.count||0)>0) throw new Error(`No se puede eliminar: hay ${p.count} producto(s) en esta categoría. Movelos primero.`);
+      const r=await db.from('importb2b_categories').update({active:false}).eq('id',id);assert(r);
+    },
+    async createProduct(payload){
+      const u=await authUser();
+      const r=await db.from('importb2b_products').insert({owner_id:u.id,active:true,catalog_visible:true,...payload}).select().single();assert(r);return r.data;
+    },
+    async duplicateProduct(productId){
+      const p=await this.productDetail(productId),u=await authUser();
+      const baseSku=p.sku?`${p.sku}-COPY`:null;
+      let r=await db.from('importb2b_products').insert({owner_id:u.id,name:`${p.name} - copia`,sku:baseSku,category:p.category,active:true,catalog_visible:false,primary_image_url:null}).select().single();assert(r);
+      const copy=r.data;
+      for(const v of p.variants){
+        const vr=await db.from('importb2b_product_variants').insert({owner_id:u.id,product_id:copy.id,variant_name:v.variant_name,sku:v.sku?`${v.sku}-COPY`:null,cost_ars:v.cost_ars,price_ars:v.price_ars,wholesale_price_ars:v.wholesale_price_ars,stock_min:v.stock_min,active:true,attributes:v.attributes||{}});assert(vr);
+      }
+      return copy;
     },
 
     async products(q='',category='',stockFilter='all'){
