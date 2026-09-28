@@ -143,7 +143,6 @@
 
   async function renderDashboard(){
     const d=await DB.dashboard(),v=d.valuation||{};
-    const maxHour=Math.max(1,...d.hours.map(x=>x.total));
     const diff=d.yesterdaySales?((d.todaySales-d.yesterdaySales)/d.yesterdaySales*100):(d.todaySales>0?100:0);
     const diffClass=diff>=0?'positive':'negative';
     const diffText=d.yesterdaySales?`${diff>=0?'+':''}${number(diff)}% vs ayer`:(d.todaySales>0?'Primera venta del día':'Sin ventas registradas hoy');
@@ -153,8 +152,7 @@
           <div><span class="eyebrow">VENTAS DE HOY</span><h3>${money(d.todaySales)}</h3><p>${number(d.todayCount)} operaciones · Ticket promedio <b>${money(d.todayTicket)}</b></p></div>
           <div class="dashboard-diff ${diffClass}">${esc(diffText)}</div>
         </div>
-        <div class="sales-hour-chart" aria-label="Ventas por hora">${d.hours.map(x=>`<div class="hour-col"><span class="hour-bar" style="height:${Math.max(4,Math.round(x.total/maxHour*100))}%" title="${money(x.total)}"></span><small>${String(x.hour).padStart(2,'0')}</small></div>`).join('')}</div>
-        <div class="month-inside-hero">
+        <div class="month-inside-hero dashboard-summary-no-chart">
           <div><small>Mes actual</small><b>${money(d.monthSales)}</b></div>
           <div><small>Operaciones</small><b>${number(d.monthCount)}</b></div>
           <div><small>Promedio diario</small><b>${money(d.monthDailyAvg)}</b></div>
