@@ -480,6 +480,12 @@
       if(isPrimary){ const r=await db.from('importb2b_products').update({primary_image_url:pub}).eq('id',productId);assert(r); }
       return ins.data;
     },
+    async setProductImageOrder(productId,imageIds){
+      const ids=(imageIds||[]).map(String);
+      for(let i=0;i<ids.length;i++){
+        const r=await db.from('importb2b_product_images').update({sort_order:i+1}).eq('id',ids[i]).eq('product_id',productId);assert(r);
+      }
+    },
     async setPrimaryImage(productId,imageId){
       const u=await authUser();
       const r=await db.from('importb2b_product_images').select('*').eq('id',imageId).eq('product_id',productId).single();assert(r);
