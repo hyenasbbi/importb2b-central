@@ -52,10 +52,11 @@
     if(!data)return;
     const newest=[...data.products].slice(0,6),featured=data.products.filter(p=>p.featured).slice(0,6);
     $('#catalogNewGrid').innerHTML=newest.map(p=>card(p,'NUEVO')).join('');
-    $('#catalogFeaturedGrid').innerHTML=(featured.length?featured:data.products.slice(0,6)).map(p=>card(p)).join('');
+    const featuredFallback=data.products.slice(6,12).length?data.products.slice(6,12):data.products.slice(0,6);
+    $('#catalogFeaturedGrid').innerHTML=(featured.length?featured:featuredFallback).map(p=>card(p)).join('');
     const discounts=data.products.filter(p=>p.discount_price_ars||p.on_sale).slice(0,6);
     $('#catalogDiscountSection').classList.add('hidden');
-    $('#catalogDiscountGrid').innerHTML=discounts.map(p=>card(p,'OFERTA')).join('');
+    $('#catalogDiscountGrid').innerHTML=(catalogBrowseOpen&&catalogMode==='discount')?discounts.map(p=>card(p,'OFERTA')).join(''):'';
     const browse=$('.catalog-all-section'),grid=$('#catalogGrid'),title=$('#catalogBrowseTitle');
     if(catalogBrowseOpen){
       browse?.classList.remove('hidden');
