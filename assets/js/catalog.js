@@ -55,8 +55,8 @@
   function openProduct(pid,push=true){
     const p=data.products.find(x=>x.id===pid);if(!p)return;
     const vars=p.variants.filter(v=>v.in_stock&&Number(v.available||1)>0);
-    const raw=[...(Array.isArray(p.images)?p.images:[]),p.image_url,p.thumbnail_url].map(x=>typeof x==='string'?x:(x?.image_url||x?.thumbnail_url)).filter(Boolean);
-    const images=[];for(const src of raw){if(!images.includes(src))images.push(src)}
+    const ordered=(Array.isArray(p.images)?p.images:[]).map(x=>typeof x==='string'?x:x?.image_url).filter(Boolean);
+    const images=[];if(p.image_url)images.push(p.image_url);for(const src of ordered){if(!images.includes(src))images.push(src)}
     const media=images.length?images:[''];
     const view=$('#catalogProductView'),main=$('#catalogMain');if(!view||!main)return;
     catalogReturnScroll=window.scrollY;main.classList.add('hidden');view.classList.remove('hidden');document.body.classList.add('catalog-product-open');
@@ -78,7 +78,7 @@
           <small class="product-category-label">${esc(p.category||'')}</small>
           <h1>${esc(p.name)}</h1>
           <div class="catalog-product-price" id="productPagePrice">${selectedVariant?money(vars.find(v=>String(v.id)===selectedVariant)?.price_ars):(vars.length?money(Math.min(...vars.map(v=>Number(v.price_ars||0)))):'Consultar')}</div>
-          ${vars.length>1?`<div class="product-option-title"><b>Elegí una opción</b></div><div class="product-sheet-variants">${vars.map(v=>`<button class="${selectedVariant===String(v.id)?'active':''}" data-sheet-v="${v.id}"><span>${esc(v.name)}</span><b>${money(v.price_ars)}</b><small>${data.settings.show_exact_stock?`${Number(v.available||0)} disponibles`:'Disponible'}</small></button>`).join('')}</div>`:''}
+          ${vars.length>1?`<button id="jumpToVariants" class="product-option-title product-option-jump" type="button"><b>Elegí una opción</b><span>↓</span></button><div id="productVariantGrid" class="product-sheet-variants">${vars.map(v=>`<button class="${selectedVariant===String(v.id)?'active':''}" data-sheet-v="${v.id}"><span>${esc(v.name)}</span><b>${money(v.price_ars)}</b><small>${data.settings.show_exact_stock?`${Number(v.available||0)} disponibles`:'Disponible'}</small></button>`).join('')}</div>`:''}
           <button id="productAddButton" class="store-primary product-inline-add" ${selectedVariant?'':'disabled'}>${selectedVariant?'Agregar al pedido':'Elegí una opción'}</button>
           <div class="catalog-product-description"><span>DESCRIPCIÓN</span><p>${esc(p.description||'Producto disponible en IMPORTB2B. Consultanos por WhatsApp si necesitás más información.')}</p></div>
         </div>
@@ -89,7 +89,9 @@
     view.querySelector('#catalogProductBack').onclick=()=>closeProductPage(true);
     view.querySelector('#catalogProductCart').onclick=()=>openCart(true);
     view.querySelectorAll('[data-gallery-index]').forEach(b=>b.addEventListener('click',()=>{const ix=Number(b.dataset.galleryIndex),img=view.querySelector('#productMainImage'),hero=view.querySelector('.catalog-product-hero');if(img)img.src=media[ix];if(hero)hero.style.setProperty('--hero-bg',`url("${media[ix].replace(/"/g,'%22')}")`);view.querySelectorAll('[data-gallery-index]').forEach(x=>x.classList.toggle('active',x===b))}));
-    view.querySelectorAll('[data-sheet-v]').forEach(b=>b.addEventListener('click',()=>{selectedVariant=String(b.dataset.sheetV);view.querySelectorAll('[data-sheet-v]').forEach(x=>x.classList.toggle('active',x===b));const v=vars.find(x=>String(x.id)===selectedVariant);view.querySelector('#productPagePrice').textContent=v?money(v.price_ars):'';const addBtn=view.querySelector('#productAddButton');addBtn.disabled=!selectedVariant;addBtn.textContent=selectedVariant?'Agregar al pedido':'Elegí una opción'}));
+    view.querySelector('#jumpToVariants')?.addEventListener('click',()=>view.querySelector('#productVariantGrid')?.scrollIntoView({behavior:'smooth',block:'center'}));
+    let lastVariantTap={id:'',at:0};
+    view.querySelectorAll('[data-sheet-v]').forEach(b=>b.addEventListener('click',()=>{const id=String(b.dataset.sheetV),now=Date.now();if(lastVariantTap.id===id&&now-lastVariantTap.at<450){selectedVariant='';lastVariantTap={id:'',at:0};view.querySelectorAll('[data-sheet-v]').forEach(x=>x.classList.remove('active'));const prices=vars.map(v=>Number(v.price_ars||0)).filter(Boolean);view.querySelector('#productPagePrice').textContent=prices.length?money(Math.min(...prices)):'Consultar';const addBtn=view.querySelector('#productAddButton');addBtn.disabled=true;addBtn.textContent='Elegí una opción';return}lastVariantTap={id,at:now};selectedVariant=id;view.querySelectorAll('[data-sheet-v]').forEach(x=>x.classList.toggle('active',x===b));const v=vars.find(x=>String(x.id)===selectedVariant);view.querySelector('#productPagePrice').textContent=v?money(v.price_ars):'';const addBtn=view.querySelector('#productAddButton');addBtn.disabled=!selectedVariant;addBtn.textContent=selectedVariant?'Agregar al pedido':'Elegí una opción'}));
     view.querySelector('#productAddButton').addEventListener('click',()=>{if(!selectedVariant)return;add(pid,selectedVariant);const btn=view.querySelector('#productAddButton');btn.textContent='✓ Agregado al pedido';btn.classList.add('added');setTimeout(()=>{btn.textContent='Agregar al pedido';btn.classList.remove('added')},900)});
   }
   window.addEventListener('popstate',()=>{if($('#catalogProductView')&&!$('#catalogProductView').classList.contains('hidden'))closeProductPage(false)});
