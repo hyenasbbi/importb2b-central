@@ -705,3 +705,10 @@ html::-webkit-scrollbar-button,body::-webkit-scrollbar-button,#content::-webkit-
 .pos-category-chip{display:inline-flex;align-items:center;gap:7px}
 .pos-cat-check{display:inline-grid;place-items:center;width:16px;height:16px;flex:0 0 16px;border:1px solid #39414a;border-radius:5px;color:transparent;font-size:11px;font-weight:950;line-height:1}
 .pos-category-chip.active .pos-cat-check{color:#fff;background:var(--red);border-color:var(--red)}
+
+
+/* ==================== PHASE 6.8.5 · STOCK CATEGORY CHECK ==================== */
+.category-pick{display:flex;align-items:center;gap:11px}
+.category-filter-check{display:inline-grid;place-items:center;width:19px;height:19px;flex:0 0 19px;border:1px solid #3b444e;border-radius:5px;color:transparent;font-size:12px;font-weight:950}
+.category-pick.active .category-filter-check{background:var(--red);border-color:var(--red);color:#fff}
+.category-pick.active{color:#fff}
