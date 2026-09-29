@@ -28,48 +28,72 @@
     $('#catalogCategoryChips').querySelectorAll('[data-cat]').forEach(b=>b.addEventListener('click',()=>{cat=b.dataset.cat||'';$('#catalogCategory').value=cat;catalogMode='all';$('#catalogCategoryChips').querySelectorAll('[data-cat]').forEach(x=>x.classList.toggle('active',x===b));renderProducts();document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth',block:'start'})}));
     renderPromoCarousel();renderProducts();renderCart();bindCatalogActions();
   }
-  function card(p,badge=''){const vars=p.variants.filter(v=>v.in_stock&&Number(v.available||1)>0),prices=vars.map(v=>Number(v.price_ars||0)).filter(Boolean),price=prices.length?Math.min(...prices):0,img=p.thumbnail_url||p.image_url;return `<article class="store-card" data-open-product="${p.id}"><div class="store-card-image">${badge?`<span class="catalog-badge">${badge}</span>`:''}${img?`<img loading="lazy" decoding="async" src="${esc(img)}" alt="${esc(p.name)}">`:`<div class="store-card-placeholder">IB</div>`}</div><div class="store-card-body"><div class="store-card-copy"><h3>${esc(p.name)}</h3><small>${esc(p.category||'')}</small></div><div class="catalog-card-bottom"><strong>${price?`Desde ${money(price)}`:'Consultar'}</strong><small>${vars.length>1?`${vars.length} variantes`:'Disponible'}</small></div></div></article>`}
+  function card(p,badge=''){
+    const vars=p.variants.filter(v=>v.in_stock&&Number(v.available||1)>0),prices=vars.map(v=>Number(v.price_ars||0)).filter(Boolean),price=prices.length?Math.min(...prices):0,img=p.thumbnail_url||p.image_url;
+    const direct=vars.length===1;
+    return `<article class="store-card" data-open-product="${p.id}">
+      <div class="store-card-image">
+        ${badge?`<span class="catalog-badge">${badge}</span>`:''}
+        ${img?`<div class="store-card-image-bg" style="background-image:url('${esc(img)}')"></div><img loading="lazy" decoding="async" src="${esc(img)}" alt="${esc(p.name)}">`:`<div class="store-card-placeholder">IB</div>`}
+        ${direct?`<button class="catalog-direct-add" data-direct-p="${p.id}" data-direct-v="${vars[0].id}" aria-label="Agregar ${esc(p.name)}">＋</button>`:`<span class="catalog-options-pill">${vars.length} opciones ›</span>`}
+      </div>
+      <div class="store-card-body">
+        <div class="store-card-copy"><h3>${esc(p.name)}</h3><small>${esc(p.category||'')}</small></div>
+        <div class="catalog-card-bottom"><strong>${price?`Desde ${money(price)}`:'Consultar'}</strong><small>${direct?'Agregar directo':`${vars.length} variantes`}</small></div>
+      </div>
+    </article>`
+  }
   function filteredProducts(){const term=q.trim().toLowerCase();return data.products.filter(p=>(!cat||p.category===cat)&&(!term||[p.name,p.category,...p.variants.flatMap(v=>[v.name,v.sku,Object.values(v.attributes||{}).join(' ')])].join(' ').toLowerCase().includes(term)))}
-  function renderProducts(){if(!data)return;let products=filteredProducts();if(catalogMode==='new')products=[...products].slice(0,24);$('#catalogGrid').innerHTML=products.map(p=>card(p)).join('')||'<div class="store-loading">No encontramos productos con esos filtros.</div>';const newest=[...data.products].slice(0,6),featured=data.products.filter(p=>p.featured).slice(0,6);$('#catalogNewGrid').innerHTML=newest.map(p=>card(p,'NUEVO')).join('');$('#catalogFeaturedGrid').innerHTML=(featured.length?featured:data.products.slice(0,6)).map(p=>card(p)).join('');const discounts=data.products.filter(p=>p.discount_price_ars||p.on_sale).slice(0,6);$('#catalogDiscountSection').classList.toggle('hidden',!discounts.length);$('#catalogDiscountGrid').innerHTML=discounts.map(p=>card(p,'OFERTA')).join('');document.querySelectorAll('[data-open-product]').forEach(x=>x.addEventListener('click',()=>openProduct(x.dataset.openProduct)))}
-  function openProduct(pid){
+  function renderProducts(){if(!data)return;let products=filteredProducts();if(catalogMode==='new')products=[...products].slice(0,24);$('#catalogGrid').innerHTML=products.map(p=>card(p)).join('')||'<div class="store-loading">No encontramos productos con esos filtros.</div>';const newest=[...data.products].slice(0,6),featured=data.products.filter(p=>p.featured).slice(0,6);$('#catalogNewGrid').innerHTML=newest.map(p=>card(p,'NUEVO')).join('');$('#catalogFeaturedGrid').innerHTML=(featured.length?featured:data.products.slice(0,6)).map(p=>card(p)).join('');const discounts=data.products.filter(p=>p.discount_price_ars||p.on_sale).slice(0,6);$('#catalogDiscountSection').classList.toggle('hidden',!discounts.length);$('#catalogDiscountGrid').innerHTML=discounts.map(p=>card(p,'OFERTA')).join('');document.querySelectorAll('[data-open-product]').forEach(x=>x.addEventListener('click',e=>{if(e.target.closest('[data-direct-v]'))return;openProduct(x.dataset.openProduct)}));document.querySelectorAll('[data-direct-v]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();add(b.dataset.directP,b.dataset.directV);b.textContent='✓';setTimeout(()=>b.textContent='＋',700)}))}
+  let catalogReturnScroll=0;
+  function closeProductPage(useHistory=false){
+    const view=$('#catalogProductView'),main=$('#catalogMain');if(!view||!main)return;
+    view.classList.add('hidden');view.innerHTML='';main.classList.remove('hidden');document.body.classList.remove('catalog-product-open');
+    requestAnimationFrame(()=>window.scrollTo({top:catalogReturnScroll,behavior:'instant'}));
+    if(useHistory&&history.state?.catalogProduct)history.back();
+  }
+  function openProduct(pid,push=true){
     const p=data.products.find(x=>x.id===pid);if(!p)return;
     const vars=p.variants.filter(v=>v.in_stock&&Number(v.available||1)>0);
     const raw=[...(Array.isArray(p.images)?p.images:[]),p.image_url,p.thumbnail_url].map(x=>typeof x==='string'?x:(x?.image_url||x?.thumbnail_url)).filter(Boolean);
-    const images=[];for(const src of raw){if(!images.some(x=>x===src))images.push(src)}
+    const images=[];for(const src of raw){if(!images.includes(src))images.push(src)}
     const media=images.length?images:[''];
-    const modal=document.createElement('div');modal.className='store-modal catalog-product-modal';
+    const view=$('#catalogProductView'),main=$('#catalogMain');if(!view||!main)return;
+    catalogReturnScroll=window.scrollY;main.classList.add('hidden');view.classList.remove('hidden');document.body.classList.add('catalog-product-open');
     let selectedVariant=vars.length===1?String(vars[0].id):'';
-    modal.innerHTML=`<div class="store-modal-card product-sheet product-page-card">
-      <div class="product-page-top">
-        <button class="product-sheet-close product-back" type="button" aria-label="Volver">←</button>
+    view.innerHTML=`<div class="catalog-inline-product">
+      <div class="catalog-product-header">
+        <button id="catalogProductBack" type="button" aria-label="Volver">←</button>
         <img src="./assets/img/logo-importb2b.png" alt="IMPORTB2B">
-        <button class="product-cart-shortcut" type="button" aria-label="Abrir carrito">🛒 <span>${cart.reduce((a,x)=>a+x.quantity,0)}</span></button>
+        <button id="catalogProductCart" type="button">🛒 <span>${cart.reduce((a,x)=>a+x.quantity,0)}</span></button>
       </div>
-      <div class="product-gallery">
-        <div class="product-sheet-media">${media[0]?`<img id="productMainImage" src="${esc(media[0])}" alt="${esc(p.name)}">`:'<div class="store-card-placeholder">IB</div>'}</div>
-        ${media.length>1?`<div class="product-gallery-thumbs">${media.map((src,i)=>`<button class="${i?'':'active'}" data-gallery-index="${i}" aria-label="Foto ${i+1}"><img src="${esc(src)}" alt=""></button>`).join('')}</div>`:''}
-      </div>
-      <div class="product-sheet-copy">
-        <small class="product-category-label">${esc(p.category||'')}</small>
-        <h2>${esc(p.name)}</h2>
-        ${p.description?`<p class="product-description">${esc(p.description)}</p>`:''}
-        <div class="product-option-title"><b>${vars.length>1?'Elegí una opción':'Opción disponible'}</b></div>
-        <div class="product-sheet-variants">${vars.map(v=>`<button class="${selectedVariant===String(v.id)?'active':''}" data-sheet-v="${v.id}"><span>${esc(v.name)}</span><b>${money(v.price_ars)}</b><small>${data.settings.show_exact_stock?`${Number(v.available||0)} disponibles`:'Disponible'}</small></button>`).join('')}</div>
-      </div>
-      <div class="product-sticky-buy">
-        <div><small>Precio</small><b id="productPagePrice">${selectedVariant?money(vars.find(v=>String(v.id)===selectedVariant)?.price_ars):(vars.length?money(Math.min(...vars.map(v=>Number(v.price_ars||0)))):'Consultar')}</b></div>
-        <button id="productAddButton" class="store-primary product-add-main" ${selectedVariant?'':'disabled'}>${selectedVariant?'Agregar al pedido':'Elegí una opción'}</button>
+      <div class="catalog-product-content">
+        <div class="catalog-product-gallery">
+          <div class="catalog-product-hero" style="--hero-bg:url('${esc(media[0]||'')}')">
+            ${media[0]?`<div class="catalog-product-hero-bg"></div><img id="productMainImage" src="${esc(media[0])}" alt="${esc(p.name)}">`:'<div class="store-card-placeholder">IB</div>'}
+          </div>
+          ${media.length>1?`<div class="product-gallery-thumbs">${media.map((src,i)=>`<button class="${i?'':'active'}" data-gallery-index="${i}"><img src="${esc(src)}" alt=""></button>`).join('')}</div>`:''}
+        </div>
+        <div class="catalog-product-info">
+          <small class="product-category-label">${esc(p.category||'')}</small>
+          <h1>${esc(p.name)}</h1>
+          <div class="catalog-product-price" id="productPagePrice">${selectedVariant?money(vars.find(v=>String(v.id)===selectedVariant)?.price_ars):(vars.length?money(Math.min(...vars.map(v=>Number(v.price_ars||0)))):'Consultar')}</div>
+          ${vars.length>1?`<div class="product-option-title"><b>Elegí una opción</b></div><div class="product-sheet-variants">${vars.map(v=>`<button class="${selectedVariant===String(v.id)?'active':''}" data-sheet-v="${v.id}"><span>${esc(v.name)}</span><b>${money(v.price_ars)}</b><small>${data.settings.show_exact_stock?`${Number(v.available||0)} disponibles`:'Disponible'}</small></button>`).join('')}</div>`:''}
+          <button id="productAddButton" class="store-primary product-inline-add" ${selectedVariant?'':'disabled'}>${selectedVariant?'Agregar al pedido':'Elegí una opción'}</button>
+          <div class="catalog-product-description"><span>DESCRIPCIÓN</span><p>${esc(p.description||'Producto disponible en IMPORTB2B. Consultanos por WhatsApp si necesitás más información.')}</p></div>
+        </div>
       </div>
     </div>`;
-    document.body.appendChild(modal);document.body.classList.add('product-page-open');
-    const close=()=>{modal.remove();document.body.classList.remove('product-page-open')};
-    modal.querySelector('.product-sheet-close').onclick=close;
-    modal.querySelector('.product-cart-shortcut').onclick=()=>{close();openCart(true)};
-    modal.addEventListener('click',e=>{if(e.target===modal)close()});
-    modal.querySelectorAll('[data-gallery-index]').forEach(b=>b.addEventListener('click',()=>{const ix=Number(b.dataset.galleryIndex);const img=modal.querySelector('#productMainImage');if(img)img.src=media[ix];modal.querySelectorAll('[data-gallery-index]').forEach(x=>x.classList.toggle('active',x===b))}));
-    modal.querySelectorAll('[data-sheet-v]').forEach(b=>b.addEventListener('click',()=>{selectedVariant=String(b.dataset.sheetV);modal.querySelectorAll('[data-sheet-v]').forEach(x=>x.classList.toggle('active',x===b));const v=vars.find(x=>String(x.id)===selectedVariant);modal.querySelector('#productPagePrice').textContent=v?money(v.price_ars):'';const addBtn=modal.querySelector('#productAddButton');addBtn.disabled=!selectedVariant;addBtn.textContent=selectedVariant?'Agregar al pedido':'Elegí una opción'}));
-    modal.querySelector('#productAddButton').addEventListener('click',()=>{if(!selectedVariant)return;add(pid,selectedVariant);const btn=modal.querySelector('#productAddButton');btn.textContent='✓ Agregado';btn.classList.add('added');setTimeout(()=>{close();openCart(true)},220)});
+    window.scrollTo({top:0,behavior:'instant'});
+    if(push)history.pushState({catalogProduct:pid},'',`${location.pathname}${location.search}#producto-${encodeURIComponent(pid)}`);
+    view.querySelector('#catalogProductBack').onclick=()=>closeProductPage(true);
+    view.querySelector('#catalogProductCart').onclick=()=>openCart(true);
+    view.querySelectorAll('[data-gallery-index]').forEach(b=>b.addEventListener('click',()=>{const ix=Number(b.dataset.galleryIndex),img=view.querySelector('#productMainImage'),hero=view.querySelector('.catalog-product-hero');if(img)img.src=media[ix];if(hero)hero.style.setProperty('--hero-bg',`url("${media[ix].replace(/"/g,'%22')}")`);view.querySelectorAll('[data-gallery-index]').forEach(x=>x.classList.toggle('active',x===b))}));
+    view.querySelectorAll('[data-sheet-v]').forEach(b=>b.addEventListener('click',()=>{selectedVariant=String(b.dataset.sheetV);view.querySelectorAll('[data-sheet-v]').forEach(x=>x.classList.toggle('active',x===b));const v=vars.find(x=>String(x.id)===selectedVariant);view.querySelector('#productPagePrice').textContent=v?money(v.price_ars):'';const addBtn=view.querySelector('#productAddButton');addBtn.disabled=!selectedVariant;addBtn.textContent=selectedVariant?'Agregar al pedido':'Elegí una opción'}));
+    view.querySelector('#productAddButton').addEventListener('click',()=>{if(!selectedVariant)return;add(pid,selectedVariant);const btn=view.querySelector('#productAddButton');btn.textContent='✓ Agregado al pedido';btn.classList.add('added');setTimeout(()=>{btn.textContent='Agregar al pedido';btn.classList.remove('added')},900)});
   }
+  window.addEventListener('popstate',()=>{if($('#catalogProductView')&&!$('#catalogProductView').classList.contains('hidden'))closeProductPage(false)});
+
   function renderPromoCarousel(){const el=$('#catalogPromoCarousel');if(!el)return;const slides=[['NUEVOS INGRESOS','Descubrí lo último que llegó a IMPORTB2B','new'],['DESTACADOS','Una selección para encontrar rápido nuestros productos elegidos','featured'],['PRECIOS MAYORISTAS','Comprá para revender y consultá condiciones especiales','wholesale']];el.innerHTML=`<div class="catalog-promo-track">${slides.map((x,i)=>`<button class="catalog-promo-slide ${i?'':'active'}" data-promo="${x[2]}"><span>${x[0]}</span><b>${x[1]}</b><i>Ver más →</i></button>`).join('')}</div><div class="catalog-promo-dots">${slides.map((_,i)=>`<button data-promo-dot="${i}" class="${i?'':'active'}"></button>`).join('')}</div>`;let ix=0,timer;const go=n=>{const slides=[...el.querySelectorAll('.catalog-promo-slide')],dots=[...el.querySelectorAll('[data-promo-dot]')];ix=(n+slides.length)%slides.length;slides.forEach((x,i)=>x.classList.toggle('active',i===ix));dots.forEach((x,i)=>x.classList.toggle('active',i===ix))};timer=setInterval(()=>go(ix+1),4800);el.querySelectorAll('[data-promo-dot]').forEach((b,i)=>b.onclick=()=>go(i));el.querySelectorAll('[data-promo]').forEach(b=>b.onclick=()=>{if(b.dataset.promo==='wholesale')return openWholesaleWhatsapp();catalogMode=b.dataset.promo;document.querySelector(b.dataset.promo==='new'?'#catalogNewGrid':'#catalogFeaturedGrid')?.scrollIntoView({behavior:'smooth',block:'center'})});el.addEventListener('pointerdown',()=>clearInterval(timer),{once:true})}
   function bindCatalogActions(){document.querySelectorAll('[data-catalog-show]').forEach(b=>b.addEventListener('click',()=>{catalogMode=b.dataset.catalogShow;document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth'});renderProducts()}));$('#wholesaleWhatsapp')?.addEventListener('click',openWholesaleWhatsapp);document.querySelectorAll('[data-city]').forEach(b=>b.addEventListener('click',()=>{checkoutCity=b.dataset.city;document.querySelectorAll('[data-city]').forEach(x=>x.classList.toggle('active',x===b))}))}
   function openWholesaleWhatsapp(){const wa=String(data?.settings?.whatsapp_number||'').replace(/\D/g,'');const msg='Hola! Quiero conocer precios mayoristas de ';if(!wa)return alert('WhatsApp mayorista todavía no está configurado.');window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`,'_blank')}
