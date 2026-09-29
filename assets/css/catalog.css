@@ -116,3 +116,14 @@
   .catalog-product-hero{height:min(52dvh,430px)}
   .catalog-product-info h1{font-size:24px}
 }
+
+
+/* ==================== 7.1.2 · GALLERY + VARIANT UX FIX ==================== */
+.product-option-jump{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;background:transparent;color:#fff;padding:0;margin:16px 0 9px;text-align:left}
+.product-option-jump span{display:grid;place-items:center;width:28px;height:28px;border-radius:999px;border:1px solid #30363d;color:#d9dfe5}
+.catalog-product-hero{background:#0b0e11}
+.catalog-product-hero-bg{opacity:.34;filter:blur(32px);transform:scale(1.18)}
+.catalog-product-hero>img{max-width:100%;max-height:100%;object-fit:contain!important;object-position:center!important}
+.product-gallery-thumbs button{background:#0b0e11}
+.product-gallery-thumbs img{object-fit:contain!important;object-position:center!important}
+.product-sheet-variants button.active{border-color:var(--red);background:rgba(255,49,56,.12)}
