@@ -96,7 +96,33 @@
   }
   window.addEventListener('popstate',()=>{if($('#catalogProductView')&&!$('#catalogProductView').classList.contains('hidden'))closeProductPage(false)});
 
-  function renderPromoCarousel(){const el=$('#catalogPromoCarousel');if(!el)return;const slides=[['NUEVOS INGRESOS','Descubrí lo último que llegó a IMPORTB2B','new'],['DESTACADOS','Una selección para encontrar rápido nuestros productos elegidos','featured'],['PRECIOS MAYORISTAS','Comprá para revender y consultá condiciones especiales','wholesale']];el.innerHTML=`<div class="catalog-promo-track">${slides.map((x,i)=>`<button class="catalog-promo-slide ${i?'':'active'}" data-promo="${x[2]}"><span>${x[0]}</span><b>${x[1]}</b><i>Ver más →</i></button>`).join('')}</div><div class="catalog-promo-dots">${slides.map((_,i)=>`<button data-promo-dot="${i}" class="${i?'':'active'}"></button>`).join('')}</div>`;let ix=0,timer;const go=n=>{const slides=[...el.querySelectorAll('.catalog-promo-slide')],dots=[...el.querySelectorAll('[data-promo-dot]')];ix=(n+slides.length)%slides.length;slides.forEach((x,i)=>x.classList.toggle('active',i===ix));dots.forEach((x,i)=>x.classList.toggle('active',i===ix))};timer=setInterval(()=>go(ix+1),4800);el.querySelectorAll('[data-promo-dot]').forEach((b,i)=>b.onclick=()=>go(i));el.querySelectorAll('[data-promo]').forEach(b=>b.onclick=()=>{if(b.dataset.promo==='wholesale')return openWholesaleWhatsapp();catalogMode=b.dataset.promo;document.querySelector(b.dataset.promo==='new'?'#catalogNewGrid':'#catalogFeaturedGrid')?.scrollIntoView({behavior:'smooth',block:'center'})});el.addEventListener('pointerdown',()=>clearInterval(timer),{once:true})}
+  function renderPromoCarousel(){
+    const el=$('#catalogPromoCarousel');if(!el)return;
+    const slidesData=[
+      ['NUEVOS INGRESOS','Descubrí lo último que llegó a IMPORTB2B','new'],
+      ['DESTACADOS','Una selección para encontrar rápido nuestros productos elegidos','featured'],
+      ['PRECIOS MAYORISTAS','Comprá para revender y consultá condiciones especiales','wholesale']
+    ];
+    el.innerHTML=`<div class="catalog-promo-track">${slidesData.map((x,i)=>`<button class="catalog-promo-slide ${i?'':'active'}" data-promo="${x[2]}" aria-hidden="${i?'true':'false'}"><span>${x[0]}</span><b>${x[1]}</b><i>Ver más →</i></button>`).join('')}</div><div class="catalog-promo-dots" role="tablist" aria-label="Promociones">${slidesData.map((_,i)=>`<button type="button" aria-label="Banner ${i+1}" data-promo-dot="${i}" class="${i?'':'active'}"></button>`).join('')}</div>`;
+    const slides=[...el.querySelectorAll('.catalog-promo-slide')],dots=[...el.querySelectorAll('[data-promo-dot]')];
+    let ix=0,timer=null,startX=null,startY=null,dragging=false;
+    const go=n=>{
+      ix=(n+slides.length)%slides.length;
+      slides.forEach((x,i)=>{const on=i===ix;x.classList.toggle('active',on);x.setAttribute('aria-hidden',String(!on))});
+      dots.forEach((x,i)=>x.classList.toggle('active',i===ix));
+    };
+    const stop=()=>{if(timer){clearInterval(timer);timer=null}};
+    const startAuto=()=>{stop();if(document.hidden)return;timer=setInterval(()=>go(ix+1),4200)};
+    const manual=n=>{go(n);startAuto()};
+    dots.forEach((b,i)=>b.addEventListener('click',e=>{e.stopPropagation();manual(i)}));
+    slides.forEach(b=>b.addEventListener('click',()=>{if(dragging)return;if(b.dataset.promo==='wholesale')return openWholesaleWhatsapp();catalogMode=b.dataset.promo;document.querySelector(b.dataset.promo==='new'?'#catalogNewGrid':'#catalogFeaturedGrid')?.scrollIntoView({behavior:'smooth',block:'center'})}));
+    el.addEventListener('pointerdown',e=>{startX=e.clientX;startY=e.clientY;dragging=false;stop()});
+    el.addEventListener('pointermove',e=>{if(startX===null)return;if(Math.abs(e.clientX-startX)>12&&Math.abs(e.clientX-startX)>Math.abs(e.clientY-startY))dragging=true});
+    el.addEventListener('pointerup',e=>{if(startX!==null){const dx=e.clientX-startX,dy=e.clientY-startY;if(Math.abs(dx)>42&&Math.abs(dx)>Math.abs(dy)){go(ix+(dx<0?1:-1));dragging=true}}startX=startY=null;setTimeout(()=>{dragging=false},0);startAuto()});
+    el.addEventListener('pointercancel',()=>{startX=startY=null;dragging=false;startAuto()});
+    document.addEventListener('visibilitychange',()=>document.hidden?stop():startAuto());
+    go(0);startAuto();
+  }
   function bindCatalogActions(){document.querySelectorAll('[data-catalog-show]').forEach(b=>b.addEventListener('click',()=>{catalogMode=b.dataset.catalogShow;document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth'});renderProducts()}));$('#wholesaleWhatsapp')?.addEventListener('click',openWholesaleWhatsapp);document.querySelectorAll('[data-city]').forEach(b=>b.addEventListener('click',()=>{checkoutCity=b.dataset.city;document.querySelectorAll('[data-city]').forEach(x=>x.classList.toggle('active',x===b))}))}
   function openWholesaleWhatsapp(){const wa=String(data?.settings?.whatsapp_number||'').replace(/\D/g,'');const msg='Hola! Quiero conocer precios mayoristas de ';if(!wa)return alert('WhatsApp mayorista todavía no está configurado.');window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`,'_blank')}
 
