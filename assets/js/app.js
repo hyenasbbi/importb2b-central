@@ -12,7 +12,8 @@
   let posMethods=[];
   let posCustomers=[];
   let posRecentSales=[];
-  let posRecentLimit=80;
+  let posRecentPage=1;
+  const posRecentPageSize=25;
   let posSearch='';
   let posCategory='';
   let posViewMode=localStorage.getItem('importb2b-pos-view')||'grid';
@@ -382,13 +383,16 @@
 
   function renderRecentSales(){
     const el=$('#recentSales');if(!el)return;
-    const visible=posRecentSales.slice(0,posRecentLimit),hasMore=posRecentSales.length>visible.length;
-    el.innerHTML=`<div class="table-wrap"><table class="table"><thead><tr><th>Venta</th><th>Fecha</th><th>Cliente</th><th>Pago</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody>${visible.map(s=>`<tr class="${s.status==='cancelled'?'sale-cancelled-row':''}"><td><button class="btn tiny ghost open-recent-sale" data-id="${s.id}">${esc(s.sale_code)}</button>${s.is_historical?' <span class="pill blue">HISTÓRICA</span>':''}${s.stock_link_status==='pending'?` <span class="pill stock-pending-pill">Stock pendiente</span>`:''}</td><td>${safeDate(s.sold_at)}</td><td>${esc(s.customer?.full_name||'Consumidor final')}</td><td>${esc(s.payments?.[0]?.method?.name||s.original_payment_method||'—')}</td><td>${money(s.total_ars)}</td><td>${statusPill(s.status)}</td><td>${s.is_historical?'<button class="btn tiny primary edit-historical-sale" data-id="'+s.id+'">Editar</button>':s.status==='completed'?(s.stock_link_status==='pending'?`<button class="btn tiny ghost link-quick-sale" data-id="${s.id}">Vincular</button> `:'')+`<button class="btn tiny danger-btn cancel-sale" data-id="${s.id}" data-code="${esc(s.sale_code)}">Anular</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Aún no hay ventas en Central.</td></tr>'}</tbody></table></div>${hasMore?`<div class="recent-sales-more"><button id="showMoreRecentSales" class="btn ghost">Mostrar 80 más · ${number(posRecentSales.length-visible.length)} restantes</button></div>`:''}`;
+    const total=posRecentSales.length,totalPages=Math.max(1,Math.ceil(total/posRecentPageSize));
+    posRecentPage=Math.min(Math.max(1,posRecentPage),totalPages);
+    const from=(posRecentPage-1)*posRecentPageSize,to=Math.min(from+posRecentPageSize,total),visible=posRecentSales.slice(from,to);
+    const pageWindow=()=>{if(totalPages<=7)return Array.from({length:totalPages},(_,i)=>i+1);const out=[1],a=Math.max(2,posRecentPage-1),b=Math.min(totalPages-1,posRecentPage+1);if(a>2)out.push("…");for(let i=a;i<=b;i++)out.push(i);if(b<totalPages-1)out.push("…");out.push(totalPages);return out};
+    el.innerHTML=`<div class="table-wrap"><table class="table"><thead><tr><th>Venta</th><th>Fecha</th><th>Cliente</th><th>Pago</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody>${visible.map(s=>`<tr class="${s.status==='cancelled'?'sale-cancelled-row':''}"><td><button class="btn tiny ghost open-recent-sale" data-id="${s.id}">${esc(s.sale_code)}</button>${s.is_historical?' <span class="pill blue">HISTÓRICA</span>':''}${s.stock_link_status==='pending'?` <span class="pill stock-pending-pill">Stock pendiente</span>`:''}</td><td>${safeDate(s.sold_at)}</td><td>${esc(s.customer?.full_name||'Consumidor final')}</td><td>${esc(s.payments?.[0]?.method?.name||s.original_payment_method||'—')}</td><td>${money(s.total_ars)}</td><td>${statusPill(s.status)}</td><td>${s.is_historical?'<button class="btn tiny primary edit-historical-sale" data-id="'+s.id+'">Editar</button>':s.status==='completed'?(s.stock_link_status==='pending'?`<button class="btn tiny ghost link-quick-sale" data-id="${s.id}">Vincular</button> `:'')+`<button class="btn tiny danger-btn cancel-sale" data-id="${s.id}" data-code="${esc(s.sale_code)}">Anular</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Aún no hay ventas en Central.</td></tr>'}</tbody></table></div>${total?`<div class="recent-sales-pagination"><small>Mostrando ${number(from+1)}–${number(to)} de ${number(total)} ventas</small><div class="recent-sales-pages"><button class="recent-page-arrow" data-recent-page="${posRecentPage-1}" ${posRecentPage<=1?"disabled":""} aria-label="Página anterior">←</button>${pageWindow().map(x=>x==="…"?`<span class="recent-page-ellipsis">…</span>`:`<button class="recent-page-number ${x===posRecentPage?"active":""}" data-recent-page="${x}">${x}</button>`).join("")}<button class="recent-page-arrow" data-recent-page="${posRecentPage+1}" ${posRecentPage>=totalPages?"disabled":""} aria-label="Página siguiente">→</button></div></div>`:""}`;
     el.querySelectorAll('.open-recent-sale').forEach(b=>b.addEventListener('click',()=>openSaleDetail(b.dataset.id)));
     el.querySelectorAll('.edit-historical-sale').forEach(b=>b.addEventListener('click',async()=>{try{const sale=await DB.saleDetail(b.dataset.id);openHistoricalSaleEditor(sale)}catch(e){alert(e.message)}}));
     el.querySelectorAll('.link-quick-sale').forEach(b=>b.addEventListener('click',()=>openQuickSaleStockLink(b.dataset.id)));
     el.querySelectorAll('.cancel-sale').forEach(b=>b.addEventListener('click',async()=>{const reason=prompt(`Motivo para anular ${b.dataset.code}:`,'Error / devolución');if(reason===null)return;if(!confirm('Esto devolverá el stock vinculado y revertirá el dinero en Finanzas. La venta seguirá visible como CANCELADA. ¿Continuar?'))return;try{await DB.cancelSale(b.dataset.id,reason);await renderSell()}catch(e){alert(e.message)}}));
-    $('#showMoreRecentSales')?.addEventListener('click',()=>{posRecentLimit+=80;renderRecentSales()});
+    el.querySelectorAll("[data-recent-page]").forEach(b=>b.addEventListener("click",()=>{const page=Number(b.dataset.recentPage);if(!Number.isFinite(page)||page<1||page>totalPages||page===posRecentPage)return;posRecentPage=page;renderRecentSales();document.querySelector("#recentSales")?.scrollIntoView({behavior:"smooth",block:"start"})}));
   }
 
   /* -------------------- PRODUCTS -------------------- */
