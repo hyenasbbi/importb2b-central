@@ -744,3 +744,19 @@ html,body{width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
   .card{box-shadow:none}
   .table-wrap{max-width:100%}
 }
+
+
+/* ==================== 7.2.1 · RECENT SALES PAGINATION ==================== */
+.recent-sales-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 2px 2px}
+.recent-sales-pagination>small{color:var(--muted)}
+.recent-sales-pages{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.recent-page-number,.recent-page-arrow{display:grid;place-items:center;min-width:38px;height:38px;padding:0 10px;border:1px solid #2b3239;border-radius:11px;background:#11151a;color:#dce2e8;font-weight:900;cursor:pointer}
+.recent-page-number.active{background:var(--red);border-color:var(--red);color:#fff}
+.recent-page-number:hover,.recent-page-arrow:hover:not(:disabled){border-color:#49535e;background:#191f25}
+.recent-page-arrow:disabled{opacity:.3;cursor:not-allowed}
+.recent-page-ellipsis{display:grid;place-items:center;min-width:24px;color:var(--muted);font-weight:900}
+@media(max-width:760px){
+  .recent-sales-pagination{display:grid;justify-items:center;padding-top:12px}
+  .recent-sales-pages{justify-content:center}
+  .recent-page-number,.recent-page-arrow{min-width:40px;height:40px}
+}
