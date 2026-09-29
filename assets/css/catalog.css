@@ -169,3 +169,27 @@
     max-height:calc(100% - 28px)!important;
   }
 }
+
+
+/* ==================== 7.2 · MOBILE FLUIDITY + NO SIDE BOUNCE ==================== */
+html,body{width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
+body{position:relative}
+.store-header,.store-main,.catalog-product-view,.catalog-inline-product,.store-drawer,.store-modal{max-width:100%}
+.store-main,.catalog-inline-product{overflow-x:clip}
+.store-grid,.store-card,.store-card-body,.catalog-section,.catalog-product-content,.catalog-product-info{min-width:0}
+.store-tools input{min-width:0}
+.catalog-category-chips{max-width:100%;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+.catalog-promo-carousel{overflow:hidden;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.catalog-promo-track{overflow:hidden}
+.catalog-promo-slide{will-change:opacity,transform}
+.catalog-promo-dots button{touch-action:manipulation}
+.product-gallery-thumbs{overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+@media(max-width:780px){
+  .store-header{backdrop-filter:none;background:#060708}
+  .catalog-promo-slide{transition:opacity .28s ease,transform .28s ease}
+  .store-card-image-bg{filter:blur(14px)}
+  .catalog-product-hero-bg{filter:blur(24px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .catalog-promo-slide{transition:none}
+}
