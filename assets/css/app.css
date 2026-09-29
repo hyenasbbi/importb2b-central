@@ -712,3 +712,13 @@ html::-webkit-scrollbar-button,body::-webkit-scrollbar-button,#content::-webkit-
 .category-filter-check{display:inline-grid;place-items:center;width:19px;height:19px;flex:0 0 19px;border:1px solid #3b444e;border-radius:5px;color:transparent;font-size:12px;font-weight:950}
 .category-pick.active .category-filter-check{background:var(--red);border-color:var(--red);color:#fff}
 .category-pick.active{color:#fff}
+
+
+/* ==================== PHASE 6.9 · PRODUCT GALLERY ORDER ==================== */
+.product-image-card{position:relative;touch-action:pan-y;transition:transform .14s ease,opacity .14s ease,border-color .14s ease}
+.product-image-drag{position:absolute;z-index:4;top:8px;left:8px;display:grid;place-items:center;width:28px;height:28px;border:1px solid rgba(255,255,255,.16);border-radius:9px;background:rgba(8,10,12,.78);backdrop-filter:blur(6px);color:#d8dee5;font-weight:950;letter-spacing:-3px;cursor:grab}
+.product-image-order{position:absolute;z-index:4;top:8px;right:8px;display:grid;place-items:center;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:rgba(8,10,12,.8);border:1px solid rgba(255,255,255,.14);color:#fff;font-size:11px;font-weight:900}
+.product-image-card.dragging{opacity:.6;transform:scale(.97);border-color:rgba(255,49,56,.7)!important;z-index:8}
+.product-image-card.touch-dragging{touch-action:none;box-shadow:0 18px 42px rgba(0,0,0,.48)}
+.product-image-card img{user-select:none;-webkit-user-drag:none;pointer-events:none}
+@media(max-width:760px){.product-image-drag{width:32px;height:32px}.product-image-order{height:28px;min-width:28px}}
