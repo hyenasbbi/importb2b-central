@@ -220,9 +220,6 @@
         <div id="posCatalogGrid" class="pos-product-grid pos-product-grid-wide ${posViewMode==='grid'?'cards-view':'list-view'}"></div>
       </section>
 
-      <button id="cartToggle" class="cart-launcher" type="button" aria-label="Abrir carrito">
-        <span class="cart-launcher-count" id="cartLauncherCount">0</span><span class="cart-launcher-copy"><small>CARRITO</small><b id="cartLauncherLabel">Venta vacía</b></span><strong id="cartLauncherTotal">${money(0)}</strong>
-      </button>
       <div id="cartBackdrop" class="cart-backdrop"></div>
       <aside id="posCartDrawer" class="cart-drawer" aria-hidden="true">
         <div class="cart-drawer-head"><div><span class="eyebrow">CARRITO</span><h3>Venta actual</h3></div><div class="cart-drawer-head-actions"><span id="cartCount" class="pill">0</span><button id="cartClose" class="drawer-close" type="button">×</button></div></div>
@@ -244,7 +241,7 @@
     $('#posViewToggle').addEventListener('click',()=>{posViewMode=posViewMode==='grid'?'list':'grid';localStorage.setItem('importb2b-pos-view',posViewMode);renderPosCatalog();const b=$('#posViewToggle');b.textContent=posViewMode==='grid'?'☷':'▦';b.classList.toggle('active',posViewMode==='grid')});
     ['#posShipping','#posDiscount','#posPayment'].forEach(sel=>$(sel).addEventListener('input',renderCartTotals));
     $('#posHolder').addEventListener('change',e=>{posHolder=e.target.value;localStorage.setItem('importb2b-pos-holder',posHolder)});
-    $('#quickCustomer').addEventListener('click',()=>openCustomerEditor(null,true));$('#finishSale').addEventListener('click',finishSale);$('#cartToggle').addEventListener('click',openCartDrawer);$('#cartClose').addEventListener('click',closeCartDrawer);$('#cartBackdrop').addEventListener('click',closeCartDrawer);
+    $('#quickCustomer').addEventListener('click',()=>openCustomerEditor(null,true));$('#finishSale').addEventListener('click',finishSale);$('#cartClose').addEventListener('click',closeCartDrawer);$('#cartBackdrop').addEventListener('click',closeCartDrawer);
     $('#quickSaleBtn').addEventListener('click',openQuickSale);
     $('#reviewQuickSales')?.addEventListener('click',()=>openPendingQuickSales());
   }
