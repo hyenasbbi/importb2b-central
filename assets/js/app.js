@@ -394,8 +394,13 @@
   /* -------------------- PRODUCTS -------------------- */
   async function renderProducts(q=''){
     const currentStock=window.__stockFilter||'all', currentCat=window.__stockCategory||'';
+    const summaryFilters=window.__stockSummaryFilters instanceof Set?window.__stockSummaryFilters:new Set(window.__stockSummaryFilters||[]);
+    window.__stockSummaryFilters=summaryFilters;
     const [cats,baseRows]=await Promise.all([DB.categoryRecords(),DB.products(q,currentCat,currentStock)]);
     let products=[...baseRows];
+    if(summaryFilters.has('available')) products=products.filter(p=>p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0)>0);
+    if(summaryFilters.has('out')) products=products.filter(p=>p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0)<=0);
+    if(summaryFilters.has('no_image')) products=products.filter(p=>!p.thumbnail_url);
     if(stockSort.dir){
       const val=(p,key)=>key==='available'?p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0):key==='variants'?p.variants.length:key==='price'?Math.min(...p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean),0):key==='cost'?Math.min(...p.variants.map(v=>Number(v.cost_ars||0)).filter(Boolean),0):String(p.name||'').toLowerCase();
       products.sort((a,b)=>{const x=val(a,stockSort.key),y=val(b,stockSort.key);return (typeof x==='string'?x.localeCompare(y):x-y)*stockSort.dir});
@@ -411,16 +416,16 @@
       <div class="stock-command-spacer"></div><button id="newProductBtn" class="btn primary stock-add-product">＋ Producto</button>
     </div>
     <div class="stock-summary">
-      <button class="stock-stat blue ${currentStock==='all'?'active':''}" data-summary-filter="all"><b>${number(all.length)}</b><small>Productos visibles</small></button>
-      <button class="stock-stat green" data-summary-filter="available"><b>${number(totalStock)}</b><small>Stock total</small></button>
-      <button class="stock-stat red ${currentStock==='out'?'active':''}" data-summary-filter="out"><b>${number(out)}</b><small>Sin stock</small></button>
-      <button class="stock-stat orange ${currentStock==='no_image'?'active':''}" data-summary-filter="no_image"><b>${number(noPhoto)}</b><small>Sin foto</small></button>
+      <button class="stock-stat blue ${summaryFilters.size===0?'active':''}" data-summary-filter="all"><b>${number(all.length)}</b><small>Productos visibles</small></button>
+      <button class="stock-stat green ${summaryFilters.has('available')?'active':''}" data-summary-filter="available"><b>${number(totalStock)}</b><small>Stock total</small></button>
+      <button class="stock-stat red ${summaryFilters.has('out')?'active':''}" data-summary-filter="out"><b>${number(out)}</b><small>Sin stock</small></button>
+      <button class="stock-stat orange ${summaryFilters.has('no_image')?'active':''}" data-summary-filter="no_image"><b>${number(noPhoto)}</b><small>Sin foto</small></button>
       ${currentCat?`<button id="clearStockCategory" class="stock-active-category">Categoría: ${esc(currentCat)} ×</button>`:''}
     </div>
     <div class="table-wrap"><table class="table"><thead><tr><th>Producto</th><th>Categoría</th><th>${sortHead('variants','Variantes')}</th><th>${sortHead('available','Disponible')}</th><th>En tránsito</th><th>${sortHead('cost','Costo')}</th><th>${sortHead('price','Precio')}</th><th></th></tr></thead><tbody>${products.map(p=>{const av=p.variants.reduce((a,v)=>a+Number(v.stock.available||0),0),tr=p.variants.reduce((a,v)=>a+Number(v.stock.in_transit||0),0),prices=p.variants.map(v=>Number(v.price_ars||0)).filter(Boolean),costs=p.variants.map(v=>Number(v.cost_ars||0)).filter(Boolean),minPrice=prices.length?Math.min(...prices):0,minCost=costs.length?Math.min(...costs):0,costDanger=minCost>0&&minPrice>0&&minCost>=minPrice;return`<tr><td><b>${esc(p.name)}</b> ${!p.thumbnail_url?'<span class="pill yellow stock-no-photo">SIN FOTO</span>':''}<br><small class="muted">${esc(p.sku||'Sin SKU')}</small></td><td>${esc(p.category||'—')}</td><td>${p.variants.length}</td><td><span class="pill ${av>0?'green':'red'}">${number(av)}</span></td><td>${tr?`<span class="pill blue">${number(tr)}</span>`:'0'}</td><td><span class="${costDanger?'stock-cost-danger':''}" ${costDanger?'title="Costo igual o superior al precio de venta"':''}>${minCost?money(minCost):'—'}</span></td><td>${minPrice?money(minPrice):'—'}</td><td><div class="stock-row-actions"><button class="btn tiny ghost duplicate-product" data-id="${p.id}" title="Duplicar producto">⧉</button><button class="btn tiny ghost edit-product" data-id="${p.id}">Editar</button></div></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Sin resultados.</td></tr>'}</tbody></table></div>`;
     $('#stockFilterBtn').addEventListener('click',()=>openStockFilters());$('#stockCategoriesBtn').addEventListener('click',()=>openCategoryManager());$('#newProductBtn').addEventListener('click',()=>openNewProduct());
     $('#clearStockCategory')?.addEventListener('click',()=>{window.__stockCategory='';renderProducts($('#globalSearch').value)});
-    document.querySelectorAll('[data-summary-filter]').forEach(b=>b.addEventListener('click',()=>{window.__stockFilter=b.dataset.summaryFilter;renderProducts($('#globalSearch').value)}));
+    document.querySelectorAll('[data-summary-filter]').forEach(b=>b.addEventListener('click',()=>{const key=b.dataset.summaryFilter;if(key==='all'){summaryFilters.clear()}else if(summaryFilters.has(key)){summaryFilters.delete(key)}else{if(key==='available')summaryFilters.delete('out');if(key==='out')summaryFilters.delete('available');summaryFilters.add(key)}renderProducts($('#globalSearch').value)}));
     document.querySelectorAll('[data-stock-sort]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.stockSort;if(stockSort.key!==k)stockSort={key:k,dir:-1};else if(stockSort.dir===-1)stockSort.dir=1;else stockSort={key:'',dir:0};renderProducts($('#globalSearch').value)}));
     document.querySelectorAll('.edit-product').forEach(b=>b.addEventListener('click',()=>openProductEditor(b.dataset.id)));
     document.querySelectorAll('.duplicate-product').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Duplicar este producto para usarlo como base? La copia quedará oculta del catálogo hasta que la revises.'))return;try{const p=await DB.duplicateProduct(b.dataset.id);await renderProducts($('#globalSearch').value);await openProductEditor(p.id)}catch(e){alert(e.message)}}));
