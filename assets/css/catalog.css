@@ -74,3 +74,45 @@
 .product-sticky-buy .store-primary{position:static;margin:0;box-shadow:none}
 .product-add-main:disabled{opacity:.45}
 @media(max-width:420px){.product-sheet-media{height:min(42dvh,360px)}.product-sheet-variants{grid-template-columns:repeat(2,minmax(0,1fr))}.product-sticky-buy b{font-size:18px}}
+
+
+/* ==================== 7.1 · INLINE PRODUCT EXPERIENCE ==================== */
+.store-card-image{position:relative;overflow:hidden;background:#0b0e11}
+.store-card-image-bg{position:absolute;inset:-14px;background-size:cover;background-position:center;filter:blur(18px);transform:scale(1.12);opacity:.28}
+.store-card-image>img{position:relative;z-index:1;width:100%;height:100%;object-fit:contain!important;object-position:center!important}
+.catalog-direct-add{position:absolute;right:9px;bottom:9px;z-index:3;width:42px;height:42px;border:0;border-radius:12px;background:var(--red);color:#fff;font-size:27px;line-height:1;font-weight:500;box-shadow:0 8px 22px rgba(0,0,0,.35)}
+.catalog-options-pill{position:absolute;right:9px;bottom:9px;z-index:3;background:rgba(11,14,17,.92);color:#fff;border:1px solid #30363d;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:900}
+.catalog-product-view{min-height:100dvh;background:#060708}
+.catalog-inline-product{width:min(900px,100%);margin:auto;min-height:100dvh;background:#080a0c}
+.catalog-product-header{position:sticky;top:0;z-index:30;display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;padding:max(10px,env(safe-area-inset-top)) 14px 10px;background:rgba(8,10,12,.95);backdrop-filter:blur(16px);border-bottom:1px solid #1f2429}
+.catalog-product-header>img{justify-self:center;width:58px;height:36px;object-fit:contain}
+.catalog-product-header button{height:40px;min-width:40px;border:1px solid #2e353c;background:#11151a;color:#fff;border-radius:12px;padding:0 11px;font-size:18px}
+.catalog-product-header #catalogProductCart{display:flex;align-items:center;gap:6px}
+.catalog-product-header #catalogProductCart span{display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--red);font-size:11px;font-weight:900}
+.catalog-product-content{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(320px,.92fr);gap:24px;padding:20px}
+.catalog-product-gallery{min-width:0}
+.catalog-product-hero{--hero-bg:none;position:relative;display:grid;place-items:center;overflow:hidden;min-height:520px;border:1px solid #20262c;border-radius:24px;background:#0b0e11}
+.catalog-product-hero-bg{position:absolute;inset:-24px;background-image:var(--hero-bg);background-size:cover;background-position:center;filter:blur(28px);transform:scale(1.14);opacity:.48}
+.catalog-product-hero::after{content:"";position:absolute;inset:0;background:rgba(6,7,8,.20)}
+.catalog-product-hero>img{position:relative;z-index:2;width:100%;height:100%;max-height:620px;object-fit:contain;object-position:center;padding:18px}
+.catalog-product-info{align-self:start;position:sticky;top:82px;min-width:0;padding:8px 0 40px}
+.catalog-product-info h1{font-size:34px;line-height:1.05;margin:6px 0 12px}
+.catalog-product-price{font-size:30px;font-weight:950;margin:10px 0 18px}
+.product-inline-add{margin-top:18px}
+.catalog-product-description{margin-top:24px;padding-top:18px;border-top:1px solid #252b31}
+.catalog-product-description span{color:var(--red);font-size:10px;font-weight:950;letter-spacing:.15em}
+.catalog-product-description p{color:#d9dee4;line-height:1.6;white-space:pre-line}
+@media(max-width:780px){
+  .catalog-product-content{display:block;padding:0}
+  .catalog-product-gallery{padding:10px 12px 0}
+  .catalog-product-hero{min-height:0;height:min(58dvh,520px);border-radius:18px}
+  .catalog-product-hero>img{max-height:none;padding:12px}
+  .catalog-product-info{position:static;padding:16px 16px calc(26px + env(safe-area-inset-bottom))}
+  .catalog-product-info h1{font-size:27px}
+  .catalog-product-price{font-size:26px}
+  .product-inline-add{position:sticky;bottom:max(10px,env(safe-area-inset-bottom));z-index:12;box-shadow:0 12px 34px rgba(0,0,0,.42)}
+}
+@media(max-width:420px){
+  .catalog-product-hero{height:min(52dvh,430px)}
+  .catalog-product-info h1{font-size:24px}
+}
