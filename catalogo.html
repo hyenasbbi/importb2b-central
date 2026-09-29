@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#060708">
   <title>IMPORTB2B · Catálogo</title>
   <link rel="icon" href="./assets/img/app-icon-512.png">
-  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.0.2">
+  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.1.0">
 </head>
 <body>
   <header class="store-header">
     <a class="store-brand" href="./catalogo.html"><img src="./assets/img/logo-importb2b.png" alt="IMPORTB2B"><div><b id="storeTitle">IMPORTB2B</b><small id="storeSubtitle">Catálogo online</small></div></a>
     <button id="catalogCartButton" class="store-cart-btn"><span id="catalogCartCount">0</span><b>Carrito</b><strong id="catalogCartTotal">$ 0</strong></button>
   </header>
-  <main class="store-main">
+  <main id="catalogMain" class="store-main">
     <section class="store-hero store-hero-brand">
       <img src="./assets/img/logo-importb2b.png" alt="IMPORTB2B">
       <div><span>CATÁLOGO ACTIVO</span><h1>Encontrá lo que buscás.</h1><p>Stock actualizado directamente desde IMPORTB2B.</p></div>
@@ -30,6 +30,7 @@
     <section class="catalog-section catalog-all-section"><div class="catalog-section-head"><div><span>CATÁLOGO</span><h2>Todos los productos</h2></div></div><section id="catalogGrid" class="store-grid"><div class="store-loading">Cargando catálogo…</div></section></section>
     <section class="wholesale-cta"><span>MAYORISTA</span><h2>¿Comprás para revender?</h2><p>Consultanos la lista de precios mayoristas y armamos una propuesta para tu compra.</p><button id="wholesaleWhatsapp">Quiero conocer precios mayoristas</button></section>
   </main>
+  <section id="catalogProductView" class="catalog-product-view hidden"></section>
 
   <div id="catalogBackdrop" class="store-backdrop"></div>
   <aside id="catalogCartDrawer" class="store-drawer" aria-hidden="true">
@@ -57,7 +58,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
-  <script src="./assets/js/config.js?v=7.0.2"></script>
-  <script src="./assets/js/catalog.js?v=7.0.2"></script>
+  <script src="./assets/js/config.js?v=7.1.0"></script>
+  <script src="./assets/js/catalog.js?v=7.1.0"></script>
 </body>
 </html>
