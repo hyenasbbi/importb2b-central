@@ -215,7 +215,7 @@
         <div class="section-title"><div><span class="eyebrow">VENDER</span><h3>Productos</h3></div><span class="pill blue">${products.reduce((a,p)=>a+p.variants.filter(v=>Number(v.stock.available)>0).length,0)} variantes con stock</span></div>
         <div class="pos-shell-tools">
           <div class="pos-quick-tools"><input id="posSearch" value="${esc(posSearch)}" placeholder="Buscar producto, SKU, modelo, color, talle o sabor…"><button id="quickSaleBtn" class="pos-icon-btn quick" title="Venta fugaz">⚡</button><button id="posViewToggle" class="pos-icon-btn ${posViewMode==='grid'?'active':''}" title="Cambiar vista">${posViewMode==='grid'?'☷':'▦'}</button></div>
-          <div id="posCategoryStrip" class="pos-category-strip"><button class="pos-category-chip ${!posCategory?'active':''}" data-pos-cat="">TODOS</button>${cats.map(c=>`<button class="pos-category-chip ${c===posCategory?'active':''}" data-pos-cat="${esc(c)}">${esc(c).toUpperCase()}</button>`).join('')}</div>
+          <div id="posCategoryStrip" class="pos-category-strip"><button class="pos-category-chip ${!posCategory?'active':''}" data-pos-cat=""><span class="pos-cat-check">${!posCategory?'✓':''}</span><span>TODOS</span></button>${cats.map(c=>`<button class="pos-category-chip ${c===posCategory?'active':''}" data-pos-cat="${esc(c)}"><span class="pos-cat-check">${c===posCategory?'✓':''}</span><span>${esc(c).toUpperCase()}</span></button>`).join('')}</div>
         </div>
         <div id="posCatalogGrid" class="pos-product-grid pos-product-grid-wide ${posViewMode==='grid'?'cards-view':'list-view'}"></div>
       </section>
@@ -240,7 +240,7 @@
       <section class="card" style="margin-top:14px"><div class="section-title"><div><span class="eyebrow">HISTORIAL</span><h3>Últimas ventas</h3></div></div><div id="recentSales"></div></section>`;
     renderPosCatalog();renderCart();renderRecentSales();
     $('#posSearch').addEventListener('input',e=>{posSearch=e.target.value;$('#globalSearch').value=posSearch;renderPosCatalog()});
-    document.querySelectorAll('[data-pos-cat]').forEach(b=>b.addEventListener('click',()=>{posCategory=b.dataset.posCat||'';renderSell()}));
+    document.querySelectorAll('[data-pos-cat]').forEach(b=>b.addEventListener('click',()=>{posCategory=b.dataset.posCat||'';document.querySelectorAll('[data-pos-cat]').forEach(x=>{const on=(x.dataset.posCat||'')===posCategory;x.classList.toggle('active',on);const mark=x.querySelector('.pos-cat-check');if(mark)mark.textContent=on?'✓':''});renderPosCatalog()}));
     $('#posViewToggle').addEventListener('click',()=>{posViewMode=posViewMode==='grid'?'list':'grid';localStorage.setItem('importb2b-pos-view',posViewMode);renderPosCatalog();const b=$('#posViewToggle');b.textContent=posViewMode==='grid'?'☷':'▦';b.classList.toggle('active',posViewMode==='grid')});
     ['#posShipping','#posDiscount','#posPayment'].forEach(sel=>$(sel).addEventListener('input',renderCartTotals));
     $('#posHolder').addEventListener('change',e=>{posHolder=e.target.value;localStorage.setItem('importb2b-pos-holder',posHolder)});
