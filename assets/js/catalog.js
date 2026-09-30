@@ -80,7 +80,7 @@
   function renderProducts(){
     if(!data)return;
     const homeMode=!catalogBrowseOpen;
-    $('#catalogPromoCarousel')?.classList.toggle('hidden',!homeMode);$('#catalogNewSection')?.classList.toggle('hidden',!homeMode);$('#catalogFeaturedSection')?.classList.toggle('hidden',!homeMode);
+    $('#catalogPromoCarousel')?.classList.toggle('hidden',!homeMode);$('#catalogNewSection')?.classList.toggle('hidden',!homeMode);$('#catalogFeaturedSection')?.classList.toggle('hidden',!homeMode);$('#catalogWholesaleCta')?.classList.toggle('hidden',!homeMode);
     if(homeMode){
       const newest=[...data.products].slice(0,6),featured=data.products.filter(p=>p.featured).slice(0,6);
       $('#catalogNewGrid').innerHTML=newest.map(p=>card(p,'NUEVO')).join('');
@@ -186,7 +186,7 @@
     document.addEventListener('visibilitychange',()=>document.hidden?stop():startAuto());
     go(0);startAuto();
   }
-  function bindCatalogActions(){document.querySelectorAll('[data-catalog-show]').forEach(b=>b.addEventListener('click',()=>{catalogMode=b.dataset.catalogShow;cat='';q='';catalogBrowseOpen=true;$('#catalogSearch').value='';$('#catalogCategory').value='';renderProducts();document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth',block:'start'})}));$('#closeCatalogBrowse')?.addEventListener('click',()=>{catalogBrowseOpen=false;catalogMode='home';cat='';q='';$('#catalogSearch').value='';$('#catalogCategory').value='';document.querySelectorAll('[data-cat],[data-home]').forEach(x=>x.classList.remove('active'));renderProducts();window.scrollTo({top:0,behavior:'smooth'})});$('#wholesaleWhatsapp')?.addEventListener('click',openWholesaleWhatsapp);document.querySelectorAll('[data-city]').forEach(b=>b.addEventListener('click',()=>{checkoutCity=b.dataset.city;document.querySelectorAll('[data-city]').forEach(x=>x.classList.toggle('active',x===b))}))}
+  function bindCatalogActions(){document.querySelectorAll('[data-catalog-show]').forEach(b=>b.addEventListener('click',()=>{catalogMode=b.dataset.catalogShow;cat='';q='';catalogBrowseOpen=true;$('#catalogSearch').value='';$('#catalogCategory').value='';renderProducts();document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth',block:'start'})}));$('#closeCatalogBrowse')?.addEventListener('click',()=>goHome());$('#wholesaleWhatsapp')?.addEventListener('click',openWholesaleWhatsapp);document.querySelectorAll('[data-city]').forEach(b=>b.addEventListener('click',()=>{checkoutCity=b.dataset.city;document.querySelectorAll('[data-city]').forEach(x=>x.classList.toggle('active',x===b))}))}
   function openWholesaleWhatsapp(){const wa=String(data?.settings?.whatsapp_number||'').replace(/\D/g,'');const msg='Hola! Quiero conocer precios mayoristas de ';if(!wa)return alert('WhatsApp mayorista todavía no está configurado.');window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`,'_blank')}
 
   function add(pid,vid){const p=data.products.find(x=>x.id===pid),v=p?.variants.find(x=>x.id===vid);if(!v||!v.in_stock)return;const x=cart.find(i=>i.variant_id===vid);const max=data.settings.show_exact_stock?Number(v.available||0):20;if(x){if(x.quantity>=max)return alert('No hay más unidades disponibles');x.quantity++}else cart.push({product_id:pid,variant_id:vid,product_name:p.name,variant_name:v.name,price:Number(v.price_ars||0),quantity:1,max});renderCart()}
