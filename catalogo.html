@@ -6,19 +6,19 @@
   <meta name="theme-color" content="#060708">
   <title>IMPORTB2B · Catálogo</title>
   <link rel="icon" href="./assets/img/app-icon-512.png">
-  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.4.0">
+  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.4.1">
 </head>
 <body>
   <header class="store-header">
     <a class="store-brand" href="./catalogo.html"><img src="./assets/img/logo-importb2b.png" alt="IMPORTB2B"><div><b id="storeTitle">IMPORTB2B</b><small id="storeSubtitle">Catálogo online</small></div></a>
+    <button id="catalogCategoryMenuButton" class="catalog-header-icon category-menu-trigger" type="button" aria-label="Ver categorías" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+    </button>
     <div class="catalog-header-search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.2 4.2"></path></svg>
       <input id="catalogSearch" placeholder="¿Qué estás buscando?" autocomplete="off">
     </div>
     <div class="catalog-header-actions">
-      <button id="catalogCategoryMenuButton" class="catalog-header-icon category-menu-trigger" type="button" aria-label="Ver categorías" aria-expanded="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
-      </button>
       <button id="catalogCartButton" class="catalog-header-icon store-cart-btn compact-cart" aria-label="Abrir carrito">
         <svg class="cart-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 10.1a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L20.5 8H6.2"></path><circle cx="9.5" cy="19" r="1"></circle><circle cx="17.5" cy="19" r="1"></circle></svg>
         <span id="catalogCartCount">0</span>
@@ -71,7 +71,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
-  <script src="./assets/js/config.js?v=7.4.0"></script>
-  <script src="./assets/js/catalog.js?v=7.4.0"></script>
+  <script src="./assets/js/config.js?v=7.4.1"></script>
+  <script src="./assets/js/catalog.js?v=7.4.1"></script>
 </body>
 </html>
