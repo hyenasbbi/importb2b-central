@@ -412,3 +412,181 @@ body{background:#060708!important;min-height:100%;min-height:100dvh;overscroll-b
 body::before{content:"";position:fixed;inset:-120px 0;z-index:-9999;background:#060708;pointer-events:none}
 #catalogMain,.catalog-product-view,.catalog-inline-product{background-color:#060708}
 @supports(-webkit-touch-callout:none){html,body{background-color:#060708!important}}
+
+
+/* ==================== 7.4 · COMMERCE HEADER + EARLY CATEGORIES ==================== */
+.store-header{
+  position:sticky!important;
+  top:0;
+  z-index:80;
+  display:grid!important;
+  grid-template-columns:minmax(150px,240px) minmax(260px,720px) minmax(88px,1fr);
+  align-items:center;
+  gap:22px;
+  min-height:82px;
+  padding:10px max(20px,calc((100vw - 1280px)/2))!important;
+  background:rgba(6,7,8,.97)!important;
+  border-bottom:1px solid #1d2227;
+}
+.store-brand{min-width:0}
+.store-brand img{width:54px;height:54px}
+.catalog-header-search{
+  width:100%;
+  height:48px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:0 15px;
+  background:#0b0e11;
+  border:1px solid #30363d;
+  border-radius:14px;
+  transition:border-color .2s ease,box-shadow .2s ease;
+}
+.catalog-header-search:focus-within{border-color:#59636e;box-shadow:0 0 0 3px rgba(255,255,255,.035)}
+.catalog-header-search svg{width:21px;height:21px;flex:0 0 auto;fill:none;stroke:#aeb7c1;stroke-width:1.8;stroke-linecap:round}
+.catalog-header-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#fff;font-size:15px}
+.catalog-header-search input::placeholder{color:#7f8994}
+.catalog-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px}
+.catalog-header-icon{
+  position:relative;
+  display:grid!important;
+  place-items:center;
+  width:46px;
+  height:46px;
+  min-width:46px!important;
+  padding:0!important;
+  border:1px solid transparent!important;
+  border-radius:13px!important;
+  background:transparent!important;
+  color:#f5f7f8;
+}
+.catalog-header-icon:hover{background:#101419!important;border-color:#282f36!important}
+.catalog-header-icon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.compact-cart .cart-glyph{width:25px;height:25px;font-size:inherit}
+.compact-cart #catalogCartCount{
+  position:absolute!important;
+  top:1px;
+  right:0;
+  display:grid;
+  place-items:center;
+  width:18px!important;
+  height:18px!important;
+  min-width:18px;
+  padding:0 4px;
+  border:2px solid #060708;
+  border-radius:999px;
+  background:var(--red)!important;
+  color:#fff;
+  font-size:10px;
+  line-height:1;
+  font-weight:900;
+}
+.category-menu-trigger{display:none!important}
+body.catalog-categories-sticky .category-menu-trigger{display:grid!important}
+.catalog-category-native{display:none!important}
+
+/* Categories are part of the first screen, before promotional content. */
+.catalog-category-home{
+  margin:10px 0 16px;
+  padding:15px 0 13px;
+  border-bottom:1px solid #171c21;
+}
+.catalog-category-home-label{display:flex;align-items:baseline;gap:12px;margin-bottom:11px}
+.catalog-category-home-label span{color:var(--red);font-size:10px;font-weight:950;letter-spacing:.22em}
+.catalog-category-home-label b{font-size:18px;letter-spacing:-.02em}
+.catalog-category-chips{
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  padding:1px 1px 4px;
+  scrollbar-width:none;
+}
+.catalog-category-chips::-webkit-scrollbar{display:none}
+.catalog-category-chips button{
+  flex:0 0 auto;
+  min-height:40px;
+  padding:0 16px;
+  border:1px solid #2b3239;
+  border-radius:999px;
+  background:#0b0e11;
+  color:#e9edf1;
+  font-size:14px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.catalog-category-chips button:hover,.catalog-category-chips button.active{border-color:#ff3138;background:#161012;color:#fff}
+
+/* Slide-out category index used once the home category strip has scrolled away. */
+.catalog-category-drawer{
+  position:fixed;
+  z-index:102;
+  top:0;
+  left:0;
+  width:min(390px,88vw);
+  height:100dvh;
+  padding:24px 20px;
+  transform:translateX(-104%);
+  transition:transform .24s ease;
+  background:#080a0c;
+  border-right:1px solid #252b31;
+  box-shadow:24px 0 70px rgba(0,0,0,.48);
+}
+.catalog-category-drawer.open{transform:translateX(0)}
+.catalog-category-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:4px 0 18px;border-bottom:1px solid #20262c}
+.catalog-category-drawer-head span{color:var(--red);font-size:10px;font-weight:950;letter-spacing:.22em}
+.catalog-category-drawer-head h2{margin:5px 0 0;font-size:27px}
+.catalog-category-drawer-head button{width:42px;height:42px;border:1px solid #2a3037;border-radius:12px;background:#0f1317;color:#fff;font-size:28px;line-height:1}
+.catalog-category-drawer-list{display:grid;gap:3px;padding:15px 0;max-height:calc(100dvh - 110px);overflow-y:auto}
+.catalog-category-drawer-list button{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  width:100%;
+  min-height:52px;
+  padding:0 12px;
+  border:0;
+  border-bottom:1px solid #171c21;
+  background:transparent;
+  color:#f1f3f5;
+  text-align:left;
+  font-size:16px;
+  font-weight:750;
+}
+.catalog-category-drawer-list button::after{content:"›";color:#747f8a;font-size:22px}
+.catalog-category-drawer-list button.active{color:#ff4a50}
+
+/* Search is now structural header navigation, never a floating footer control. */
+.floating-search{display:none!important}
+
+@media(max-width:780px){
+  .store-header{
+    grid-template-columns:48px minmax(0,1fr) auto;
+    gap:8px;
+    min-height:66px;
+    padding:8px 10px!important;
+  }
+  .store-brand{width:48px}
+  .store-brand img{width:46px;height:46px;padding:4px;border-radius:13px}
+  .store-brand div{display:none}
+  .catalog-header-search{height:44px;padding:0 11px;border-radius:12px}
+  .catalog-header-search svg{width:19px;height:19px}
+  .catalog-header-search input{font-size:14px}
+  .catalog-header-actions{gap:1px}
+  .catalog-header-icon{width:42px;height:42px;min-width:42px!important;border-radius:11px!important}
+  .catalog-header-icon svg{width:23px;height:23px}
+  .compact-cart #catalogCartCount{top:0;right:-1px}
+  .store-main{padding-top:0!important}
+  .catalog-category-home{margin:0 0 13px;padding:12px 0 10px}
+  .catalog-category-home-label{margin-bottom:9px}
+  .catalog-category-home-label b{font-size:16px}
+  .catalog-category-chips{margin-right:-9px;padding-right:9px}
+  .catalog-category-chips button{min-height:38px;padding:0 14px;font-size:13px}
+  .catalog-promo-carousel{margin-top:10px!important}
+}
+@media(max-width:390px){
+  .store-header{grid-template-columns:44px minmax(0,1fr) auto;padding-left:7px!important;padding-right:7px!important}
+  .store-brand{width:44px}.store-brand img{width:42px;height:42px}
+  .catalog-header-search{padding:0 9px}
+  .catalog-header-search input{font-size:13px}
+  .catalog-header-icon{width:39px;height:39px;min-width:39px!important}
+}
