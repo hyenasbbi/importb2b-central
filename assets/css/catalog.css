@@ -590,3 +590,42 @@ body.catalog-categories-sticky .category-menu-trigger{display:grid!important}
   .catalog-header-search input{font-size:13px}
   .catalog-header-icon{width:39px;height:39px;min-width:39px!important}
 }
+
+
+/* ==================== 7.4.1 · HEADER ORDER ==================== */
+/* Desktop: logo → categories → search → cart, with cart locked to the far right. */
+.store-header{
+  grid-template-columns:minmax(220px,300px) 46px minmax(280px,1fr) 46px!important;
+  gap:12px!important;
+}
+.category-menu-trigger{
+  display:grid!important;
+  grid-column:2;
+}
+.catalog-header-search{
+  grid-column:3;
+  width:100%;
+  max-width:none;
+}
+.catalog-header-actions{
+  grid-column:4;
+  width:46px;
+  justify-self:end;
+}
+.catalog-header-actions .compact-cart{margin-left:auto}
+@media(max-width:780px){
+  .store-header{
+    grid-template-columns:48px 42px minmax(0,1fr) 42px!important;
+    gap:6px!important;
+  }
+  .category-menu-trigger{grid-column:2}
+  .catalog-header-search{grid-column:3}
+  .catalog-header-actions{grid-column:4;width:42px}
+}
+@media(max-width:390px){
+  .store-header{
+    grid-template-columns:42px 38px minmax(0,1fr) 38px!important;
+    gap:4px!important;
+  }
+  .catalog-header-actions{width:38px}
+}
