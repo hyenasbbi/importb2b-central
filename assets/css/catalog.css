@@ -714,3 +714,78 @@ body.catalog-categories-sticky .category-menu-trigger{display:grid!important}
   .catalog-footer-social{width:100%;display:grid;grid-template-columns:1fr 1fr}
   .catalog-social-link{justify-content:center;min-height:46px}
 }
+
+
+/* ==================== 7.6 · PRODUCT MEDIA + SUPPORT ==================== */
+.store-card-main-image{transition:opacity .22s ease,transform .3s ease}
+.store-card-main-image.changing{opacity:.18;transform:scale(.985)}
+.card-gallery-dots{
+  position:absolute;z-index:6;left:50%;bottom:10px;transform:translateX(-50%);
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  padding:5px 7px;border-radius:999px;background:rgba(4,6,8,.58);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.card-gallery-dots button{
+  width:6px;height:6px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.42);
+  transition:width .2s ease,background .2s ease;cursor:pointer;
+}
+.card-gallery-dots button.active{width:15px;border-radius:999px;background:#fff}
+.catalog-card-social{
+  display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px;padding-top:10px;border-top:1px solid #1c2228;
+}
+.catalog-card-social a{
+  min-width:0;height:34px;display:flex;align-items:center;justify-content:center;gap:6px;
+  border:1px solid #282f36;border-radius:9px;background:#0b0e11;color:#cfd6dc;
+  text-decoration:none;font-size:11px;font-weight:800;
+}
+.catalog-card-social svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.catalog-card-social a:first-child:hover{border-color:#2f8f5b;color:#fff}
+.catalog-card-social a:last-child:hover{border-color:#b34b83;color:#fff}
+
+/* Footer: centered compact block, social actions split evenly */
+.catalog-footer{
+  width:min(100%,560px)!important;margin:30px auto 0!important;
+  display:grid!important;justify-items:center!important;gap:18px!important;text-align:center;
+}
+.catalog-footer-brand{justify-content:center!important}
+.catalog-footer-brand div{text-align:left}
+.catalog-footer-social{width:100%!important;display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}
+.catalog-social-link{justify-content:center!important}
+
+/* Floating WhatsApp support */
+.catalog-floating-support{
+  position:fixed;z-index:70;right:max(18px,env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom));
+  pointer-events:none;
+}
+.catalog-floating-wa{
+  width:56px;height:56px;display:grid;place-items:center;border-radius:50%;
+  background:#25d366;color:#fff;border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 12px 34px rgba(0,0,0,.45);transform:translateY(90px);opacity:0;
+  transition:.3s ease;pointer-events:auto;
+}
+.catalog-floating-support.scrolled .catalog-floating-wa{transform:translateY(0);opacity:1}
+.catalog-floating-wa svg{width:29px;height:29px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.catalog-help-bubble{
+  position:absolute;right:0;bottom:68px;width:min(310px,calc(100vw - 36px));padding:15px 40px 15px 16px;
+  display:grid;gap:4px;border:1px solid #303840;border-radius:16px;background:rgba(13,17,21,.97);
+  color:#fff;text-decoration:none;box-shadow:0 14px 44px rgba(0,0,0,.5);
+  opacity:0;transform:translateY(10px) scale(.97);visibility:hidden;transition:.25s ease;pointer-events:auto;
+}
+.catalog-help-bubble.show{opacity:1;transform:none;visibility:visible}
+.catalog-help-bubble b{font-size:14px}
+.catalog-help-bubble span{font-size:12px;line-height:1.42;color:#aeb7c0}
+.catalog-help-close{
+  position:absolute;right:8px;top:7px;width:28px;height:28px;border:0;background:transparent;color:#8d98a3;
+  font-size:21px;line-height:1;cursor:pointer;
+}
+@media(max-width:780px){
+  .catalog-footer{width:min(100%,480px)!important;padding-left:4px!important;padding-right:4px!important}
+  .catalog-footer-brand{display:grid!important;justify-items:center!important;gap:8px!important}
+  .catalog-footer-brand div{text-align:center!important}
+  .catalog-card-social a{height:32px;font-size:10px}
+  .catalog-floating-support{right:16px;bottom:calc(16px + env(safe-area-inset-bottom))}
+  .catalog-floating-wa{width:54px;height:54px}
+}
+@media(prefers-reduced-motion:reduce){
+  .store-card-main-image,.catalog-floating-wa,.catalog-help-bubble{transition:none!important}
+}
