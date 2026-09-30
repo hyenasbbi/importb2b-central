@@ -629,3 +629,17 @@ body.catalog-categories-sticky .category-menu-trigger{display:grid!important}
   }
   .catalog-header-actions{width:38px}
 }
+
+
+/* ==================== 7.4.2 · CLEAN CATEGORY NAV ==================== */
+/* The chips are navigation themselves; a second title added unnecessary hierarchy. */
+.catalog-category-home{
+  margin:0 0 14px!important;
+  padding:12px 0!important;
+  border-bottom:1px solid #171c21;
+}
+.catalog-category-home-label{display:none!important}
+.catalog-category-chips{align-items:center;min-height:42px}
+@media(max-width:780px){
+  .catalog-category-home{margin:0 0 10px!important;padding:9px 0!important}
+}
