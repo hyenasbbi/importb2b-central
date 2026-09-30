@@ -403,3 +403,12 @@ body{position:relative}
   .catalog-product-hero-bg{filter:blur(12px)!important}
   .catalog-product-hero>img{width:calc(100% - 20px)!important;height:calc(100% - 20px)!important}
 }
+
+
+/* ==================== 7.3.3 · DARK MOBILE OVERSCROLL ==================== */
+/* Keep iOS/Android rubber-band areas visually inside the store instead of flashing white. */
+html{background:#060708!important;min-height:100%;min-height:100dvh;overscroll-behavior-x:none}
+body{background:#060708!important;min-height:100%;min-height:100dvh;overscroll-behavior-x:none}
+body::before{content:"";position:fixed;inset:-120px 0;z-index:-9999;background:#060708;pointer-events:none}
+#catalogMain,.catalog-product-view,.catalog-inline-product{background-color:#060708}
+@supports(-webkit-touch-callout:none){html,body{background-color:#060708!important}}
