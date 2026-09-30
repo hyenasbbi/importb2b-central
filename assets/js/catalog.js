@@ -55,27 +55,54 @@
     $('#catalogCategoryDrawerList').innerHTML=categoryMarkup;
     document.querySelectorAll('[data-home]').forEach(b=>b.addEventListener('click',()=>goHome()));
     document.querySelectorAll('[data-cat]').forEach(b=>b.addEventListener('click',()=>chooseCategory(b.dataset.cat||'')));
-    renderPromoCarousel();renderProducts();renderCart();bindCatalogActions();initHeaderNavigation();
+    renderPromoCarousel();renderProducts();renderCart();bindCatalogActions();initHeaderNavigation();initFloatingSupport();
   }
+  const contactWa='5493425575323',contactIg='https://www.instagram.com/import.b2b/';
+  const waUrl=message=>`https://wa.me/${contactWa}?text=${encodeURIComponent(message)}`;
+  const productMedia=p=>{
+    const out=[],push=x=>{if(x&&!out.includes(x))out.push(x)};
+    push(p.image_url);
+    (Array.isArray(p.images)?p.images:[]).forEach(x=>push(typeof x==='string'?x:x?.image_url));
+    if(!out.length)push(p.thumbnail_url);
+    return out;
+  };
+  const whatsappIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.4-4.2a8.5 8.5 0 1 1 15.6-4.6Z"></path><path d="M8.2 7.7c.2-.5.4-.5.8-.5h.5c.2 0 .4.1.5.4l.8 2c.1.3.1.5-.1.7l-.6.7c-.2.2-.1.4 0 .6.7 1.2 1.7 2.2 3 2.8.2.1.4.1.6-.1l.8-1c.2-.2.4-.3.7-.2l1.9.9c.3.1.5.3.5.5 0 .4-.2 1.5-1 2.1-.7.6-1.6.8-2.6.5-1.4-.4-3.1-1.1-4.8-2.6-1.4-1.3-2.4-2.8-2.9-4.1-.5-1.2-.1-2.2.3-2.7Z"></path></svg>';
+  const instagramIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.4" cy="6.7" r="1"></circle></svg>';
   function card(p,badge=''){
-    const vars=p.variants.filter(v=>v.in_stock&&Number(v.available||1)>0),prices=vars.map(v=>Number(v.price_ars||0)).filter(Boolean),price=prices.length?Math.min(...prices):0,img=p.image_url||p.thumbnail_url;
-    const direct=vars.length===1;
+    const vars=p.variants.filter(v=>v.in_stock&&Number(v.available||1)>0),prices=vars.map(v=>Number(v.price_ars||0)).filter(Boolean),price=prices.length?Math.min(...prices):0,media=productMedia(p),img=media[0]||'';
+    const direct=vars.length===1,productMsg=`Hola, me interesa ${p.name}. ¿Me ayudan con la elección?`;
     return `<article class="store-card" data-open-product="${p.id}">
-      <div class="store-card-image">
+      <div class="store-card-image" data-card-gallery="${p.id}" data-card-media="${esc(JSON.stringify(media))}">
         ${badge?`<span class="catalog-badge">${badge}</span>`:''}
-        ${img?`<div class="store-card-image-bg" style="background-image:url('${esc(img)}')"></div><img loading="lazy" decoding="async" src="${esc(img)}" alt="${esc(p.name)}">`:`<div class="store-card-placeholder">IB</div>`}
+        ${img?`<div class="store-card-image-bg" style="background-image:url('${esc(img)}')"></div><img class="store-card-main-image" loading="lazy" decoding="async" src="${esc(img)}" alt="${esc(p.name)}">`:`<div class="store-card-placeholder">IB</div>`}
+        ${media.length>1?`<div class="card-gallery-dots" aria-label="${media.length} fotos">${media.map((_,i)=>`<button type="button" class="${i?'':'active'}" data-card-dot="${i}" aria-label="Foto ${i+1}"></button>`).join('')}</div>`:''}
         ${direct?`<button class="catalog-direct-add" data-direct-p="${p.id}" data-direct-v="${vars[0].id}" aria-label="Agregar ${esc(p.name)}">＋</button>`:`<span class="catalog-options-pill">${vars.length} opciones ›</span>`}
       </div>
       <div class="store-card-body">
         <div class="store-card-copy"><h3>${esc(p.name)}</h3><small>${esc(p.category||'')}</small></div>
         <div class="catalog-card-bottom"><strong>${price?(direct?money(price):`Desde ${money(price)}`):'Consultar'}</strong><small class="${direct?'catalog-single-variant':''}">${direct?`Opción: ${esc(vars[0].name||'Única')}`:`${vars.length} variantes`}</small></div>
+        <div class="catalog-card-social">
+          <a href="${waUrl(productMsg)}" target="_blank" rel="noopener" data-card-social aria-label="Consultar ${esc(p.name)} por WhatsApp">${whatsappIcon}<span>WhatsApp</span></a>
+          <a href="${contactIg}" target="_blank" rel="noopener" data-card-social aria-label="Instagram IMPORTB2B">${instagramIcon}<span>Instagram</span></a>
+        </div>
       </div>
     </article>`
   }
   function filteredProducts(){const term=q.trim().toLowerCase();return data.products.filter(p=>(!cat||p.category===cat)&&(!term||[p.name,p.category,...p.variants.flatMap(v=>[v.name,v.sku,Object.values(v.attributes||{}).join(' ')])].join(' ').toLowerCase().includes(term)))}
   function bindProductCards(scope=document){
-    scope.querySelectorAll('[data-open-product]').forEach(x=>x.addEventListener('click',e=>{if(e.target.closest('[data-direct-v]'))return;openProduct(x.dataset.openProduct)}));
+    scope.querySelectorAll('[data-open-product]').forEach(x=>x.addEventListener('click',e=>{if(e.target.closest('[data-direct-v],[data-card-dot],[data-card-social]'))return;openProduct(x.dataset.openProduct)}));
     scope.querySelectorAll('[data-direct-v]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();add(b.dataset.directP,b.dataset.directV);b.textContent='✓';setTimeout(()=>b.textContent='＋',700)}));
+    scope.querySelectorAll('[data-card-social]').forEach(a=>a.addEventListener('click',e=>e.stopPropagation()));
+    scope.querySelectorAll('[data-card-gallery]').forEach(g=>{
+      let media=[];try{media=JSON.parse(g.dataset.cardMedia||'[]')}catch{}if(media.length<2)return;
+      const img=g.querySelector('.store-card-main-image'),bg=g.querySelector('.store-card-image-bg'),dots=[...g.querySelectorAll('[data-card-dot]')];if(!img)return;
+      let ix=0,timer=null,touched=false;
+      const show=n=>{ix=(n+media.length)%media.length;img.classList.add('changing');setTimeout(()=>{img.src=media[ix];if(bg)bg.style.backgroundImage=`url("${media[ix].replace(/"/g,'%22')}")`;dots.forEach((d,i)=>d.classList.toggle('active',i===ix));requestAnimationFrame(()=>img.classList.remove('changing'))},110)};
+      const stop=()=>{if(timer){clearInterval(timer);timer=null}};
+      const start=()=>{stop();if(!touched&&!document.hidden)timer=setInterval(()=>show(ix+1),2000)};
+      dots.forEach((d,i)=>d.addEventListener('click',e=>{e.stopPropagation();touched=true;stop();show(i)}));
+      const io=new IntersectionObserver(entries=>entries.forEach(e=>e.isIntersecting?start():stop()),{threshold:.35});io.observe(g);
+    });
   }
   function renderProducts(){
     if(!data)return;
@@ -185,6 +212,17 @@
     el.addEventListener('pointercancel',()=>{startX=startY=null;dragging=false;startAuto()});
     document.addEventListener('visibilitychange',()=>document.hidden?stop():startAuto());
     go(0);startAuto();
+  }
+  function initFloatingSupport(){
+    if($('#catalogFloatingSupport'))return;
+    const wrap=document.createElement('div');wrap.id='catalogFloatingSupport';wrap.className='catalog-floating-support';
+    wrap.innerHTML=`<a class="catalog-floating-wa" href="${waUrl('Hola me gustaria realizar un pedido en su pagina me ayudan con la eleccion?')}" target="_blank" rel="noopener" aria-label="Contactar por WhatsApp">${whatsappIcon}</a><a class="catalog-help-bubble" href="${waUrl('Hola me gustaria realizar un pedido en su pagina me ayudan con la eleccion?')}" target="_blank" rel="noopener"><button type="button" class="catalog-help-close" aria-label="Cerrar">×</button><b>¿Necesitás ayuda?</b><span>Estamos para asesorarte. Escribinos por WhatsApp y te ayudamos a elegir.</span></a>`;
+    document.body.appendChild(wrap);
+    const bubble=wrap.querySelector('.catalog-help-bubble'),close=wrap.querySelector('.catalog-help-close');
+    close.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();bubble.classList.remove('show')});
+    setTimeout(()=>bubble.classList.add('show'),5000);
+    const sync=()=>wrap.classList.toggle('scrolled',window.scrollY>180);
+    window.addEventListener('scroll',sync,{passive:true});sync();
   }
   function bindCatalogActions(){document.querySelectorAll('[data-catalog-show]').forEach(b=>b.addEventListener('click',()=>{catalogMode=b.dataset.catalogShow;cat='';q='';catalogBrowseOpen=true;$('#catalogSearch').value='';$('#catalogCategory').value='';document.querySelectorAll('[data-cat],[data-home]').forEach(x=>x.classList.remove('active'));renderProducts();document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth',block:'start'})}));$('#closeCatalogBrowse')?.addEventListener('click',()=>goHome());$('#wholesaleWhatsapp')?.addEventListener('click',openWholesaleWhatsapp);document.querySelectorAll('[data-city]').forEach(b=>b.addEventListener('click',()=>{checkoutCity=b.dataset.city;document.querySelectorAll('[data-city]').forEach(x=>x.classList.toggle('active',x===b))}))}
   function openWholesaleWhatsapp(){const wa=String(data?.settings?.whatsapp_number||'').replace(/\D/g,'');const msg='Hola! Quiero conocer precios mayoristas de ';if(!wa)return alert('WhatsApp mayorista todavía no está configurado.');window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`,'_blank')}
