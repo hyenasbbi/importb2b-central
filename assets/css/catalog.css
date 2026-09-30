@@ -953,3 +953,30 @@ body.catalog-categories-sticky .category-menu-trigger{display:grid!important}
   display:block;
 }
 .catalog-product-header #catalogProductCart{display:none!important}
+
+
+/* ==================== 7.7.3 · UNIFIED PRODUCT HEADER ==================== */
+/* Product detail uses the same global header as the rest of the catalog. */
+.catalog-product-back-main{
+  display:none!important;
+  grid-column:2;
+}
+body.catalog-product-open .category-menu-trigger{
+  display:none!important;
+}
+body.catalog-product-open .catalog-product-back-main{
+  display:grid!important;
+}
+body.catalog-product-open .catalog-header-search{
+  grid-column:3;
+}
+.catalog-product-header{
+  display:none!important;
+}
+.catalog-product-content{
+  padding-top:20px!important;
+}
+@media(max-width:780px){
+  .catalog-product-back-main{grid-column:2}
+  .catalog-product-content{padding-top:14px!important}
+}
