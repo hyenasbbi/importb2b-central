@@ -6,27 +6,44 @@
   <meta name="theme-color" content="#060708">
   <title>IMPORTB2B · Catálogo</title>
   <link rel="icon" href="./assets/img/app-icon-512.png">
-  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.3.3">
+  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.4.0">
 </head>
 <body>
   <header class="store-header">
     <a class="store-brand" href="./catalogo.html"><img src="./assets/img/logo-importb2b.png" alt="IMPORTB2B"><div><b id="storeTitle">IMPORTB2B</b><small id="storeSubtitle">Catálogo online</small></div></a>
-    <button id="catalogCartButton" class="store-cart-btn compact-cart" aria-label="Abrir carrito"><span class="cart-glyph">🛒</span><span id="catalogCartCount">0</span></button>
+    <div class="catalog-header-search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.2 4.2"></path></svg>
+      <input id="catalogSearch" placeholder="¿Qué estás buscando?" autocomplete="off">
+    </div>
+    <div class="catalog-header-actions">
+      <button id="catalogCategoryMenuButton" class="catalog-header-icon category-menu-trigger" type="button" aria-label="Ver categorías" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+      </button>
+      <button id="catalogCartButton" class="catalog-header-icon store-cart-btn compact-cart" aria-label="Abrir carrito">
+        <svg class="cart-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 10.1a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L20.5 8H6.2"></path><circle cx="9.5" cy="19" r="1"></circle><circle cx="17.5" cy="19" r="1"></circle></svg>
+        <span id="catalogCartCount">0</span>
+      </button>
+    </div>
+    <select id="catalogCategory" class="catalog-category-native" aria-label="Categoría"><option value="">Todas las categorías</option></select>
   </header>
   <main id="catalogMain" class="store-main">
+    <section id="catalogCategoryHome" class="catalog-category-home">
+      <div class="catalog-category-home-label"><span>EXPLORAR</span><b>Categorías</b></div>
+      <nav id="catalogCategoryChips" class="catalog-category-chips" aria-label="Categorías"></nav>
+    </section>
     <section id="catalogPromoCarousel" class="catalog-promo-carousel" aria-label="Promociones"></section>
     <section class="catalog-section"><div class="catalog-section-head"><div><span>NOVEDADES</span><h2>Nuevos ingresos</h2></div><button data-catalog-show="new">Ver todos</button></div><div id="catalogNewGrid" class="store-grid store-grid-featured"></div></section>
     <section class="catalog-section"><div class="catalog-section-head"><div><span>SELECCIÓN</span><h2>Destacados</h2></div><button data-catalog-show="featured">Ver todos</button></div><div id="catalogFeaturedGrid" class="store-grid store-grid-featured"></div></section>
-    <section class="catalog-category-section"><div class="catalog-section-head"><div><span>EXPLORAR</span><h2>Categorías</h2></div></div><nav id="catalogCategoryChips" class="catalog-category-chips" aria-label="Categorías"></nav></section>
     <section id="catalogDiscountSection" class="catalog-section hidden"><div class="catalog-section-head"><div><span>OPORTUNIDADES</span><h2>Productos en descuento</h2></div><button data-catalog-show="discount">Ver todos</button></div><div id="catalogDiscountGrid" class="store-grid store-grid-featured"></div></section>
     <section class="catalog-section catalog-all-section hidden"><div class="catalog-section-head"><div><span>CATÁLOGO</span><h2 id="catalogBrowseTitle">Productos</h2></div><button id="closeCatalogBrowse" type="button">Cerrar</button></div><section id="catalogGrid" class="store-grid"></section></section>
     <section class="wholesale-cta"><span>MAYORISTA</span><h2>Tu negocio, mejor margen.</h2><p>Precios especiales para revendedores.</p><button id="wholesaleWhatsapp">Consultar mayorista</button></section>
-    <section class="store-tools floating-search">
-      <input id="catalogSearch" placeholder="Buscar productos…" autocomplete="off">
-      <select id="catalogCategory"><option value="">Todas las categorías</option></select>
-    </section>
   </main>
   <section id="catalogProductView" class="catalog-product-view hidden"></section>
+
+  <aside id="catalogCategoryDrawer" class="catalog-category-drawer" aria-hidden="true">
+    <div class="catalog-category-drawer-head"><div><span>EXPLORAR</span><h2>Categorías</h2></div><button id="catalogCategoryDrawerClose" type="button" aria-label="Cerrar">×</button></div>
+    <nav id="catalogCategoryDrawerList" class="catalog-category-drawer-list" aria-label="Todas las categorías"></nav>
+  </aside>
 
   <div id="catalogBackdrop" class="store-backdrop"></div>
   <aside id="catalogCartDrawer" class="store-drawer" aria-hidden="true">
@@ -54,7 +71,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
-  <script src="./assets/js/config.js?v=7.3.3"></script>
-  <script src="./assets/js/catalog.js?v=7.3.3"></script>
+  <script src="./assets/js/config.js?v=7.4.0"></script>
+  <script src="./assets/js/catalog.js?v=7.4.0"></script>
 </body>
 </html>
