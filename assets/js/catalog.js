@@ -70,7 +70,7 @@
   const instagramIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.4" cy="6.7" r="1"></circle></svg>';
   function card(p,badge=''){
     const vars=p.variants.filter(v=>v.in_stock&&Number(v.available||1)>0),prices=vars.map(v=>Number(v.price_ars||0)).filter(Boolean),price=prices.length?Math.min(...prices):0,media=productMedia(p),img=media[0]||'';
-    const direct=vars.length===1,productMsg=`Hola, me interesa ${p.name}. ¿Me ayudan con la elección?`;
+    const direct=vars.length===1;
     return `<article class="store-card" data-open-product="${p.id}">
       <div class="store-card-image" data-card-gallery="${p.id}" data-card-media="${esc(JSON.stringify(media))}">
         ${badge?`<span class="catalog-badge">${badge}</span>`:''}
@@ -81,18 +81,13 @@
       <div class="store-card-body">
         <div class="store-card-copy"><h3>${esc(p.name)}</h3><small>${esc(p.category||'')}</small></div>
         <div class="catalog-card-bottom"><strong>${price?(direct?money(price):`Desde ${money(price)}`):'Consultar'}</strong><small class="${direct?'catalog-single-variant':''}">${direct?`Opción: ${esc(vars[0].name||'Única')}`:`${vars.length} variantes`}</small></div>
-        <div class="catalog-card-social">
-          <a href="${waUrl(productMsg)}" target="_blank" rel="noopener" data-card-social aria-label="Consultar ${esc(p.name)} por WhatsApp">${whatsappIcon}<span>WhatsApp</span></a>
-          <a href="${contactIg}" target="_blank" rel="noopener" data-card-social aria-label="Instagram IMPORTB2B">${instagramIcon}<span>Instagram</span></a>
-        </div>
       </div>
     </article>`
   }
   function filteredProducts(){const term=q.trim().toLowerCase();return data.products.filter(p=>(!cat||p.category===cat)&&(!term||[p.name,p.category,...p.variants.flatMap(v=>[v.name,v.sku,Object.values(v.attributes||{}).join(' ')])].join(' ').toLowerCase().includes(term)))}
   function bindProductCards(scope=document){
-    scope.querySelectorAll('[data-open-product]').forEach(x=>x.addEventListener('click',e=>{if(e.target.closest('[data-direct-v],[data-card-dot],[data-card-social]'))return;openProduct(x.dataset.openProduct)}));
+    scope.querySelectorAll('[data-open-product]').forEach(x=>x.addEventListener('click',e=>{if(e.target.closest('[data-direct-v],[data-card-dot]'))return;openProduct(x.dataset.openProduct)}));
     scope.querySelectorAll('[data-direct-v]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();add(b.dataset.directP,b.dataset.directV);b.textContent='✓';setTimeout(()=>b.textContent='＋',700)}));
-    scope.querySelectorAll('[data-card-social]').forEach(a=>a.addEventListener('click',e=>e.stopPropagation()));
     scope.querySelectorAll('[data-card-gallery]').forEach(g=>{
       let media=[];try{media=JSON.parse(g.dataset.cardMedia||'[]')}catch{}if(media.length<2)return;
       const img=g.querySelector('.store-card-main-image'),bg=g.querySelector('.store-card-image-bg'),dots=[...g.querySelectorAll('[data-card-dot]')];if(!img)return;
