@@ -149,7 +149,7 @@
       <div class="catalog-product-header">
         <button id="catalogProductBack" type="button" aria-label="Volver">←</button>
         <img src="./assets/img/logo-importb2b.png" alt="IMPORTB2B">
-        <button id="catalogProductCart" type="button">🛒 <span>${cart.reduce((a,x)=>a+x.quantity,0)}</span></button>
+        <span class="catalog-product-header-spacer" aria-hidden="true"></span>
       </div>
       <div class="catalog-product-content">
         <div class="catalog-product-gallery">
@@ -181,7 +181,6 @@
     window.scrollTo({top:0,behavior:'instant'});
     if(push)history.pushState({catalogProduct:pid},'',`${location.pathname}${location.search}#producto-${encodeURIComponent(pid)}`);
     view.querySelector('#catalogProductBack').onclick=()=>closeProductPage(true);
-    view.querySelector('#catalogProductCart').onclick=()=>openCart(true);
     if(productGalleryTimer){clearInterval(productGalleryTimer);productGalleryTimer=null}
     let galleryIx=0;
     const showProductMedia=n=>{if(media.length<2)return;galleryIx=(n+media.length)%media.length;const img=view.querySelector('#productMainImage'),hero=view.querySelector('.catalog-product-hero');if(!img)return;img.classList.add('changing');setTimeout(()=>{img.src=media[galleryIx];if(hero)hero.style.setProperty('--hero-bg',`url("${media[galleryIx].replace(/"/g,'%22')}")`);view.querySelectorAll('[data-gallery-index]').forEach((x,i)=>x.classList.toggle('active',i===galleryIx));view.querySelectorAll('[data-hero-dot]').forEach((x,i)=>x.classList.toggle('active',i===galleryIx));requestAnimationFrame(()=>img.classList.remove('changing'))},150)};
