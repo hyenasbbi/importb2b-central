@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#060708">
   <title>IMPORTB2B · Catálogo</title>
   <link rel="icon" href="./assets/img/app-icon-512.png">
-  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.4.1">
+  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.4.2">
 </head>
 <body>
   <header class="store-header">
@@ -27,10 +27,9 @@
     <select id="catalogCategory" class="catalog-category-native" aria-label="Categoría"><option value="">Todas las categorías</option></select>
   </header>
   <main id="catalogMain" class="store-main">
-    <section id="catalogCategoryHome" class="catalog-category-home">
-      <div class="catalog-category-home-label"><span>EXPLORAR</span><b>Categorías</b></div>
-      <nav id="catalogCategoryChips" class="catalog-category-chips" aria-label="Categorías"></nav>
-    </section>
+    <nav id="catalogCategoryHome" class="catalog-category-home" aria-label="Categorías">
+      <div id="catalogCategoryChips" class="catalog-category-chips"></div>
+    </nav>
     <section id="catalogPromoCarousel" class="catalog-promo-carousel" aria-label="Promociones"></section>
     <section class="catalog-section"><div class="catalog-section-head"><div><span>NOVEDADES</span><h2>Nuevos ingresos</h2></div><button data-catalog-show="new">Ver todos</button></div><div id="catalogNewGrid" class="store-grid store-grid-featured"></div></section>
     <section class="catalog-section"><div class="catalog-section-head"><div><span>SELECCIÓN</span><h2>Destacados</h2></div><button data-catalog-show="featured">Ver todos</button></div><div id="catalogFeaturedGrid" class="store-grid store-grid-featured"></div></section>
@@ -71,7 +70,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
-  <script src="./assets/js/config.js?v=7.4.1"></script>
-  <script src="./assets/js/catalog.js?v=7.4.1"></script>
+  <script src="./assets/js/config.js?v=7.4.2"></script>
+  <script src="./assets/js/catalog.js?v=7.4.2"></script>
 </body>
 </html>
