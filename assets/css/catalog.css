@@ -941,3 +941,15 @@ body.catalog-categories-sticky .category-menu-trigger{display:grid!important}
   }
   .product-hero-dots{bottom:12px}
 }
+
+
+/* ==================== 7.7.2 · SINGLE CART HEADER ==================== */
+.catalog-product-header{
+  grid-template-columns:44px 1fr 44px!important;
+}
+.catalog-product-header-spacer{
+  width:44px;
+  height:40px;
+  display:block;
+}
+.catalog-product-header #catalogProductCart{display:none!important}
