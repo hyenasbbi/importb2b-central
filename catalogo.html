@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#060708">
   <title>IMPORTB2B · Catálogo</title>
   <link rel="icon" href="./assets/img/app-icon-512.png">
-  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.4.3">
+  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.5.0">
 </head>
 <body>
   <header class="store-header">
@@ -31,11 +31,24 @@
       <div id="catalogCategoryChips" class="catalog-category-chips"></div>
     </nav>
     <section id="catalogPromoCarousel" class="catalog-promo-carousel" aria-label="Promociones"></section>
-    <section class="catalog-section"><div class="catalog-section-head"><div><span>NOVEDADES</span><h2>Nuevos ingresos</h2></div><button data-catalog-show="new">Ver todos</button></div><div id="catalogNewGrid" class="store-grid store-grid-featured"></div></section>
-    <section class="catalog-section"><div class="catalog-section-head"><div><span>SELECCIÓN</span><h2>Destacados</h2></div><button data-catalog-show="featured">Ver todos</button></div><div id="catalogFeaturedGrid" class="store-grid store-grid-featured"></div></section>
+    <section id="catalogNewSection" class="catalog-section"><div class="catalog-section-head"><div><span>NOVEDADES</span><h2>Nuevos ingresos</h2></div><button data-catalog-show="new">Ver todos</button></div><div id="catalogNewGrid" class="store-grid store-grid-featured"></div></section>
+    <section id="catalogFeaturedSection" class="catalog-section"><div class="catalog-section-head"><div><span>SELECCIÓN</span><h2>Destacados</h2></div><button data-catalog-show="featured">Ver todos</button></div><div id="catalogFeaturedGrid" class="store-grid store-grid-featured"></div></section>
     <section id="catalogDiscountSection" class="catalog-section hidden"><div class="catalog-section-head"><div><span>OPORTUNIDADES</span><h2>Productos en descuento</h2></div><button data-catalog-show="discount">Ver todos</button></div><div id="catalogDiscountGrid" class="store-grid store-grid-featured"></div></section>
     <section class="catalog-section catalog-all-section hidden"><div class="catalog-section-head"><div><span>CATÁLOGO</span><h2 id="catalogBrowseTitle">Productos</h2></div><button id="closeCatalogBrowse" type="button">Cerrar</button></div><section id="catalogGrid" class="store-grid"></section></section>
     <section class="wholesale-cta"><span>MAYORISTA</span><h2>Tu negocio, mejor margen.</h2><p>Precios especiales para revendedores.</p><button id="wholesaleWhatsapp">Consultar mayorista</button></section>
+    <footer class="catalog-footer">
+      <div class="catalog-footer-brand"><img src="./assets/img/logo-importb2b.png" alt="IMPORTB2B"><div><b>IMPORTB2B</b><small>Importados · Santa Fe</small></div></div>
+      <div class="catalog-footer-social">
+        <a class="catalog-social-link whatsapp" href="https://wa.me/5493425575323?text=Hola%20me%20gustaria%20realizar%20un%20pedido%20en%20su%20pagina%20me%20ayudan%20con%20la%20eleccion%3F" target="_blank" rel="noopener" aria-label="Escribir a IMPORTB2B por WhatsApp">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.4-4.2a8.5 8.5 0 1 1 15.6-4.6Z"></path><path d="M8.2 7.7c.2-.5.4-.5.8-.5h.5c.2 0 .4.1.5.4l.8 2c.1.3.1.5-.1.7l-.6.7c-.2.2-.1.4 0 .6.7 1.2 1.7 2.2 3 2.8.2.1.4.1.6-.1l.8-1c.2-.2.4-.3.7-.2l1.9.9c.3.1.5.3.5.5 0 .4-.2 1.5-1 2.1-.7.6-1.6.8-2.6.5-1.4-.4-3.1-1.1-4.8-2.6-1.4-1.3-2.4-2.8-2.9-4.1-.5-1.2-.1-2.2.3-2.7Z"></path></svg>
+          <span>WhatsApp</span>
+        </a>
+        <a class="catalog-social-link instagram" href="https://www.instagram.com/import.b2b/" target="_blank" rel="noopener" aria-label="Ver Instagram de IMPORTB2B">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.4" cy="6.7" r="1"></circle></svg>
+          <span>Instagram</span>
+        </a>
+      </div>
+    </footer>
   </main>
   <section id="catalogProductView" class="catalog-product-view hidden"></section>
 
@@ -70,7 +83,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
-  <script src="./assets/js/config.js?v=7.4.3"></script>
-  <script src="./assets/js/catalog.js?v=7.4.3"></script>
+  <script src="./assets/js/config.js?v=7.5.0"></script>
+  <script src="./assets/js/catalog.js?v=7.5.0"></script>
 </body>
 </html>
