@@ -789,3 +789,155 @@ body.catalog-categories-sticky .category-menu-trigger{display:grid!important}
 @media(prefers-reduced-motion:reduce){
   .store-card-main-image,.catalog-floating-wa,.catalog-help-bubble{transition:none!important}
 }
+
+
+/* ==================== 7.7 · FINAL CATALOG POLISH ==================== */
+/* Use the real WhatsApp silhouette everywhere instead of the outlined approximation. */
+.wa-brand-icon{
+  fill:currentColor!important;
+  stroke:none!important;
+}
+.catalog-social-link .wa-brand-icon,
+.catalog-card-social .wa-brand-icon,
+.catalog-floating-wa .wa-brand-icon,
+.product-whatsapp-cta .wa-brand-icon{
+  fill:currentColor!important;
+  stroke:none!important;
+}
+
+/* 3-second product media rhythm with a softer 300 ms transition. */
+.store-card-main-image,
+.catalog-product-hero>img{
+  transition:opacity .30s ease,transform .30s ease!important;
+}
+.store-card-main-image.changing,
+.catalog-product-hero>img.changing{
+  opacity:.16!important;
+  transform:translate(-50%,-50%) scale(.985)!important;
+}
+.product-hero-dots{
+  position:absolute;
+  z-index:6;
+  left:50%;
+  bottom:14px;
+  transform:translateX(-50%);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  padding:5px 7px;
+  border-radius:999px;
+  background:rgba(4,6,8,.58);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+.product-hero-dots button{
+  width:7px;
+  height:7px;
+  padding:0;
+  border:0;
+  border-radius:50%;
+  background:rgba(255,255,255,.42);
+  transition:width .2s ease,background .2s ease;
+}
+.product-hero-dots button.active{
+  width:17px;
+  border-radius:999px;
+  background:#fff;
+}
+
+/* Product-specific WhatsApp CTA below Add to order. */
+.product-whatsapp-cta{
+  width:100%;
+  min-height:48px;
+  margin-top:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  border:1px solid #2f8f5b;
+  border-radius:14px;
+  background:#0d1813;
+  color:#eaf9ef;
+  text-decoration:none;
+  font-weight:900;
+}
+.product-whatsapp-cta:hover{
+  background:#112018;
+  border-color:#38b06d;
+}
+.product-whatsapp-cta svg{width:22px;height:22px}
+
+/* One footer language everywhere: home, categories, search and product detail. */
+.catalog-footer{
+  width:min(100%,560px)!important;
+  max-width:560px!important;
+  margin:32px auto 0!important;
+  padding:28px 0 calc(30px + env(safe-area-inset-bottom))!important;
+  display:grid!important;
+  justify-items:center!important;
+  align-items:center!important;
+  gap:18px!important;
+  text-align:center!important;
+  border-top:1px solid #1d2329;
+}
+.catalog-footer-brand{
+  width:100%!important;
+  display:grid!important;
+  justify-items:center!important;
+  align-items:center!important;
+  gap:9px!important;
+  text-align:center!important;
+}
+.catalog-footer-brand img{
+  margin:0 auto!important;
+}
+.catalog-footer-brand div{
+  width:100%;
+  display:grid!important;
+  justify-items:center!important;
+  gap:3px!important;
+  text-align:center!important;
+}
+.catalog-footer-brand b,
+.catalog-footer-brand small{
+  display:block;
+  width:100%;
+  text-align:center!important;
+}
+.catalog-footer-social{
+  width:min(100%,500px)!important;
+  margin:0 auto!important;
+  display:grid!important;
+  grid-template-columns:1fr 1fr!important;
+  gap:10px!important;
+}
+.catalog-social-link{
+  width:100%;
+  justify-content:center!important;
+}
+.catalog-product-footer{
+  margin-top:8px!important;
+}
+
+/* Help bubble lifecycle is controlled in JS; keep visual transitions subtle. */
+.catalog-help-bubble{
+  transition:opacity .28s ease,transform .28s ease,visibility .28s ease!important;
+}
+
+@media(max-width:780px){
+  .catalog-footer{
+    width:min(100%,520px)!important;
+    padding-left:0!important;
+    padding-right:0!important;
+  }
+  .catalog-footer-social{
+    width:min(100%,500px)!important;
+    grid-template-columns:1fr 1fr!important;
+  }
+  .catalog-product-footer{
+    padding-left:16px!important;
+    padding-right:16px!important;
+  }
+  .product-hero-dots{bottom:12px}
+}
