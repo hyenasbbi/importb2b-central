@@ -12,12 +12,18 @@
     trigger?.setAttribute('aria-expanded',String(open));
     backdrop?.classList.toggle('open',open);
   }
+  function goHome(scroll=true){
+    cat='';q='';catalogMode='home';catalogBrowseOpen=false;
+    if($('#catalogCategory'))$('#catalogCategory').value='';if($('#catalogSearch'))$('#catalogSearch').value='';
+    document.querySelectorAll('[data-cat]').forEach(x=>x.classList.remove('active'));document.querySelectorAll('[data-home]').forEach(x=>x.classList.add('active'));
+    openCategoryDrawer(false);renderProducts();if(scroll)window.scrollTo({top:0,behavior:'smooth'});
+  }
   function chooseCategory(value=''){
-    cat=value;catalogMode='all';catalogBrowseOpen=true;
-    if($('#catalogCategory'))$('#catalogCategory').value=cat;
-    document.querySelectorAll('[data-cat]').forEach(x=>x.classList.toggle('active',(x.dataset.cat||'')===cat));
-    openCategoryDrawer(false);renderProducts();
-    document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth',block:'start'});
+    if(!value)return goHome();
+    cat=value;q='';catalogMode='category';catalogBrowseOpen=true;
+    if($('#catalogCategory'))$('#catalogCategory').value=cat;if($('#catalogSearch'))$('#catalogSearch').value='';
+    document.querySelectorAll('[data-home]').forEach(x=>x.classList.remove('active'));document.querySelectorAll('[data-cat]').forEach(x=>x.classList.toggle('active',(x.dataset.cat||'')===cat));
+    openCategoryDrawer(false);renderProducts();document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth',block:'start'});
   }
   function initHeaderNavigation(){
     const home=$('#catalogCategoryHome'),header=$('.store-header');
@@ -44,9 +50,10 @@
     data.products=(j.products||[]).filter(p=>p.variants?.some(v=>v.in_stock&&Number(v.available||1)>0));
     const cats=[...new Set(data.products.map(p=>p.category).filter(Boolean))].sort();
     $('#catalogCategory').innerHTML='<option value="">Todas las categorías</option>'+cats.map(x=>`<option>${esc(x)}</option>`).join('');
-    const categoryMarkup=`<button data-cat="">Todos</button>${cats.map(x=>`<button data-cat="${esc(x)}">${esc(x)}</button>`).join('')}`;
+    const categoryMarkup=`<button data-home="true" class="active">Inicio</button>${cats.map(x=>`<button data-cat="${esc(x)}">${esc(x)}</button>`).join('')}`;
     $('#catalogCategoryChips').innerHTML=categoryMarkup;
     $('#catalogCategoryDrawerList').innerHTML=categoryMarkup;
+    document.querySelectorAll('[data-home]').forEach(b=>b.addEventListener('click',()=>goHome()));
     document.querySelectorAll('[data-cat]').forEach(b=>b.addEventListener('click',()=>chooseCategory(b.dataset.cat||'')));
     renderPromoCarousel();renderProducts();renderCart();bindCatalogActions();initHeaderNavigation();
   }
@@ -61,7 +68,7 @@
       </div>
       <div class="store-card-body">
         <div class="store-card-copy"><h3>${esc(p.name)}</h3><small>${esc(p.category||'')}</small></div>
-        <div class="catalog-card-bottom"><strong>${price?`Desde ${money(price)}`:'Consultar'}</strong><small>${direct?'Agregar directo':`${vars.length} variantes`}</small></div>
+        <div class="catalog-card-bottom"><strong>${price?(direct?money(price):`Desde ${money(price)}`):'Consultar'}</strong><small class="${direct?'catalog-single-variant':''}">${direct?`Opción: ${esc(vars[0].name||'Única')}`:`${vars.length} variantes`}</small></div>
       </div>
     </article>`
   }
