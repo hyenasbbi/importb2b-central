@@ -771,3 +771,33 @@ html,body{width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
 .stock-page-arrow:disabled{opacity:.3;cursor:not-allowed}
 .stock-page-ellipsis{display:grid;place-items:center;min-width:24px;color:var(--muted)}
 @media(max-width:760px){.stock-pagination{display:grid;justify-items:center}.stock-pages{justify-content:center}.stock-page-number,.stock-page-arrow{min-width:40px;height:40px}}
+
+
+/* ==================== 7.2.3 · MANUAL CATALOG MERCHANDISING ==================== */
+.catalog-merch-toggle{
+  min-width:36px;
+  border:1px solid #30363d;
+  background:#11151a;
+  color:#7f8994;
+  font-size:15px;
+  transition:.16s ease;
+}
+.catalog-merch-toggle.new.active{
+  color:#fff;
+  border-color:#ff3138;
+  background:rgba(255,49,56,.16);
+  box-shadow:inset 0 0 0 1px rgba(255,49,56,.12);
+}
+.catalog-merch-toggle.featured.active{
+  color:#ffd75a;
+  border-color:#8f7623;
+  background:rgba(255,206,49,.09);
+}
+.merch-check{
+  border:1px solid #2a3138;
+  border-radius:12px;
+  padding:11px 12px;
+  background:#0d1013;
+}
+.merch-check.new:has(input:checked){border-color:#ff3138;background:rgba(255,49,56,.08)}
+.merch-check.featured:has(input:checked){border-color:#8f7623;background:rgba(255,206,49,.07)}
