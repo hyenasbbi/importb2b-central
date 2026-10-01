@@ -980,3 +980,27 @@ body.catalog-product-open .catalog-header-search{
   .catalog-product-back-main{grid-column:2}
   .catalog-product-content{padding-top:14px!important}
 }
+
+
+/* ==================== 7.8.1 · COMPACT FOOTER ==================== */
+/* Keep footer content unchanged; remove only the excess page/footer tail spacing. */
+.store-main{
+  padding-bottom:0!important;
+}
+.catalog-footer{
+  min-height:0!important;
+  height:auto!important;
+  margin-bottom:0!important;
+  padding-bottom:calc(16px + env(safe-area-inset-bottom))!important;
+}
+@media(max-width:780px){
+  .store-main{
+    padding-bottom:0!important;
+  }
+  .catalog-footer{
+    min-height:0!important;
+    height:auto!important;
+    margin-bottom:0!important;
+    padding-bottom:calc(14px + env(safe-area-inset-bottom))!important;
+  }
+}
