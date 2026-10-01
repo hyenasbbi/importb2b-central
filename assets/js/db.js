@@ -156,7 +156,7 @@
     async duplicateProduct(productId){
       const p=await this.productDetail(productId),u=await authUser();
       const baseSku=p.sku?`${p.sku}-COPY`:null;
-      let r=await db.from('importb2b_products').insert({owner_id:u.id,name:`${p.name} - copia`,sku:baseSku,category:p.category,active:true,catalog_visible:false,primary_image_url:null}).select().single();assert(r);
+      let r=await db.from('importb2b_products').insert({owner_id:u.id,name:`${p.name} - copia`,sku:baseSku,category:p.category,active:true,catalog_visible:false,new_arrival:false,featured:false,catalog_priority:100,primary_image_url:null}).select().single();assert(r);
       const copy=r.data;
       for(const v of p.variants){
         const vr=await db.from('importb2b_product_variants').insert({owner_id:u.id,product_id:copy.id,variant_name:v.variant_name,sku:v.sku?`${v.sku}-COPY`:null,cost_ars:v.cost_ars,price_ars:v.price_ars,wholesale_price_ars:v.wholesale_price_ars,stock_min:v.stock_min,active:true,attributes:v.attributes||{}});assert(vr);
@@ -165,7 +165,7 @@
     },
 
     async products(q='',category='',stockFilter='all'){
-      let req=db.from('importb2b_products').select('id,sku,name,category,active,catalog_visible,primary_image_url,created_at').eq('active',true).order('name');
+      let req=db.from('importb2b_products').select('id,sku,name,category,active,catalog_visible,new_arrival,featured,catalog_priority,primary_image_url,created_at').eq('active',true).order('name');
       if(category) req=req.eq('category',category);
       const pr=await req.limit(1200); assert(pr);
       const products=pr.data||[], ids=products.map(x=>x.id); if(!ids.length) return [];
