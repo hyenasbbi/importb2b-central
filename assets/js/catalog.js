@@ -102,31 +102,46 @@
   function renderProducts(){
     if(!data)return;
     const homeMode=!catalogBrowseOpen;
-    $('#catalogPromoCarousel')?.classList.toggle('hidden',!homeMode);$('#catalogNewSection')?.classList.toggle('hidden',!homeMode);$('#catalogFeaturedSection')?.classList.toggle('hidden',!homeMode);$('#catalogWholesaleCta')?.classList.toggle('hidden',!homeMode);
+    const rank=(a,b)=>Number(a.catalog_priority??100)-Number(b.catalog_priority??100)||new Date(b.created_at||0)-new Date(a.created_at||0)||String(a.name||'').localeCompare(String(b.name||''),'es');
+    const newItems=data.products.filter(p=>p.new_arrival).sort(rank);
+    const featuredItems=data.products.filter(p=>p.featured).sort(rank);
+
+    $('#catalogPromoCarousel')?.classList.toggle('hidden',!homeMode);
+    $('#catalogWholesaleCta')?.classList.toggle('hidden',!homeMode);
+    $('#catalogNewSection')?.classList.toggle('hidden',!homeMode||!newItems.length);
+    $('#catalogFeaturedSection')?.classList.toggle('hidden',!homeMode||!featuredItems.length);
+
     if(homeMode){
-      const newest=[...data.products].slice(0,6),featured=data.products.filter(p=>p.featured).slice(0,6);
-      $('#catalogNewGrid').innerHTML=newest.map(p=>card(p,'NUEVO')).join('');
-      const featuredFallback=data.products.slice(6,12).length?data.products.slice(6,12):data.products.slice(0,6);
-      $('#catalogFeaturedGrid').innerHTML=(featured.length?featured:featuredFallback).map(p=>card(p)).join('');
-    }else{$('#catalogNewGrid').innerHTML='';$('#catalogFeaturedGrid').innerHTML='';}
+      $('#catalogNewGrid').innerHTML=newItems.slice(0,6).map(p=>card(p,'NUEVO')).join('');
+      $('#catalogFeaturedGrid').innerHTML=featuredItems.slice(0,6).map(p=>card(p)).join('');
+    }else{
+      $('#catalogNewGrid').innerHTML='';
+      $('#catalogFeaturedGrid').innerHTML='';
+    }
+
     const discounts=data.products.filter(p=>p.discount_price_ars||p.on_sale).slice(0,6);
     $('#catalogDiscountSection').classList.add('hidden');
     $('#catalogDiscountGrid').innerHTML=(catalogBrowseOpen&&catalogMode==='discount')?discounts.map(p=>card(p,'OFERTA')).join(''):'';
+
     const browse=$('.catalog-all-section'),grid=$('#catalogGrid'),title=$('#catalogBrowseTitle');
     if(catalogBrowseOpen){
       browse?.classList.remove('hidden');
       let products=filteredProducts();
-      if(catalogMode==='new')products=products.slice(0,24);
-      else if(catalogMode==='featured'){const picks=products.filter(p=>p.featured);products=(picks.length?picks:products).slice(0,24)}
+      if(catalogMode==='new')products=products.filter(p=>p.new_arrival).sort(rank);
+      else if(catalogMode==='featured')products=products.filter(p=>p.featured).sort(rank);
       else if(catalogMode==='discount')products=products.filter(p=>p.discount_price_ars||p.on_sale);
-      if(title)title.textContent=cat?cat:(catalogMode==='new'?'Nuevos ingresos':catalogMode==='featured'?'Destacados':catalogMode==='discount'?'Descuentos':q.trim()?('Resultados para “'+q.trim()+'”'):'Todos los productos');
-      grid.innerHTML=products.map(p=>card(p,catalogMode==='new'?'NUEVO':catalogMode==='discount'?'OFERTA':'')).join('')||'<div class="store-loading">No encontramos productos con esos filtros.</div>';
+      if(title)title.textContent=cat?cat:(catalogMode==='new'?'Nuevos ingresos':catalogMode==='featured'?'Destacados':catalogMode==='discount'?'Descuentos':q.trim()?('Resultados para “'+q.trim()+'”'):'Productos');
+      grid.innerHTML=products.map(p=>card(p,catalogMode==='new'?'NUEVO':catalogMode==='discount'?'OFERTA':'')).join('')||'<div class="store-loading">No hay productos seleccionados para esta sección.</div>';
       bindProductCards(grid);
     }else{
       browse?.classList.add('hidden');
       if(grid)grid.innerHTML='';
     }
-    if(homeMode){bindProductCards($('#catalogNewGrid'));bindProductCards($('#catalogFeaturedGrid'));}
+
+    if(homeMode){
+      bindProductCards($('#catalogNewGrid'));
+      bindProductCards($('#catalogFeaturedGrid'));
+    }
     bindProductCards($('#catalogDiscountGrid'));
   }
   let catalogReturnScroll=0,productGalleryTimer=null;
