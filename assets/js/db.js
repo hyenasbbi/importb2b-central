@@ -276,6 +276,11 @@
       const u=await authUser();
       const r=await db.from('importb2b_customers').insert({owner_id:u.id,active:true,source:'manual',...payload}).select().single(); assert(r); return r.data;
     },
+    async createQuickCustomer(name){
+      const u=await authUser(),fullName=String(name||'').trim();
+      if(!fullName) throw new Error('Ingresá el nombre del cliente');
+      const r=await db.from('importb2b_customers').insert({owner_id:u.id,active:true,source:'quick_sale',full_name:fullName,source_payload:{incomplete_profile:true,created_from:'sale_customer_search'}}).select().single(); assert(r); return r.data;
+    },
     async updateCustomer(id,payload){ const r=await db.from('importb2b_customers').update(payload).eq('id',id); assert(r); },
 
     async customer360(id){
