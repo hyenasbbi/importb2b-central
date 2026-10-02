@@ -801,3 +801,46 @@ html,body{width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
 }
 .merch-check.new:has(input:checked){border-color:#ff3138;background:rgba(255,49,56,.08)}
 .merch-check.featured:has(input:checked){border-color:#8f7623;background:rgba(255,206,49,.07)}
+
+
+/* ==================== 7.2.5 · BULK VARIANTS ==================== */
+.bulk-variant-panel{
+  margin:0 0 14px;
+  padding:14px;
+  border:1px solid #2a3036;
+  border-radius:14px;
+  background:#0b0e11;
+}
+.bulk-variant-panel.hidden{display:none!important}
+.bulk-variant-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:10px;
+}
+.bulk-variant-head>div{display:grid;gap:3px}
+.bulk-variant-head small{color:#8f99a3;line-height:1.35}
+.bulk-variant-panel textarea{
+  width:100%;
+  min-height:118px;
+  resize:vertical;
+  margin:0 0 10px;
+}
+.bulk-variant-defaults{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(110px,1fr)) auto;
+  gap:10px;
+  align-items:end;
+}
+.bulk-variant-defaults label{margin:0}
+.bulk-variant-defaults .btn{min-height:42px;white-space:nowrap}
+.v-stock{min-width:76px!important;width:86px!important}
+.variant-available-note{display:block;margin-top:4px;white-space:nowrap}
+@media(max-width:780px){
+  .bulk-variant-panel{padding:12px}
+  .bulk-variant-head{gap:8px}
+  .bulk-variant-defaults{grid-template-columns:1fr 1fr}
+  .bulk-variant-defaults .btn{grid-column:1/-1}
+  .v-stock{width:78px!important}
+}
