@@ -1191,7 +1191,7 @@ El stock y el historial se conservan.`))return;
         <section><div><span class="eyebrow">TRANSFERENCIAS</span><small>Saldo real</small></div>${field('frTransferNahuel','Nahuel',transfer.nahuel,'transfer')}${field('frTransferEsteban','Esteban',transfer.esteban,'transfer')}</section>
         <section><div><span class="eyebrow">USDT</span><small>Tenencia real</small></div>${field('frUsdtNahuel','Nahuel',usdtB.nahuel,'usdt')}${field('frUsdtEsteban','Esteban',usdtB.esteban,'usdt')}</section>
       </div>
-      <div class="notice finance-recount-example">Ejemplo: si Efectivo · Nahuel figura en ${money(cash.nahuel)} y escribís un saldo ${cash.nahuel===50000?money(150000):'mayor'}, el historial registra solamente la diferencia como ajuste de recuento.</div>
+      <div class="notice finance-recount-example">Ejemplo: si Efectivo · Nahuel figura en $50.000 y en el recuento tenés $150.000, Central registra automáticamente un ingreso de ajuste de $100.000 a Nahuel.</div>
       <div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveFinanceRecount" class="btn primary">Actualizar y registrar diferencias</button></div>`);
     $('#saveFinanceRecount').addEventListener('click',async()=>{
       const entries=[
