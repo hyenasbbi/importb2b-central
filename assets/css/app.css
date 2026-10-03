@@ -886,3 +886,24 @@ html,body{width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
   .customer-search-results{position:relative;top:auto;left:auto;right:auto;max-height:245px;box-shadow:none}
   .smart-search-results{max-height:285px}
 }
+
+
+/* ==================== 7.2.7 · PURCHASE PRODUCT SEARCH ==================== */
+.purchase-existing-fields{display:grid;gap:12px}
+.purchase-product-search{position:relative}
+.purchase-product-search>label{display:block}
+.purchase-product-results{display:none;margin:6px 0 0;max-height:300px}
+.purchase-product-results.open{display:grid}
+.purchase-variant-area{padding:12px;border:1px solid #262c32;border-radius:12px;background:#0c1014}
+.purchase-variant-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
+.purchase-variant-head label{margin:0}
+.purchase-new-variant-inline{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:10px;padding-top:10px;border-top:1px solid #242a30}
+.purchase-new-variant-inline label{margin:0}
+.purchase-existing-values{margin-top:0}
+@media(max-width:780px){
+  .purchase-product-results{max-height:250px}
+  .purchase-variant-head{grid-template-columns:1fr}
+  .purchase-variant-head .btn{width:100%}
+  .purchase-new-variant-inline{grid-template-columns:1fr}
+  .purchase-new-variant-inline .btn{width:100%}
+}
