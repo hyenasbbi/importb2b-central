@@ -26,3 +26,10 @@
   from = "/club/:token"
   to = "/club.html?token=:token"
   status = 200
+
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Service-Worker-Allowed = "/"
