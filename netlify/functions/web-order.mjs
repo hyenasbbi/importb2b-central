@@ -1,4 +1,18 @@
-import { adminClient, ok, preflight, clean, digits } from './_client.mjs';
+import { adminClient, ok, preflight, clean, digits, SUPABASE_URL, SERVICE_KEY } from './_client.mjs';
+
+async function notifyNewOrder(payload){
+  if(!SUPABASE_URL||!SERVICE_KEY)return;
+  try{
+    const r=await fetch(`${SUPABASE_URL}/functions/v1/importb2b-new-order-push`,{
+      method:'POST',
+      headers:{'content-type':'application/json',Authorization:`Bearer ${SERVICE_KEY}`},
+      body:JSON.stringify(payload)
+    });
+    if(!r.ok)console.error('new order push failed',r.status,await r.text().catch(()=>''));
+  }catch(e){
+    console.error('new order push error',e?.message||e);
+  }
+}
 
 export async function handler(event){
   if(event.httpMethod==='OPTIONS') return preflight();
@@ -29,6 +43,7 @@ export async function handler(event){
     const {data:o,error:oe}=await admin.from('importb2b_web_orders').insert({owner_id:cfg.owner_id,order_code:code,status:'pending',customer_name:name,customer_phone:phone,customer_email:email||null,delivery_type:delivery,delivery_address:address||null,notes:notes||null,payment_method_id:pm.id,subtotal_ars:subtotal,shipping_ars:shipping,adjustment_ars:adj,total_ars:total}).select().single();if(oe)throw oe;created=o.id;
     const {error:ie}=await admin.from('importb2b_web_order_items').insert(rows.map(({cost_ars,...x})=>({owner_id:cfg.owner_id,order_id:o.id,...x})));if(ie)throw ie;
     const {error:re}=await admin.from('importb2b_inventory_movements').insert(rows.map(x=>({owner_id:cfg.owner_id,product_id:x.product_id,variant_id:x.variant_id,bucket:'reserved',movement_type:'reservation',quantity_delta:x.quantity,unit_cost_ars:x.cost_ars,reference_type:'web_order',reference_id:o.id,note:`Reserva ${code}`,created_by:null})));if(re)throw re;
+    await notifyNewOrder({owner_id:cfg.owner_id,order_id:o.id,order_code:code,customer_name:name,total_ars:total,total_units:rows.reduce((a,x)=>a+Number(x.quantity||0),0)});
     return ok({order_id:o.id,order_code:code,status:'pending',subtotal_ars:subtotal,shipping_ars:shipping,adjustment_ars:adj,total_ars:total,payment_method:pm.name,whatsapp_number:cfg.whatsapp_number});
   }catch(e){if(created){try{await admin.from('importb2b_inventory_movements').delete().eq('reference_type','web_order').eq('reference_id',created);await admin.from('importb2b_web_orders').delete().eq('id',created)}catch{}}return ok({error:e?.message||'Error procesando pedido'},500)}
 }
