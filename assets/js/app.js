@@ -83,12 +83,15 @@
     const allowedViews=new Set(['dashboard','sell','products','orders','finance','wholesale','customers','catalog','stats','users','settings']);
     if(deepView&&allowedViews.has(deepView))currentView=deepView;
     if(currentView==='finance')financeTab='summary';
+    if(currentView==='orders'&&params.get('tab')==='web'){operationsTab='web';webOrderStatusFilter='pending'}
+    const deepOrderId=currentView==='orders'&&operationsTab==='web'?params.get('order'):null;
     await render();
     ensurePushSubscription(false).catch(()=>{});
     if(deepView==='finance'&&params.get('action')==='recount')setTimeout(()=>openFinanceRecount(),120);
+    if(deepOrderId)setTimeout(()=>openWebOrder(deepOrderId),140);
     if(deepView){
       const clean=new URL(location.href);
-      clean.searchParams.delete('view');clean.searchParams.delete('action');
+      ['view','action','tab','order'].forEach(k=>clean.searchParams.delete(k));
       history.replaceState({},'',clean.pathname+clean.search+clean.hash);
     }
   }
