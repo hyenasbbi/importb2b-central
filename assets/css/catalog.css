@@ -1004,3 +1004,12 @@ body.catalog-product-open .catalog-header-search{
     padding-bottom:calc(14px + env(safe-area-inset-bottom))!important;
   }
 }
+
+
+/* ==================== 7.8.2 · UPPERCASE PRODUCT NAMES ==================== */
+/* Normalize only product-name casing. Typography, size, weight and layout stay unchanged. */
+.store-card-body h3,
+.product-sheet-copy h2,
+.catalog-product-info h1{
+  text-transform:uppercase!important;
+}
