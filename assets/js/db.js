@@ -90,7 +90,7 @@
       const settlements=(sett.data||[]).reduce((a,x)=>a+Number(x.net_amount||0),0);
       let income=0,expense=0;
       for(const x of (mov.data||[])){
-        if(['internal_conversion','internal_transfer'].includes(x.source_type))continue;
+        if(['internal_conversion','internal_transfer','finance_recount'].includes(x.source_type))continue;
         const val=Number(x.ars_equivalent ?? (x.currency==='ARS'?x.amount:0) ?? 0);
         if(x.kind==='income')income+=val; else if(x.kind==='expense')expense+=val;
       }
@@ -568,6 +568,30 @@
     async linkSettlementSale(settlementId,saleId){ const r=await db.rpc('importb2b_link_settlement_to_sale',{p_settlement_id:settlementId,p_sale_id:saleId});assert(r);return r.data; },
     async linkReceivableSale(receivableId,saleId){ const r=await db.rpc('importb2b_link_receivable_to_sale',{p_receivable_id:receivableId,p_sale_id:saleId});assert(r);return r.data; },
     async assignMovementHolder(movementId,holder){ const r=await db.rpc('importb2b_assign_movement_holder',{p_movement_id:movementId,p_holder:holder});assert(r);return r.data; },
+    async reconcileFinanceBalance(method,holder,targetBalance){
+      const r=await db.rpc('importb2b_reconcile_finance_balance',{p_method:method,p_holder:holder,p_target_balance:Number(targetBalance)});
+      assert(r);return r.data;
+    },
+    async pushPublicKey(){
+      const r=await db.functions.invoke('importb2b-push-config',{body:{}});
+      if(r.error)throw r.error;
+      if(!r.data?.publicKey)throw new Error('No se pudo obtener la clave de notificaciones');
+      return r.data.publicKey;
+    },
+    async savePushSubscription(subscription){
+      const u=await authUser();
+      const r=await db.from('importb2b_push_subscriptions').upsert({
+        owner_id:u.id,
+        endpoint:subscription.endpoint,
+        p256dh:subscription.p256dh,
+        auth:subscription.auth,
+        user_agent:navigator.userAgent,
+        active:true,
+        app_source:'central',
+        updated_at:new Date().toISOString()
+      },{onConflict:'owner_id,endpoint'}).select().single();
+      assert(r);return r.data;
+    },
     async financeData(limit=400){
       const [m,s,r,q,a,sales]=await Promise.all([
         db.from('movements').select('id,kind,amount,currency,payment_method,category,description,occurred_at,source_type,source_id,ars_equivalent,cash_holder,transfer_holder,usdt_holder,edited_at').order('occurred_at',{ascending:false}).limit(limit),
@@ -584,7 +608,7 @@
         if(x.currency==='USDT'&&x.payment_method==='usdt')balances.usdt+=sign*Number(x.amount||0);
         if(x.currency==='ARS'&&x.payment_method==='efectivo')balances.cash+=sign*Number(x.amount||0);
         if(x.currency==='ARS'&&x.payment_method==='transferencia')balances.transfer+=sign*Number(x.amount||0);
-        if(!['internal_conversion','internal_transfer'].includes(x.source_type)){
+        if(!['internal_conversion','internal_transfer','finance_recount'].includes(x.source_type)){
           const val=Number(x.ars_equivalent ?? (x.currency==='ARS'?x.amount:0) ?? 0);
           if(x.kind==='income')income+=val; else if(x.kind==='expense')expense+=val;
         }
