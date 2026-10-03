@@ -47,12 +47,51 @@
   const issueLabel=i=>({SIN_NOMBRE:'Sin nombre',SIN_CATEGORIA:'Sin categoría',STOCK_NEGATIVO:'Stock negativo',POSIBLE_DUPLICADO:'Posible duplicado',FUSIONADO:'Fusionado'}[i]||i);
   const statusPill=s=>({ready:'<span class="pill green">Listo</span>',needs_review:'<span class="pill yellow">Revisar</span>',imported:'<span class="pill blue">Importado</span>',skipped:'<span class="pill">Omitido</span>',error:'<span class="pill red">Error</span>',completed:'<span class="pill green">Completada</span>',confirmed:'<span class="pill green">Confirmado</span>',pending:'<span class="pill yellow">Pendiente</span>',cancelled:'<span class="pill red">Anulada</span>'}[s]||`<span class="pill">${esc(s)}</span>`);
   const safeDate=x=>x?new Date(x).toLocaleString('es-AR'):'—';
+  function urlBase64ToUint8Array(base64String){
+    const padding='='.repeat((4-base64String.length%4)%4);
+    const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+    const raw=atob(base64);
+    return Uint8Array.from([...raw].map(ch=>ch.charCodeAt(0)));
+  }
+  async function ensurePushSubscription(requestPermission=false){
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)) throw new Error('Este dispositivo no soporta notificaciones web.');
+    const registration=await navigator.serviceWorker.register('/sw.js?v=7.2.8',{scope:'/'});
+    let permission=Notification.permission;
+    if(permission==='default'&&requestPermission)permission=await Notification.requestPermission();
+    if(permission!=='granted')return {enabled:false,permission};
+    const publicKey=await DB.pushPublicKey();
+    let subscription=await registration.pushManager.getSubscription();
+    if(!subscription){
+      subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(publicKey)});
+    }
+    const data=subscription.toJSON();
+    await DB.savePushSubscription({endpoint:subscription.endpoint,p256dh:data.keys?.p256dh,auth:data.keys?.auth});
+    return {enabled:true,permission:'granted'};
+  }
 
   async function start(){
     const {data:{session}}=await db.auth.getSession(); if(session) await enter(session.user);
     db.auth.onAuthStateChange(async(_,session)=>{ if(session&&!window.currentUser) await enter(session.user); if(!session) leave(); });
   }
-  async function enter(user){ window.currentUser=user; $('#loginView').classList.add('hidden'); $('#appView').classList.remove('hidden'); $('#userLabel').textContent=user.email||user.id; await render(); }
+  async function enter(user){
+    window.currentUser=user;
+    $('#loginView').classList.add('hidden');
+    $('#appView').classList.remove('hidden');
+    $('#userLabel').textContent=user.email||user.id;
+    const params=new URLSearchParams(location.search);
+    const deepView=params.get('view');
+    const allowedViews=new Set(['dashboard','sell','products','orders','finance','wholesale','customers','catalog','stats','users','settings']);
+    if(deepView&&allowedViews.has(deepView))currentView=deepView;
+    if(currentView==='finance')financeTab='summary';
+    await render();
+    ensurePushSubscription(false).catch(()=>{});
+    if(deepView==='finance'&&params.get('action')==='recount')setTimeout(()=>openFinanceRecount(),120);
+    if(deepView){
+      const clean=new URL(location.href);
+      clean.searchParams.delete('view');clean.searchParams.delete('action');
+      history.replaceState({},'',clean.pathname+clean.search+clean.hash);
+    }
+  }
   function leave(){ window.currentUser=null; $('#appView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); }
   $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#loginError').textContent='';const {error}=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(error)$('#loginError').textContent=error.message});
   $('#logoutBtn').addEventListener('click',()=>db.auth.signOut());
@@ -1141,6 +1180,35 @@ El stock y el historial se conservan.`))return;
     openModal(`<div class="section-title"><div><span class="eyebrow">SIN ASIGNAR</span><h3>${esc(financeMethodLabel(method))}</h3><p class="muted">Asignar no genera otro ingreso: solo identifica quién tiene el dinero.</p></div><button class="modal-close modal-x">×</button></div><div class="finance-unassigned-list">${rows.map(x=>`<div class="finance-unassigned-item"><div><b>${x.kind==='income'?'+':'−'} ${financeAmountByMethod(method,Math.abs(Number(x.amount||0)))}</b><small>${safeDate(x.occurred_at)} · ${esc(x.description||x.category||'Movimiento')}</small></div><div class="finance-assign-actions"><button class="btn tiny ghost assign-movement-holder" data-id="${x.id}" data-holder="nahuel">Nahuel</button><button class="btn tiny ghost assign-movement-holder" data-id="${x.id}" data-holder="esteban">Esteban</button></div></div>`).join('')||'<div class="empty">No hay dinero sin asignar.</div>'}</div>`);
     document.querySelectorAll('.assign-movement-holder').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;try{await DB.assignMovementHolder(b.dataset.id,b.dataset.holder);closeModal();await renderFinance()}catch(e){alert(e.message);b.disabled=false}}));
   }
+  function openFinanceRecount(){
+    const f=financeCache;if(!f)return;
+    const cash=financeHolderBreakdown(f,'efectivo'),transfer=financeHolderBreakdown(f,'transferencia'),usdtB=financeHolderBreakdown(f,'usdt');
+    const field=(id,label,value,method)=>`<label>${label}<input id="${id}" type="number" step="${method==='usdt'?'0.01':'1'}" value="${Number(value||0)}"></label>`;
+    openModal(`<div class="section-title"><div><span class="eyebrow">RECUENTO RÁPIDO</span><h3>Actualizar saldos reales</h3><p class="muted">Escribí cuánto hay realmente. Central calcula la diferencia y crea el ingreso o egreso de ajuste automáticamente, sin alterar el resultado operativo.</p></div><button class="modal-close modal-x">×</button></div>
+      <div class="finance-recount-grid">
+        <section><div><span class="eyebrow">EFECTIVO</span><small>Saldo contado</small></div>${field('frCashNahuel','Nahuel',cash.nahuel,'cash')}${field('frCashEsteban','Esteban',cash.esteban,'cash')}</section>
+        <section><div><span class="eyebrow">TRANSFERENCIAS</span><small>Saldo real</small></div>${field('frTransferNahuel','Nahuel',transfer.nahuel,'transfer')}${field('frTransferEsteban','Esteban',transfer.esteban,'transfer')}</section>
+        <section><div><span class="eyebrow">USDT</span><small>Tenencia real</small></div>${field('frUsdtNahuel','Nahuel',usdtB.nahuel,'usdt')}${field('frUsdtEsteban','Esteban',usdtB.esteban,'usdt')}</section>
+      </div>
+      <div class="notice finance-recount-example">Ejemplo: si Efectivo · Nahuel figura en ${money(cash.nahuel)} y escribís un saldo ${cash.nahuel===50000?money(150000):'mayor'}, el historial registra solamente la diferencia como ajuste de recuento.</div>
+      <div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveFinanceRecount" class="btn primary">Actualizar y registrar diferencias</button></div>`);
+    $('#saveFinanceRecount').addEventListener('click',async()=>{
+      const entries=[
+        ['efectivo','nahuel','frCashNahuel',cash.nahuel],['efectivo','esteban','frCashEsteban',cash.esteban],
+        ['transferencia','nahuel','frTransferNahuel',transfer.nahuel],['transferencia','esteban','frTransferEsteban',transfer.esteban],
+        ['usdt','nahuel','frUsdtNahuel',usdtB.nahuel],['usdt','esteban','frUsdtEsteban',usdtB.esteban]
+      ];
+      const changed=entries.filter(([, ,id,current])=>{const target=Number($('#'+id).value);return Number.isFinite(target)&&Math.abs(target-Number(current||0))>0.000001});
+      if(entries.some(([, ,id])=>!Number.isFinite(Number($('#'+id).value))))return alert('Revisá los saldos ingresados.');
+      if(!changed.length)return alert('No hay diferencias para registrar.');
+      const btn=$('#saveFinanceRecount');btn.disabled=true;btn.textContent='Actualizando…';
+      try{
+        for(const [method,holder,id] of changed)await DB.reconcileFinanceBalance(method,holder,Number($('#'+id).value));
+        closeModal();financeTab='summary';await renderFinance();
+      }catch(e){alert(e.message);btn.disabled=false;btn.textContent='Actualizar y registrar diferencias'}
+    });
+  }
+
   async function renderFinance(){
     const f=await DB.financeData(500);
     financeCache=f;
@@ -1171,12 +1239,13 @@ El stock y el historial se conservan.`))return;
     }else{
       body=`<section class="card"><div class="section-title"><div><span class="eyebrow">CONTROL</span><h3>Auditoría financiera</h3></div></div><div class="audit-list">${f.audit.map(x=>`<div class="audit-row"><div><b>${esc(x.action)}</b><small>${esc(x.entity_type)} · ${safeDate(x.created_at)}</small></div><span class="pill">${String(x.entity_id||'').slice(0,8)}</span></div>`).join('')||'<div class="empty">Sin eventos de auditoría.</div>'}</div></section>`;
     }
-    const actionbar=financeTab==='movements'?`<div class="finance-actionbar"><button id="newMovement" class="btn primary">+ Nuevo movimiento</button></div>`:financeTab==='settlements'?`<div class="finance-actionbar"><button id="newSettlement" class="btn primary">+ Nueva liquidación</button></div>`:financeTab==='receivables'?`<div class="finance-actionbar"><button id="newReceivable" class="btn primary">+ Nuevo deudor</button></div>`:'';
+    const actionbar=financeTab==='summary'?`<div class="finance-actionbar finance-summary-actions"><button id="financeRecount" class="btn primary">↻ Actualizar saldos</button></div>`:financeTab==='movements'?`<div class="finance-actionbar"><button id="newMovement" class="btn primary">+ Nuevo movimiento</button></div>`:financeTab==='settlements'?`<div class="finance-actionbar"><button id="newSettlement" class="btn primary">+ Nueva liquidación</button></div>`:financeTab==='receivables'?`<div class="finance-actionbar"><button id="newReceivable" class="btn primary">+ Nuevo deudor</button></div>`:'';
     content.innerHTML=`${tabbar}${actionbar}<div class="finance-tab-body">${body}</div>`;
     document.querySelectorAll('[data-fin-tab]').forEach(b=>b.addEventListener('click',()=>{financeTab=b.dataset.finTab;renderFinance()}));
     document.querySelectorAll('[data-fin-jump]').forEach(b=>b.addEventListener('click',()=>{financeTab=b.dataset.finJump;renderFinance()}));
     document.querySelectorAll('.open-holder-movements').forEach(b=>b.addEventListener('click',()=>openFinanceHolderMovements(b.dataset.method,b.dataset.holder)));
     document.querySelectorAll('.assign-unassigned-group').forEach(b=>b.addEventListener('click',()=>openUnassignedFinance(b.dataset.method)));
+    $('#financeRecount')?.addEventListener('click',openFinanceRecount);
     $('#newMovement')?.addEventListener('click',openNewFinanceMovement);
     $('#newSettlement')?.addEventListener('click',openNewSettlement);
     $('#newReceivable')?.addEventListener('click',openNewReceivable);
@@ -1277,8 +1346,27 @@ El stock y el historial se conservan.`))return;
   }
 
   async function renderSettings(){
-    content.innerHTML=`<div class="section-title"><div><span class="eyebrow">CONFIGURACIÓN</span><h3>Administración del sistema</h3><p class="muted">Herramientas de mantenimiento que no necesitás en la operación diaria.</p></div><span class="pill">v6.5.2</span></div><div class="settings-grid"><button id="settingsKyte" class="settings-card"><span>IMPORTACIONES</span><b>Importar Kyte</b><small>Migraciones, auditoría y consolidación de archivos históricos.</small><i>›</i></button><article class="settings-card static"><span>SISTEMA</span><b>IMPORTB2B Central</b><small>Supabase · Inventario · POS · Finanzas · Club · Catálogo</small></article></div>`;
+    const pushSupported='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+    const pushPermission=pushSupported?Notification.permission:'unsupported';
+    const pushTitle=pushPermission==='granted'?'Notificaciones activas':pushPermission==='denied'?'Notificaciones bloqueadas':'Activar notificaciones';
+    content.innerHTML=`<div class="section-title"><div><span class="eyebrow">CONFIGURACIÓN</span><h3>Administración del sistema</h3><p class="muted">Herramientas de mantenimiento que no necesitás en la operación diaria.</p></div><span class="pill">v7.2.8</span></div><div class="settings-grid"><button id="settingsKyte" class="settings-card"><span>IMPORTACIONES</span><b>Importar Kyte</b><small>Migraciones, auditoría y consolidación de archivos históricos.</small><i>›</i></button><button id="settingsPush" class="settings-card" ${pushSupported?'':'disabled'}><span>NOTIFICACIONES</span><b>${esc(pushTitle)}</b><small>Control financiero cada 3 días cerca de las 14:00 · recordatorio de ventas de lunes a viernes cerca de las 17:30.</small><i>${pushPermission==='granted'?'✓':'›'}</i></button><article class="settings-card static"><span>SISTEMA</span><b>IMPORTB2B Central</b><small>Supabase · Inventario · POS · Finanzas · Club · Catálogo</small></article></div>`;
     $('#settingsKyte')?.addEventListener('click',()=>setView('imports'));
+    $('#settingsPush')?.addEventListener('click',async()=>{
+      const b=$('#settingsPush');b.disabled=true;
+      try{
+        const result=await ensurePushSubscription(true);
+        if(!result.enabled){
+          if(result.permission==='denied')alert('Las notificaciones están bloqueadas para esta app. Habilitalas desde los ajustes del dispositivo.');
+          else alert('No se activaron las notificaciones.');
+        }else{
+          alert('Notificaciones activadas para IMPORTB2B Central.');
+          await renderSettings();
+        }
+      }catch(e){
+        alert(e.message||'No se pudieron activar las notificaciones. En iPhone abrí la app instalada desde la pantalla de inicio.');
+        b.disabled=false;
+      }
+    });
   }
 
   /* -------------------- KYTE IMPORT -------------------- */
