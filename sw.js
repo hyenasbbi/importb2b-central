@@ -11,6 +11,7 @@ self.addEventListener('push',event=>{
     badge:payload.badge||'/assets/img/app-icon-512.png',
     tag:payload.tag||'importb2b',
     renotify:true,
+    silent:false,
     data:{url:payload.url||'/',...(payload.data||{})}
   };
   event.waitUntil(self.registration.showNotification(title,options));
