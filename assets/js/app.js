@@ -55,7 +55,7 @@
   }
   async function ensurePushSubscription(requestPermission=false){
     if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)) throw new Error('Este dispositivo no soporta notificaciones web.');
-    const registration=await navigator.serviceWorker.register('/sw.js?v=7.2.8',{scope:'/'});
+    const registration=await navigator.serviceWorker.register('/sw.js?v=7.2.9',{scope:'/'});
     let permission=Notification.permission;
     if(permission==='default'&&requestPermission)permission=await Notification.requestPermission();
     if(permission!=='granted')return {enabled:false,permission};
@@ -1353,7 +1353,7 @@ El stock y el historial se conservan.`))return;
     const pushSupported='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
     const pushPermission=pushSupported?Notification.permission:'unsupported';
     const pushTitle=pushPermission==='granted'?'Notificaciones activas':pushPermission==='denied'?'Notificaciones bloqueadas':'Activar notificaciones';
-    content.innerHTML=`<div class="section-title"><div><span class="eyebrow">CONFIGURACIÓN</span><h3>Administración del sistema</h3><p class="muted">Herramientas de mantenimiento que no necesitás en la operación diaria.</p></div><span class="pill">v7.2.8</span></div><div class="settings-grid"><button id="settingsKyte" class="settings-card"><span>IMPORTACIONES</span><b>Importar Kyte</b><small>Migraciones, auditoría y consolidación de archivos históricos.</small><i>›</i></button><button id="settingsPush" class="settings-card" ${pushSupported?'':'disabled'}><span>NOTIFICACIONES</span><b>${esc(pushTitle)}</b><small>Control financiero cada 3 días cerca de las 14:00 · recordatorio de ventas de lunes a viernes cerca de las 17:30.</small><i>${pushPermission==='granted'?'✓':'›'}</i></button><article class="settings-card static"><span>SISTEMA</span><b>IMPORTB2B Central</b><small>Supabase · Inventario · POS · Finanzas · Club · Catálogo</small></article></div>`;
+    content.innerHTML=`<div class="section-title"><div><span class="eyebrow">CONFIGURACIÓN</span><h3>Administración del sistema</h3><p class="muted">Herramientas de mantenimiento que no necesitás en la operación diaria.</p></div><span class="pill">v7.2.9</span></div><div class="settings-grid"><button id="settingsKyte" class="settings-card"><span>IMPORTACIONES</span><b>Importar Kyte</b><small>Migraciones, auditoría y consolidación de archivos históricos.</small><i>›</i></button><button id="settingsPush" class="settings-card" ${pushSupported?'':'disabled'}><span>NOTIFICACIONES</span><b>${esc(pushTitle)}</b><small>Control financiero cada 3 días cerca de las 14:00 · recordatorio de ventas de lunes a viernes cerca de las 17:30.</small><i>${pushPermission==='granted'?'✓':'›'}</i></button><article class="settings-card static"><span>SISTEMA</span><b>IMPORTB2B Central</b><small>Supabase · Inventario · POS · Finanzas · Club · Catálogo</small></article></div>`;
     $('#settingsKyte')?.addEventListener('click',()=>setView('imports'));
     $('#settingsPush')?.addEventListener('click',async()=>{
       const b=$('#settingsPush');b.disabled=true;
