@@ -907,3 +907,19 @@ html,body{width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
   .purchase-new-variant-inline{grid-template-columns:1fr}
   .purchase-new-variant-inline .btn{width:100%}
 }
+
+
+/* ==================== 7.2.8 · FINANCE RECOUNT + PUSH ==================== */
+.finance-summary-actions{justify-content:flex-end}
+.finance-recount-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.finance-recount-grid section{padding:13px;border:1px solid #252c33;border-radius:13px;background:#0b0f13;display:grid;gap:10px}
+.finance-recount-grid section>div{display:grid;gap:3px}
+.finance-recount-grid section>div small{color:#89939d}
+.finance-recount-grid label{margin:0}
+.finance-recount-grid input{font-weight:700}
+.finance-recount-example{margin-top:12px}
+.settings-card:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:780px){
+  .finance-summary-actions .btn{width:100%}
+  .finance-recount-grid{grid-template-columns:1fr}
+}
