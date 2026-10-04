@@ -961,3 +961,23 @@ html,body{width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
   text-transform:uppercase;
   font-weight:850;
 }
+
+
+/* ==================== 7.2.12 · MOBILE SCROLL STABILITY ==================== */
+html,body{
+  overscroll-behavior-x:none!important;
+  overscroll-behavior-y:none!important;
+  -webkit-overflow-scrolling:touch;
+}
+body{touch-action:pan-y pinch-zoom}
+.app,.app main,#content{
+  overscroll-behavior-y:none;
+}
+.modal-card,.sidebar,.cart-drawer,.table-wrap{
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+@media(max-width:760px){
+  /* Avoid costly backdrop compositing during long touch scrolls. */
+  .mobile-menu-backdrop,.cart-backdrop{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+}
