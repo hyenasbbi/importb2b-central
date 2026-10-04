@@ -936,3 +936,28 @@ html,body{width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
   .pos-product-pagination{margin-top:10px}
   .product-editor-actions{flex-wrap:wrap;justify-content:flex-end}
 }
+
+
+/* ==================== 7.2.11 · JERSEY SLEEVE TYPE ==================== */
+.sleeve-toggle{
+  margin-top:6px;
+  min-width:104px;
+  border-radius:999px!important;
+  font-size:10px!important;
+  font-weight:950!important;
+  letter-spacing:.04em;
+}
+.sleeve-toggle.short{
+  color:#dce6ef!important;
+  background:#151a1f!important;
+  border-color:#303942!important;
+}
+.sleeve-toggle.long{
+  color:#fff!important;
+  background:rgba(255,49,56,.15)!important;
+  border-color:#ff4b51!important;
+}
+#npSleeveWrap select,#epSleeveWrap select{
+  text-transform:uppercase;
+  font-weight:850;
+}
