@@ -1058,3 +1058,29 @@ body.catalog-product-open .catalog-header-search{
     font-size:11px;
   }
 }
+
+
+/* ==================== 7.8.4 · MOBILE SCROLL STABILITY ==================== */
+html,body{
+  overscroll-behavior-x:none!important;
+  overscroll-behavior-y:none!important;
+  -webkit-overflow-scrolling:touch;
+}
+body{
+  touch-action:pan-y pinch-zoom;
+}
+.store-main,.catalog-product-view,.catalog-inline-product{
+  overscroll-behavior-y:none;
+}
+.store-card{
+  content-visibility:auto;
+  contain-intrinsic-size:280px 390px;
+}
+@media(max-width:780px){
+  /* Keep the long product grid cheap to paint while preserving the current visual design. */
+  .store-card{contain:layout paint style}
+  .catalog-category-drawer,.store-drawer,.store-modal-card{
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+}
