@@ -42,6 +42,30 @@
   let customerFilter='all';
   let customerSort={key:'',dir:0};
 
+  // Mobile scroll guard: prevents browser pull-to-refresh while keeping Central fully scrollable.
+  function installPullRefreshGuard(){
+    let startY=0,startX=0,tracking=false;
+    const ownScroller=target=>{
+      const el=target?.closest?.('.modal-card,.sidebar,.cart-drawer,.table-wrap,.merge-results,.category-manager-list');
+      return !!(el&&el.scrollHeight>el.clientHeight+1);
+    };
+    document.addEventListener('touchstart',e=>{
+      if(e.touches.length!==1){tracking=false;return}
+      const t=e.touches[0];startY=t.clientY;startX=t.clientX;tracking=true;
+    },{passive:true});
+    document.addEventListener('touchmove',e=>{
+      if(!tracking||e.touches.length!==1||e.defaultPrevented)return;
+      const t=e.touches[0],dy=t.clientY-startY,dx=t.clientX-startX;
+      if(Math.abs(dx)>Math.abs(dy)||dy<=0)return;
+      if(ownScroller(e.target))return;
+      const y=window.scrollY||document.documentElement.scrollTop||0;
+      if(y<=0)e.preventDefault();
+    },{passive:false});
+    document.addEventListener('touchend',()=>{tracking=false},{passive:true});
+    document.addEventListener('touchcancel',()=>{tracking=false},{passive:true});
+  }
+  installPullRefreshGuard();
+
   const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n||0));
   const number=n=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(Number(n||0));
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
