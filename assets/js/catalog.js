@@ -4,6 +4,31 @@
   const cfg=window.IMPORTB2B_CONFIG||{};
   const publicDb=window.supabase?.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
   const slug=new URLSearchParams(location.search).get('slug')||'importb2b';
+
+  // Mobile scroll guard: prevents Safari/Chrome pull-to-refresh without blocking normal page navigation.
+  function installPullRefreshGuard(){
+    let startY=0,startX=0,tracking=false;
+    const isOwnScroller=target=>{
+      const el=target?.closest?.('.store-drawer,.catalog-category-drawer,.store-modal-card,.product-gallery-thumbs');
+      return !!(el&&el.scrollHeight>el.clientHeight+1);
+    };
+    document.addEventListener('touchstart',e=>{
+      if(e.touches.length!==1){tracking=false;return}
+      const t=e.touches[0];startY=t.clientY;startX=t.clientX;tracking=true;
+    },{passive:true});
+    document.addEventListener('touchmove',e=>{
+      if(!tracking||e.touches.length!==1||e.defaultPrevented)return;
+      const t=e.touches[0],dy=t.clientY-startY,dx=t.clientX-startX;
+      if(Math.abs(dx)>Math.abs(dy))return;
+      if(dy<=0)return;
+      if(isOwnScroller(e.target))return;
+      const y=window.scrollY||document.documentElement.scrollTop||0;
+      if(y<=0)e.preventDefault();
+    },{passive:false});
+    document.addEventListener('touchend',()=>{tracking=false},{passive:true});
+    document.addEventListener('touchcancel',()=>{tracking=false},{passive:true});
+  }
+  installPullRefreshGuard();
   function openCategoryDrawer(open=true){
     const drawer=$('#catalogCategoryDrawer'),backdrop=$('#catalogBackdrop'),trigger=$('#catalogCategoryMenuButton');
     if(!drawer)return;
