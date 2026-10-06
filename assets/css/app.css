@@ -981,3 +981,23 @@ body{touch-action:pan-y pinch-zoom}
   /* Avoid costly backdrop compositing during long touch scrolls. */
   .mobile-menu-backdrop,.cart-backdrop{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 }
+
+
+/* ==================== 7.2.13 · FINANCE CUSTOMER LINK ==================== */
+.finance-customer-selected{
+  margin-top:8px;
+  padding:10px 12px;
+  border:1px solid #294235;
+  border-radius:12px;
+  background:rgba(44,145,88,.08);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.finance-customer-selected span{display:grid;gap:3px;min-width:0}
+.finance-customer-selected b,.finance-customer-selected small{overflow:hidden;text-overflow:ellipsis}
+.finance-customer-selected small{color:#8f99a3}
+@media(max-width:780px){
+  .finance-customer-selected{align-items:flex-start}
+}
