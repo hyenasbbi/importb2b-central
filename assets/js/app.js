@@ -1358,9 +1358,88 @@ El stock y el historial se conservan.`))return;
     $('#saveNewSettlement').addEventListener('click',async()=>{try{await DB.createManualSettlement({provider:$('#nsProvider').value,gross_amount:Number($('#nsGross').value||0),fees_amount:Number($('#nsFees').value||0),expected_at:$('#nsDate').value||null,description:$('#nsDescription').value.trim()||null});closeModal();financeTab='settlements';await renderFinance()}catch(e){alert(e.message)}});
   }
   function openEditSettlement(x){if(!x)return;openModal(`<div class="section-title"><div><span class="eyebrow">A LIQUIDAR</span><h3>Editar liquidación</h3></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Bruto<input id="esGross" type="number" min="1" value="${Number(x.gross_amount||0)}"></label><label>Comisiones<input id="esFees" type="number" min="0" value="${Number(x.fees_amount||0)}"></label><label>Acreditación<input id="esDate" type="date" value="${esc(x.expected_at||'')}"></label></div><label style="margin-top:12px">Concepto<input id="esDescription" value="${esc(x.description||'')}"></label><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveEditSettlement" class="btn primary">Guardar</button></div>`);$('#saveEditSettlement').addEventListener('click',async()=>{try{await DB.updateManualSettlement(x.id,{gross_amount:Number($('#esGross').value||0),fees_amount:Number($('#esFees').value||0),expected_at:$('#esDate').value||null,description:$('#esDescription').value.trim()||null});closeModal();await renderFinance()}catch(e){alert(e.message)}})}
-  function openNewReceivable(){
-    openModal(`<div class="section-title"><div><span class="eyebrow">A COBRAR</span><h3>Nuevo deudor</h3></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Cliente<input id="nrName"></label><label>Teléfono<input id="nrPhone"></label><label>Total<input id="nrTotal" type="number" min="1"></label><label>Vencimiento<input id="nrDue" type="date"></label></div><label style="margin-top:12px">Descripción<input id="nrDescription"></label><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveNewReceivable" class="btn primary">Guardar deuda</button></div>`);$('#saveNewReceivable').addEventListener('click',async()=>{try{await DB.createManualReceivable({client_name:$('#nrName').value.trim(),client_phone:$('#nrPhone').value.trim()||null,total_amount:Number($('#nrTotal').value||0),due_at:$('#nrDue').value||null,description:$('#nrDescription').value.trim()||null});closeModal();financeTab='receivables';await renderFinance()}catch(e){alert(e.message)}})
+  async function openNewReceivable(){
+    let customers=[];
+    try{customers=await DB.customers('')}catch(e){console.error(e)}
+    let selectedCustomer=null;
+    openModal(`<div class="section-title"><div><span class="eyebrow">A COBRAR</span><h3>Nuevo deudor</h3><p class="muted">Buscá primero en tu base de Clientes. Así la deuda queda vinculada a la ficha correcta.</p></div><button class="modal-close modal-x">×</button></div>
+      <div class="form-grid">
+        <div class="smart-customer-row wide">
+          <label>Cliente<input id="nrCustomerSearch" autocomplete="off" placeholder="Escribí nombre, teléfono, email o código…"></label>
+          <input id="nrCustomerId" type="hidden">
+          <div id="nrCustomerResults" class="customer-search-results"></div>
+          <div id="nrCustomerSelected" class="finance-customer-selected hidden"></div>
+        </div>
+        <label>Teléfono<input id="nrPhone" placeholder="Se completa al elegir cliente"></label>
+        <label>Total<input id="nrTotal" type="number" min="1"></label>
+        <label>Vencimiento<input id="nrDue" type="date"></label>
+      </div>
+      <label style="margin-top:12px">Descripción<input id="nrDescription"></label>
+      <div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveNewReceivable" class="btn primary">Guardar deuda</button></div>`);
+
+    const input=$('#nrCustomerSearch'),results=$('#nrCustomerResults'),selectedBox=$('#nrCustomerSelected');
+    const normalized=v=>String(v||'').trim().toLowerCase();
+    const clearSelected=()=>{
+      selectedCustomer=null;
+      $('#nrCustomerId').value='';
+      selectedBox.classList.add('hidden');
+      selectedBox.innerHTML='';
+    };
+    const selectCustomer=c=>{
+      selectedCustomer=c;
+      $('#nrCustomerId').value=c.id;
+      input.value=c.full_name||'';
+      $('#nrPhone').value=c.phone||'';
+      results.classList.remove('open');
+      selectedBox.classList.remove('hidden');
+      selectedBox.innerHTML=`<span><b>${esc(c.full_name||'Cliente')}</b><small>${esc(c.phone||c.email||c.customer_code||'Ficha de cliente vinculada')}</small></span><button id="nrChangeCustomer" type="button" class="btn tiny ghost">Cambiar</button>`;
+      $('#nrChangeCustomer')?.addEventListener('click',()=>{clearSelected();input.focus();renderMatches()});
+    };
+    const renderMatches=()=>{
+      if(selectedCustomer)return;
+      const term=normalized(input.value);
+      if(!term){results.classList.remove('open');results.innerHTML='';return}
+      const matches=customers.filter(c=>[c.full_name,c.phone,c.email,c.customer_code,c.instagram_username].join(' ').toLowerCase().includes(term)).slice(0,10);
+      results.innerHTML=matches.map(c=>`<button type="button" class="smart-search-row nr-customer-option" data-id="${c.id}"><span><b>${esc(c.full_name||'Sin nombre')}</b><small>${esc([c.phone,c.email,c.customer_code].filter(Boolean).join(' · ')||'Cliente registrado')}</small></span><strong>Elegir</strong></button>`).join('')+
+        `<button type="button" class="smart-search-row create-new" id="nrCreateCustomer"><span><b>＋ Crear cliente “${esc(input.value.trim())}”</b><small>Se crea una ficha incompleta y queda vinculada a esta deuda</small></span><strong>Nuevo</strong></button>`;
+      results.classList.add('open');
+      results.querySelectorAll('.nr-customer-option').forEach(b=>b.addEventListener('click',()=>{const c=customers.find(x=>String(x.id)===String(b.dataset.id));if(c)selectCustomer(c)}));
+      $('#nrCreateCustomer')?.addEventListener('click',async()=>{
+        const name=input.value.trim();if(!name)return;
+        const btn=$('#nrCreateCustomer');btn.disabled=true;btn.querySelector('strong').textContent='Creando…';
+        try{
+          const c=await DB.createQuickCustomer(name);
+          customers.push({...c,full_name:c.full_name||name});
+          selectCustomer({...c,full_name:c.full_name||name});
+        }catch(e){alert(e.message);btn.disabled=false;btn.querySelector('strong').textContent='Nuevo'}
+      });
+    };
+    input.addEventListener('input',()=>{if(selectedCustomer&&normalized(input.value)!==normalized(selectedCustomer.full_name))clearSelected();renderMatches()});
+    input.addEventListener('focus',renderMatches);
+
+    $('#saveNewReceivable').addEventListener('click',async()=>{
+      const name=input.value.trim();
+      if(!selectedCustomer){
+        const exact=customers.find(c=>normalized(c.full_name)===normalized(name));
+        if(exact)selectCustomer(exact);
+      }
+      if(!selectedCustomer)return alert('Elegí un cliente de tu base o crealo desde la búsqueda.');
+      const total=Number($('#nrTotal').value||0);if(total<=0)return alert('Ingresá el total de la deuda.');
+      const btn=$('#saveNewReceivable');btn.disabled=true;btn.textContent='Guardando…';
+      try{
+        await DB.createManualReceivable({
+          customer_id:selectedCustomer.id,
+          client_name:selectedCustomer.full_name||name,
+          client_phone:$('#nrPhone').value.trim()||selectedCustomer.phone||null,
+          total_amount:total,
+          due_at:$('#nrDue').value||null,
+          description:$('#nrDescription').value.trim()||null
+        });
+        closeModal();financeTab='receivables';await renderFinance();
+      }catch(e){alert(e.message);btn.disabled=false;btn.textContent='Guardar deuda'}
+    });
   }
+
   function openEditReceivable(x){if(!x)return;openModal(`<div class="section-title"><div><span class="eyebrow">A COBRAR</span><h3>Editar deudor</h3></div><button class="modal-close modal-x">×</button></div><div class="form-grid"><label>Cliente<input id="erName" value="${esc(x.client_name||'')}"></label><label>Teléfono<input id="erPhone" value="${esc(x.client_phone||'')}"></label><label>Total<input id="erTotal" type="number" min="1" value="${Number(x.total_amount||0)}"></label><label>Vencimiento<input id="erDue" type="date" value="${esc(x.due_at||'')}"></label></div><label style="margin-top:12px">Descripción<input id="erDescription" value="${esc(x.description||'')}"></label><div class="modal-actions"><button class="btn ghost modal-close">Cancelar</button><button id="saveEditReceivable" class="btn primary">Guardar</button></div>`);$('#saveEditReceivable').addEventListener('click',async()=>{try{await DB.updateManualReceivable(x.id,{client_name:$('#erName').value.trim(),client_phone:$('#erPhone').value.trim()||null,total_amount:Number($('#erTotal').value||0),due_at:$('#erDue').value||null,description:$('#erDescription').value.trim()||null});closeModal();await renderFinance()}catch(e){alert(e.message)}})}
 
   function localDateTimeValue(v){if(!v)return'';const d=new Date(v),z=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`}
