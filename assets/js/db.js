@@ -546,7 +546,7 @@
     async updateManualSettlement(id,payload){ const r=await db.from('settlements').update(payload).eq('id',id).is('source_type',null).eq('status','pending').select().single();assert(r);return r.data; },
     async createManualReceivable(payload){
       const u=await authUser();const total=Number(payload.total_amount||0);if(total<=0)throw new Error('El total debe ser mayor a 0');
-      const r=await db.from('receivables').insert({client_name:payload.client_name,client_phone:payload.client_phone||null,description:payload.description||null,total_amount:total,paid_amount:0,due_at:payload.due_at||null,status:'pending',created_by:u.id}).select().single();assert(r);return r.data;
+      const r=await db.from('receivables').insert({customer_id:payload.customer_id||null,client_name:payload.client_name,client_phone:payload.client_phone||null,description:payload.description||null,total_amount:total,paid_amount:0,due_at:payload.due_at||null,status:'pending',created_by:u.id}).select().single();assert(r);return r.data;
     },
     async updateManualReceivable(id,payload){ const r=await db.from('receivables').update(payload).eq('id',id).is('source_type',null).select().single();assert(r);return r.data; },
     async updateFinanceMovement(id,payload){
