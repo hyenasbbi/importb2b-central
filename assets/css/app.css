@@ -829,7 +829,7 @@ html,body{width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
 }
 .bulk-variant-defaults{
   display:grid;
-  grid-template-columns:repeat(3,minmax(110px,1fr)) auto;
+  grid-template-columns:repeat(4,minmax(105px,1fr)) auto;
   gap:10px;
   align-items:end;
 }
@@ -1000,4 +1000,19 @@ body{touch-action:pan-y pinch-zoom}
 .finance-customer-selected small{color:#8f99a3}
 @media(max-width:780px){
   .finance-customer-selected{align-items:flex-start}
+}
+
+
+/* ==================== 7.2.14 · SALE PRICE ==================== */
+.v-sale-price{
+  min-width:100px!important;
+  border-color:#5d2529!important;
+  background:rgba(255,49,56,.045)!important;
+}
+.v-sale-price:not(:placeholder-shown){
+  color:#ff787d!important;
+  font-weight:900;
+}
+@media(max-width:780px){
+  .bulk-variant-defaults{grid-template-columns:1fr 1fr}
 }
