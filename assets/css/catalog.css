@@ -1084,3 +1084,66 @@ body{
     -webkit-overflow-scrolling:touch;
   }
 }
+
+
+/* ==================== 7.8.5 · SALE PRICING ==================== */
+.catalog-badge.sale{
+  background:#ff3138!important;
+  box-shadow:0 6px 18px rgba(255,49,56,.28);
+}
+.catalog-card-price{
+  min-height:38px;
+  display:flex;
+  align-items:flex-end;
+}
+.catalog-price-stack{
+  display:grid;
+  gap:1px;
+}
+.catalog-old-price{
+  display:block;
+  color:#858f99;
+  font-size:12px;
+  font-weight:700;
+  line-height:1.1;
+  text-decoration:line-through;
+  text-decoration-thickness:1.4px;
+}
+.catalog-sale-price{
+  display:block;
+  color:#fff;
+  font-size:18px;
+  line-height:1.08;
+  font-weight:950;
+}
+.catalog-product-price .catalog-old-price{
+  font-size:15px;
+  margin-bottom:2px;
+}
+.catalog-product-price .catalog-sale-price{
+  color:#ff4b51;
+  font-size:31px;
+}
+.variant-sale-price{
+  display:grid!important;
+  justify-items:end;
+  gap:2px;
+}
+.variant-sale-price del{
+  color:#7f8994;
+  font-size:11px;
+  font-weight:650;
+}
+.variant-sale-price strong{
+  color:#ff5b60;
+  font-size:15px;
+  font-weight:950;
+}
+.cart-old-price{
+  color:#7f8994;
+  text-decoration:line-through;
+}
+@media(max-width:780px){
+  .catalog-sale-price{font-size:16px}
+  .catalog-product-price .catalog-sale-price{font-size:27px}
+}
