@@ -159,7 +159,7 @@
       let r=await db.from('importb2b_products').insert({owner_id:u.id,name:`${p.name} - copia`,sku:baseSku,category:p.category,sleeve_type:p.sleeve_type||((String(p.category||'').toLowerCase()==='camisetas')?'short':null),active:true,catalog_visible:false,new_arrival:false,featured:false,catalog_priority:100,primary_image_url:null}).select().single();assert(r);
       const copy=r.data;
       for(const v of p.variants){
-        const vr=await db.from('importb2b_product_variants').insert({owner_id:u.id,product_id:copy.id,variant_name:v.variant_name,sku:v.sku?`${v.sku}-COPY`:null,cost_ars:v.cost_ars,price_ars:v.price_ars,wholesale_price_ars:v.wholesale_price_ars,stock_min:v.stock_min,active:true,attributes:v.attributes||{}});assert(vr);
+        const vr=await db.from('importb2b_product_variants').insert({owner_id:u.id,product_id:copy.id,variant_name:v.variant_name,sku:v.sku?`${v.sku}-COPY`:null,cost_ars:v.cost_ars,price_ars:v.price_ars,sale_price_ars:v.sale_price_ars||null,wholesale_price_ars:v.wholesale_price_ars,stock_min:v.stock_min,active:true,attributes:v.attributes||{}});assert(vr);
       }
       return copy;
     },
@@ -170,7 +170,7 @@
       const pr=await req.limit(1200); assert(pr);
       const products=pr.data||[], ids=products.map(x=>x.id); if(!ids.length) return [];
       const [vr,sr,ir]=await Promise.all([
-        db.from('importb2b_product_variants').select('id,product_id,sku,variant_name,price_ars,wholesale_price_ars,cost_ars,stock_min,active,attributes').in('product_id',ids).eq('active',true).order('variant_name'),
+        db.from('importb2b_product_variants').select('id,product_id,sku,variant_name,price_ars,sale_price_ars,wholesale_price_ars,cost_ars,stock_min,active,attributes').in('product_id',ids).eq('active',true).order('variant_name'),
         db.from('importb2b_stock_summary').select('*').in('product_id',ids),
         db.from('importb2b_product_images').select('product_id,image_url,thumbnail_url,is_primary,sort_order').in('product_id',ids).order('is_primary',{ascending:false}).order('sort_order')
       ]); assert(vr); assert(sr); assert(ir);
