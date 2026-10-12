@@ -141,7 +141,9 @@
   function renderProducts(){
     if(!data)return;
     const homeMode=!catalogBrowseOpen;
-    const rank=(a,b)=>Number(a.catalog_priority??100)-Number(b.catalog_priority??100)||new Date(b.created_at||0)-new Date(a.created_at||0)||String(a.name||'').localeCompare(String(b.name||''),'es');
+    const rank=(a,b)=>Number(a.catalog_priority??100)-Number(b.catalog_priority??100)||String(a.name||'').localeCompare(String(b.name||''),'es');
+    const categoryOrder=new Map((data.categories||[]).filter(x=>x.active).map((x,i)=>[x.name,Number(x.sort_order??i)]));
+    const storeRank=(a,b)=>(categoryOrder.get(a.category)??9999)-(categoryOrder.get(b.category)??9999)||rank(a,b);
     const newItems=data.products.filter(p=>p.new_arrival).sort(rank);
     const featuredItems=data.products.filter(p=>p.featured).sort(rank);
 
@@ -173,7 +175,7 @@
     }
     if(catalogBrowseOpen){
       browse?.classList.remove('hidden');
-      let products=filteredProducts();
+      let products=filteredProducts().sort(storeRank);
       if(catalogMode==='new')products=products.filter(p=>p.new_arrival).sort(rank);
       else if(catalogMode==='featured')products=products.filter(p=>p.featured).sort(rank);
       else if(catalogMode==='discount')products=products.filter(p=>p.variants?.some(saleActive));
