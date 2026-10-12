@@ -10,6 +10,8 @@ export async function handler(event){
     if(ce||!cfg) return ok({error:'Catálogo no disponible'},404);
     const {data:products,error:pe}=await admin.from('importb2b_products').select('id,name,category,description,primary_image_url').eq('owner_id',cfg.owner_id).eq('active',true).eq('catalog_visible',true).order('name');
     if(pe) throw pe;
+    const {data:categories,error:catError}=await admin.from('importb2b_categories').select('name,sort_order,active').eq('owner_id',cfg.owner_id).order('sort_order',{ascending:true});
+    if(catError)throw catError;
     const ids=(products||[]).map(p=>p.id);
     let variants=[],stock=[],images=[];
     if(ids.length){
@@ -26,6 +28,6 @@ export async function handler(event){
     const vm=new Map();for(const v of variants){const av=Math.max(0,sm.get(v.id)||0);if(!cfg.show_out_of_stock&&av<=0)continue;const a=vm.get(v.product_id)||[];a.push({id:v.id,name:v.variant_name,sku:v.sku,price_ars:Number(v.price_ars||0),in_stock:av>0,available:cfg.show_exact_stock?av:(av>0?1:0),attributes:v.attributes||{}});vm.set(v.product_id,a)}
     const safe=(products||[]).map(p=>({id:p.id,name:p.name,category:p.category,description:p.description,image_url:p.primary_image_url||im.get(p.id)||null,thumbnail_url:tm.get(p.id)||p.primary_image_url||im.get(p.id)||null,variants:vm.get(p.id)||[]})).filter(p=>p.variants.length);
     const {data:methods,error:me}=await admin.from('importb2b_payment_methods').select('id,code,name,adjustment_kind,adjustment_direction,adjustment_value,sort_order').eq('owner_id',cfg.owner_id).eq('active',true).order('sort_order');if(me)throw me;
-    return ok({settings:{slug:cfg.public_slug,title:cfg.catalog_title,subtitle:cfg.catalog_subtitle,whatsapp_number:cfg.whatsapp_number,show_exact_stock:cfg.show_exact_stock,show_out_of_stock:cfg.show_out_of_stock,allow_pickup:cfg.allow_pickup,allow_shipping:cfg.allow_shipping,pickup_label:cfg.pickup_label,shipping_label:cfg.shipping_label,shipping_note:cfg.shipping_note,shipping_fee_ars:Number(cfg.shipping_fee_ars||0),min_order_ars:Number(cfg.min_order_ars||0)},payment_methods:(methods||[]).filter(m=>m.code!=='pay_later'||cfg.allow_pay_later_public),products:safe});
+    return ok({settings:{slug:cfg.public_slug,title:cfg.catalog_title,subtitle:cfg.catalog_subtitle,whatsapp_number:cfg.whatsapp_number,show_exact_stock:cfg.show_exact_stock,show_out_of_stock:cfg.show_out_of_stock,allow_pickup:cfg.allow_pickup,allow_shipping:cfg.allow_shipping,pickup_label:cfg.pickup_label,shipping_label:cfg.shipping_label,shipping_note:cfg.shipping_note,shipping_fee_ars:Number(cfg.shipping_fee_ars||0),min_order_ars:Number(cfg.min_order_ars||0)},categories:(categories||[]).map(c=>({name:c.name,sort_order:c.sort_order,active:c.active})),payment_methods:(methods||[]).filter(m=>m.code!=='pay_later'||cfg.allow_pay_later_public),products:safe});
   }catch(e){return ok({error:e?.message||'Error cargando catálogo'},500)}
 }
