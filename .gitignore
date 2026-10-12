@@ -1,0 +1,4 @@
+node_modules/
+supabase/.temp/
+live-*.json
+live-*.html

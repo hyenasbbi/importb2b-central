@@ -59,11 +59,11 @@
     let j=null, directError=null;
     if(publicDb){
       const r=await publicDb.rpc('importb2b_public_catalog_safe',{p_slug:slug});
-      if(!r.error && r.data && !r.data.error) j=r.data;
+      if(!r.error && r.data && !r.data.error && Array.isArray(r.data.categories)) j=r.data;
       else directError=r.error?.message||r.data?.error||null;
     }
     if(!j){
-      const r=await fetch(`/api/catalog?slug=${encodeURIComponent(slug)}`);
+      const r=await fetch(`/api/catalog?slug=${encodeURIComponent(slug)}`,{cache:'no-store'});
       const fallback=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(fallback.error||directError||'No se pudo cargar el catálogo');
       j=fallback;

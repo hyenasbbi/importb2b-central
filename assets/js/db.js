@@ -117,8 +117,10 @@
       };
     },
 
-    async categoryRecords(){
-      const r=await db.from('importb2b_categories').select('*').eq('active',true).order('sort_order').order('name');
+    async categoryRecords(includeHidden=false){
+      let query=db.from('importb2b_categories').select('*').order('sort_order').order('name');
+      if(!includeHidden)query=query.eq('active',true);
+      const r=await query;
       assert(r); return r.data||[];
     },
     async categories(){
@@ -142,7 +144,10 @@
       r=await db.from('importb2b_categories').update({sort_order:sa}).eq('id',b.id);assert(r);
     },
     async setCategoryOrder(ids){
-      for(let i=0;i<ids.length;i++){const r=await db.from('importb2b_categories').update({sort_order:i+1}).eq('id',ids[i]);assert(r);}
+      const r=await db.rpc('importb2b_set_category_order',{p_ids:ids});assert(r);
+    },
+    async setCategoryVisibility(id,active){
+      const r=await db.from('importb2b_categories').update({active}).eq('id',id).select('id,active').single();assert(r);return r.data;
     },
     async deleteCategory(id,name){
       const p=await db.from('importb2b_products').select('id',{count:'exact',head:true}).eq('active',true).eq('category',name);assert(p);
