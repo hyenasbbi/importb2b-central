@@ -215,6 +215,7 @@
       const sm=new Map((s.data||[]).map(x=>[x.variant_id,x]));
       return {...p.data,images:img.data||[],variants:(v.data||[]).map(x=>({...x,stock:sm.get(x.id)||{on_hand:0,reserved:0,in_transit:0,available:0}}))};
     },
+    async setProductOrder(category,ids){const r=await db.rpc('importb2b_set_product_order',{p_category:category,p_ids:ids});assert(r);},
     async saveProduct(id,payload){ const r=await db.from('importb2b_products').update(payload).eq('id',id); assert(r); },
     async saveVariant(id,payload){ const r=await db.from('importb2b_product_variants').update(payload).eq('id',id); assert(r); },
     async createVariant(productId,payload,initialStock=0,note='Alta manual de variante'){
