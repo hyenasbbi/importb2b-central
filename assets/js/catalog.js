@@ -73,7 +73,12 @@
     $('#storeSubtitle').textContent=j.settings.subtitle||'Catálogo online';
     document.title=`${j.settings.title||'IMPORTB2B'} · Catálogo`;
     data.products=(j.products||[]).filter(p=>p.variants?.some(v=>v.in_stock&&Number(v.available||1)>0));
-    const cats=[...new Set(data.products.map(p=>p.category).filter(Boolean))].sort();
+    const configured=Array.isArray(j.categories)?j.categories:null;
+    const available=new Set(data.products.map(p=>p.category).filter(Boolean));
+    const cats=configured
+      ?configured.filter(c=>c.active&&available.has(c.name)).sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)).map(c=>c.name)
+      :[...available].sort();
+    if(configured){const visible=new Set(cats);data.products=data.products.filter(p=>visible.has(p.category));}
     $('#catalogCategory').innerHTML='<option value="">Todas las categorías</option>'+cats.map(x=>`<option>${esc(x)}</option>`).join('');
     const categoryMarkup=`<button data-home="true" class="active">Inicio</button>${cats.map(x=>`<button data-cat="${esc(x)}">${esc(x)}</button>`).join('')}`;
     $('#catalogCategoryChips').innerHTML=categoryMarkup;
