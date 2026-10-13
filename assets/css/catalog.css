@@ -1147,3 +1147,10 @@ body{
   .catalog-sale-price{font-size:16px}
   .catalog-product-price .catalog-sale-price{font-size:27px}
 }
+
+/* Category direct-link sharing */
+.catalog-share-category-row{display:flex;align-items:center;min-width:0;border-bottom:1px solid #171c21}
+.catalog-category-drawer-list .catalog-share-category-row [data-cat]{flex:1;min-width:0;border-bottom:0}
+.catalog-category-drawer-list .catalog-share-category-row .catalog-share-category-btn{flex:0 0 44px;width:44px;min-height:44px;justify-content:center;border:1px solid #313942;border-radius:12px;margin-right:8px;color:#fff;font-size:22px;background:#161c22}
+.catalog-category-drawer-list .catalog-share-category-row .catalog-share-category-btn::after{content:none}
+.catalog-share-active-btn{display:inline-flex;vertical-align:middle;align-items:center;margin:4px 0 4px 12px;padding:8px 12px;border:1px solid #ff3138;border-radius:999px;background:#211115;color:#fff;font-size:12px;font-weight:700;cursor:pointer}
