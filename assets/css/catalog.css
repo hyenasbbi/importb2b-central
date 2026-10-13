@@ -1154,3 +1154,15 @@ body{
 .catalog-category-drawer-list .catalog-share-category-row .catalog-share-category-btn{flex:0 0 44px;width:44px;min-height:44px;justify-content:center;border:1px solid #313942;border-radius:12px;margin-right:8px;color:#fff;font-size:22px;background:#161c22}
 .catalog-category-drawer-list .catalog-share-category-row .catalog-share-category-btn::after{content:none}
 .catalog-share-active-btn{display:inline-flex;vertical-align:middle;align-items:center;margin:4px 0 4px 12px;padding:8px 12px;border:1px solid #ff3138;border-radius:999px;background:#211115;color:#fff;font-size:12px;font-weight:700;cursor:pointer}
+
+
+/* Mobile footer: slightly right-weighted, aligned within safe viewport margins. */
+@media(max-width:780px){
+  .catalog-footer{box-sizing:border-box;width:100%;max-width:100%;padding-left:clamp(18px,6vw,28px)!important;padding-right:clamp(12px,4vw,20px)!important}
+  .catalog-footer-brand{width:100%!important;justify-items:end!important;text-align:right!important}
+  .catalog-footer-brand img{margin:0!important}
+  .catalog-footer-brand div{justify-items:end!important;text-align:right!important}
+  .catalog-footer-brand b,.catalog-footer-brand small{text-align:right!important}
+  .catalog-footer-social{width:min(100%,500px)!important;margin-left:auto!important;margin-right:0!important;justify-content:end!important}
+  .catalog-footer-social a{min-width:0;box-sizing:border-box}
+}
