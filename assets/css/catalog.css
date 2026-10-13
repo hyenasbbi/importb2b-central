@@ -1156,13 +1156,69 @@ body{
 .catalog-share-active-btn{display:inline-flex;vertical-align:middle;align-items:center;margin:4px 0 4px 12px;padding:8px 12px;border:1px solid #ff3138;border-radius:999px;background:#211115;color:#fff;font-size:12px;font-weight:700;cursor:pointer}
 
 
-/* Mobile footer: slightly right-weighted, aligned within safe viewport margins. */
+
+/* 7.8.7 — Consistent centered catalog footer, independent of floating support. */
+.catalog-footer{
+  width:min(100%,560px)!important;
+  max-width:560px!important;
+  box-sizing:border-box!important;
+  margin:28px auto 0!important;
+  padding:26px clamp(12px,3vw,20px) calc(24px + env(safe-area-inset-bottom))!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  gap:24px!important;
+  background-color:#0b0f12;
+}
+.catalog-footer-brand{
+  width:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:10px!important;
+  text-align:center!important;
+}
+.catalog-footer-brand img{display:block!important;margin:0 auto!important}
+.catalog-footer-brand div{
+  width:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  gap:4px!important;
+  text-align:center!important;
+}
+.catalog-footer-brand b,.catalog-footer-brand small{
+  width:auto!important;
+  text-align:center!important;
+}
+.catalog-footer-social{
+  width:100%!important;
+  max-width:500px!important;
+  margin:0 auto!important;
+  display:flex!important;
+  flex-wrap:wrap!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:12px!important;
+}
+.catalog-footer-social .catalog-social-link{
+  flex:1 1 165px!important;
+  width:auto!important;
+  max-width:240px!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+  justify-content:center!important;
+}
+.catalog-floating-support{position:fixed!important;right:max(18px,env(safe-area-inset-right))!important;bottom:calc(24px + env(safe-area-inset-bottom))!important;z-index:70!important}
 @media(max-width:780px){
-  .catalog-footer{box-sizing:border-box;width:100%;max-width:100%;padding-left:clamp(18px,6vw,28px)!important;padding-right:clamp(12px,4vw,20px)!important}
-  .catalog-footer-brand{width:100%!important;justify-items:end!important;text-align:right!important}
-  .catalog-footer-brand img{margin:0!important}
-  .catalog-footer-brand div{justify-items:end!important;text-align:right!important}
-  .catalog-footer-brand b,.catalog-footer-brand small{text-align:right!important}
-  .catalog-footer-social{width:min(100%,500px)!important;margin-left:auto!important;margin-right:0!important;justify-content:end!important}
-  .catalog-footer-social a{min-width:0;box-sizing:border-box}
+  .catalog-footer{width:100%!important;max-width:560px!important;padding-inline:clamp(12px,4vw,20px)!important;gap:20px!important}
+  .catalog-footer-social{width:100%!important;max-width:440px!important;flex-wrap:nowrap!important;gap:10px!important}
+  .catalog-footer-social .catalog-social-link{flex:1 1 0!important;max-width:none!important;padding-inline:8px!important}
+}
+@media(max-width:350px){
+  .catalog-footer-social{flex-wrap:wrap!important}
+  .catalog-footer-social .catalog-social-link{flex:1 1 100%!important}
 }
