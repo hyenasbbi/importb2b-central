@@ -1267,7 +1267,7 @@ El stock y el historial se conservan.`))return;
   function openFinanceRecount(){
     const f=financeCache;if(!f)return;
     const cash=financeHolderBreakdown(f,'efectivo'),transfer=financeHolderBreakdown(f,'transferencia'),usdtB=financeHolderBreakdown(f,'usdt');
-    const field=(id,label,value,method)=>`<label>${label}<input id="${id}" type="number" step="${method==='usdt'?'0.01':'1'}" value="${Number(value||0)}"></label>`;
+    const field=(id,label,value,method)=>`<label>${label}<input id="${id}" type="number" step="${method==='usdt'?'0.01':'1'}" value="${method==='usdt'?Number(Number(value||0).toFixed(6)):Math.round(Number(value||0))}"></label>`;
     openModal(`<div class="section-title"><div><span class="eyebrow">RECUENTO RÁPIDO</span><h3>Actualizar saldos reales</h3><p class="muted">Escribí cuánto hay realmente. Central calcula la diferencia y crea el ingreso o egreso de ajuste automáticamente, sin alterar el resultado operativo.</p></div><button class="modal-close modal-x">×</button></div>
       <div class="finance-recount-grid">
         <section><div><span class="eyebrow">EFECTIVO</span><small>Saldo contado</small></div>${field('frCashNahuel','Nahuel',cash.nahuel,'cash')}${field('frCashEsteban','Esteban',cash.esteban,'cash')}</section>
