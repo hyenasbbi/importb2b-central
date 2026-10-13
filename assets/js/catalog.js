@@ -37,15 +37,18 @@
     trigger?.setAttribute('aria-expanded',String(open));
     backdrop?.classList.toggle('open',open);
   }
+  const categoryUrl=name=>{const u=new URL(location.href);u.searchParams.set('categoria',name);u.hash='';return u.toString()};
+  const syncCategoryUrl=name=>{const u=new URL(location.href);if(name)u.searchParams.set('categoria',name);else u.searchParams.delete('categoria');u.hash='';history.replaceState(history.state,'',u)};
+  async function shareCategory(name){const url=categoryUrl(name);if(navigator.share){try{await navigator.share({title:'IMPORTB2B · '+name,url});return}catch(e){if(e?.name==='AbortError')return}}try{await navigator.clipboard.writeText(url);alert('Enlace copiado')}catch{window.prompt('Copiá el enlace',url)}}
   function goHome(scroll=true){
-    cat='';q='';sleeve='short';catalogMode='home';catalogBrowseOpen=false;
+    cat='';q='';sleeve='short';catalogMode='home';catalogBrowseOpen=false;syncCategoryUrl('');
     if($('#catalogCategory'))$('#catalogCategory').value='';if($('#catalogSearch'))$('#catalogSearch').value='';
     document.querySelectorAll('[data-cat]').forEach(x=>x.classList.remove('active'));document.querySelectorAll('[data-home]').forEach(x=>x.classList.add('active'));
     openCategoryDrawer(false);renderProducts();if(scroll)window.scrollTo({top:0,behavior:'smooth'});
   }
   function chooseCategory(value=''){
     if(!value)return goHome();
-    cat=value;q='';sleeve=String(value||'').trim().toLowerCase()==='camisetas'?'short':'';catalogMode='category';catalogBrowseOpen=true;
+    cat=value;q='';syncCategoryUrl(value);sleeve=String(value||'').trim().toLowerCase()==='camisetas'?'short':'';catalogMode='category';catalogBrowseOpen=true;
     if($('#catalogCategory'))$('#catalogCategory').value=cat;if($('#catalogSearch'))$('#catalogSearch').value='';
     document.querySelectorAll('[data-home]').forEach(x=>x.classList.remove('active'));document.querySelectorAll('[data-cat]').forEach(x=>x.classList.toggle('active',(x.dataset.cat||'')===cat));
     openCategoryDrawer(false);renderProducts();document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth',block:'start'});
@@ -82,9 +85,11 @@
     $('#catalogCategory').innerHTML='<option value="">Todas las categorías</option>'+cats.map(x=>`<option>${esc(x)}</option>`).join('');
     const categoryMarkup=`<button data-home="true" class="active">Inicio</button>${cats.map(x=>`<button data-cat="${esc(x)}">${esc(x)}</button>`).join('')}`;
     $('#catalogCategoryChips').innerHTML=categoryMarkup;
-    $('#catalogCategoryDrawerList').innerHTML=categoryMarkup;
+    $('#catalogCategoryDrawerList').innerHTML='<button data-home="true" class="active">Inicio</button>'+cats.map(x=>'<div class="catalog-share-category-row"><button data-cat="'+esc(x)+'">'+esc(x)+'</button><button type="button" class="catalog-share-category-btn" data-share-cat="'+esc(x)+'" aria-label="Compartir '+esc(x)+'" title="Compartir enlace">↗</button></div>').join('');
     document.querySelectorAll('[data-home]').forEach(b=>b.addEventListener('click',()=>goHome()));
     document.querySelectorAll('[data-cat]').forEach(b=>b.addEventListener('click',()=>chooseCategory(b.dataset.cat||'')));
+    document.querySelectorAll('[data-share-cat]').forEach(b=>b.addEventListener('click',()=>shareCategory(b.dataset.shareCat)));
+    const requested=new URLSearchParams(location.search).get('categoria');if(requested&&cats.includes(requested))chooseCategory(requested);
     renderPromoCarousel();renderProducts();renderCart();bindCatalogActions();initHeaderNavigation();initFloatingSupport();
   }
   const contactWa='5493425575323',contactIg='https://www.instagram.com/import.b2b/';
@@ -180,6 +185,7 @@
       else if(catalogMode==='featured')products=products.filter(p=>p.featured).sort(rank);
       else if(catalogMode==='discount')products=products.filter(p=>p.variants?.some(saleActive));
       if(title)title.textContent=cat?cat:(catalogMode==='new'?'Nuevos ingresos':catalogMode==='featured'?'Destacados':catalogMode==='discount'?'Descuentos':q.trim()?('Resultados para “'+q.trim()+'”'):'Productos');
+      if(title&&cat){const share=document.createElement('button');share.type='button';share.className='catalog-share-active-btn';share.textContent='↗ Compartir categoría';share.addEventListener('click',()=>shareCategory(cat));title.append(' ',share)}
       grid.innerHTML=products.map(p=>card(p,catalogMode==='new'?'NUEVO':catalogMode==='discount'?'OFERTA':'')).join('')||'<div class="store-loading">No hay productos seleccionados para esta sección.</div>';
       bindProductCards(grid);
     }else{
