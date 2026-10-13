@@ -1016,3 +1016,33 @@ body{touch-action:pan-y pinch-zoom}
 @media(max-width:780px){
   .bulk-variant-defaults{grid-template-columns:1fr 1fr}
 }
+
+
+/* Mobile-first refinements: Central navigation, stock, tables and editors. */
+@media (max-width:780px){
+  html,body,.app,.app main,#content{max-width:100%;min-width:0}
+  .app main,#content{box-sizing:border-box}
+  .topbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px max(12px,env(safe-area-inset-right)) 12px max(12px,env(safe-area-inset-left))}
+  .topbar-title{flex:1 1 190px;min-width:0}
+  .topbar-title h2{overflow-wrap:anywhere}
+  .global-search{flex:1 1 100%;min-width:0;width:100%;max-width:none}
+  .global-search input{width:100%;min-width:0;box-sizing:border-box;font-size:16px}
+  #content{padding-left:12px;padding-right:12px;overflow-x:clip}
+  #content .card,#content .panel,#content .stock-toolbar,#content .stock-summary,#content .stock-command{max-width:100%;min-width:0}
+  #content .table-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+  #content .table-wrap table{width:max-content;min-width:100%}
+  #content .table-wrap th,#content .table-wrap td{white-space:nowrap}
+  #content .table-wrap td:first-child{white-space:normal;min-width:145px}
+  #content .stock-row-actions{display:flex;gap:5px;flex-wrap:nowrap}
+  #content .stock-pagination{flex-wrap:wrap;justify-content:center;gap:8px}
+  #content .stock-pages{max-width:100%;overflow-x:auto}
+  .modal-card{max-width:calc(100vw - 20px);max-height:calc(100dvh - 20px);overflow-y:auto;box-sizing:border-box}
+  .modal-card input,.modal-card select,.modal-card textarea{max-width:100%;min-width:0;box-sizing:border-box;font-size:16px}
+  .modal-card .grid,.modal-card .form-grid{min-width:0}
+  .stock-order-controls{display:inline-flex;gap:2px;margin-right:6px}
+}
+@media(max-width:420px){
+  .topbar{gap:8px}
+  #content{padding-left:10px;padding-right:10px}
+  .modal-card{max-width:calc(100vw - 12px)}
+}
