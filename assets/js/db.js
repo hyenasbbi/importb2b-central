@@ -46,7 +46,7 @@
     return {main,thumb,originalSize:Number(file.size||0),originalName:file.name||'producto'};
   }
 
-  window.DB={
+  // One company workspace; authentication remains individual for attribution.\n  const companyOwnerId=()=> '9503c97f-e84e-467c-b22e-14745e6f62d9';\n\n  window.DB={
     async user(){ try{return await authUser()}catch{return null} },
 
     async dashboard(){
@@ -134,7 +134,7 @@
     async createCategory(name){
       name=String(name||'').trim(); if(!name) throw new Error('Ingresá un nombre');
       const u=await authUser(), rows=await this.categoryRecords(), sort=rows.length?Math.max(...rows.map(x=>Number(x.sort_order||0)))+1:1;
-      const r=await db.from('importb2b_categories').insert({owner_id:u.id,name,active:true,sort_order:sort}).select().single(); assert(r); return r.data;
+      const r=await db.from('importb2b_categories').insert({owner_id:companyOwnerId(),name,active:true,sort_order:sort}).select().single(); assert(r); return r.data;
     },
     async moveCategory(id,direction){
       const rows=await this.categoryRecords(), i=rows.findIndex(x=>String(x.id)===String(id)), j=i+direction;
@@ -156,15 +156,15 @@
     },
     async createProduct(payload){
       const u=await authUser();
-      const r=await db.from('importb2b_products').insert({owner_id:u.id,active:true,catalog_visible:true,...payload}).select().single();assert(r);return r.data;
+      const r=await db.from('importb2b_products').insert({owner_id:companyOwnerId(),active:true,catalog_visible:true,...payload}).select().single();assert(r);return r.data;
     },
     async duplicateProduct(productId){
       const p=await this.productDetail(productId),u=await authUser();
       const baseSku=p.sku?`${p.sku}-COPY`:null;
-      let r=await db.from('importb2b_products').insert({owner_id:u.id,name:`${p.name} - copia`,sku:baseSku,category:p.category,sleeve_type:p.sleeve_type||((String(p.category||'').toLowerCase()==='camisetas')?'short':null),active:true,catalog_visible:false,new_arrival:false,featured:false,catalog_priority:100,primary_image_url:null}).select().single();assert(r);
+      let r=await db.from('importb2b_products').insert({owner_id:companyOwnerId(),name:`${p.name} - copia`,sku:baseSku,category:p.category,sleeve_type:p.sleeve_type||((String(p.category||'').toLowerCase()==='camisetas')?'short':null),active:true,catalog_visible:false,new_arrival:false,featured:false,catalog_priority:100,primary_image_url:null}).select().single();assert(r);
       const copy=r.data;
       for(const v of p.variants){
-        const vr=await db.from('importb2b_product_variants').insert({owner_id:u.id,product_id:copy.id,variant_name:v.variant_name,sku:v.sku?`${v.sku}-COPY`:null,cost_ars:v.cost_ars,price_ars:v.price_ars,sale_price_ars:v.sale_price_ars||null,wholesale_price_ars:v.wholesale_price_ars,stock_min:v.stock_min,active:true,attributes:v.attributes||{}});assert(vr);
+        const vr=await db.from('importb2b_product_variants').insert({owner_id:companyOwnerId(),product_id:copy.id,variant_name:v.variant_name,sku:v.sku?`${v.sku}-COPY`:null,cost_ars:v.cost_ars,price_ars:v.price_ars,sale_price_ars:v.sale_price_ars||null,wholesale_price_ars:v.wholesale_price_ars,stock_min:v.stock_min,active:true,attributes:v.attributes||{}});assert(vr);
       }
       return copy;
     },
@@ -220,17 +220,17 @@
     async saveVariant(id,payload){ const r=await db.from('importb2b_product_variants').update(payload).eq('id',id); assert(r); },
     async createVariant(productId,payload,initialStock=0,note='Alta manual de variante'){
       const u=await authUser();
-      const r=await db.from('importb2b_product_variants').insert({owner_id:u.id,product_id:productId,...payload}).select().single(); assert(r);
+      const r=await db.from('importb2b_product_variants').insert({owner_id:companyOwnerId(),product_id:productId,...payload}).select().single(); assert(r);
       const qty=Number(initialStock||0);
       if(qty>0){
-        const m=await db.from('importb2b_inventory_movements').insert({owner_id:u.id,product_id:productId,variant_id:r.data.id,bucket:'on_hand',movement_type:'adjustment',quantity_delta:qty,unit_cost_ars:payload.cost_ars||null,reference_type:'manual_variant_create',reference_id:r.data.id,note,created_by:u.id}); assert(m);
+        const m=await db.from('importb2b_inventory_movements').insert({owner_id:companyOwnerId(),product_id:productId,variant_id:r.data.id,bucket:'on_hand',movement_type:'adjustment',quantity_delta:qty,unit_cost_ars:payload.cost_ars||null,reference_type:'manual_variant_create',reference_id:r.data.id,note,created_by:u.id}); assert(m);
       }
       return r.data;
     },
     async adjustStock(productId,variantId,currentOnHand,newOnHand,note){
       const u=await authUser(); const delta=Number(newOnHand)-Number(currentOnHand);
       if(!Number.isFinite(delta)) throw new Error('Cantidad inválida'); if(delta===0) return {delta:0};
-      const r=await db.from('importb2b_inventory_movements').insert({owner_id:u.id,product_id:productId,variant_id:variantId,bucket:'on_hand',movement_type:'adjustment',quantity_delta:delta,reference_type:'manual_stock_adjustment',reference_id:variantId,note:note||'Ajuste manual de stock',created_by:u.id}); assert(r); return {delta};
+      const r=await db.from('importb2b_inventory_movements').insert({owner_id:companyOwnerId(),product_id:productId,variant_id:variantId,bucket:'on_hand',movement_type:'adjustment',quantity_delta:delta,reference_type:'manual_stock_adjustment',reference_id:variantId,note:note||'Ajuste manual de stock',created_by:u.id}); assert(r); return {delta};
     },
 
     async archiveProduct(productId,reason=''){
@@ -280,12 +280,12 @@
     },
     async createCustomer(payload){
       const u=await authUser();
-      const r=await db.from('importb2b_customers').insert({owner_id:u.id,active:true,source:'manual',...payload}).select().single(); assert(r); return r.data;
+      const r=await db.from('importb2b_customers').insert({owner_id:companyOwnerId(),active:true,source:'manual',...payload}).select().single(); assert(r); return r.data;
     },
     async createQuickCustomer(name){
       const u=await authUser(),fullName=String(name||'').trim();
       if(!fullName) throw new Error('Ingresá el nombre del cliente');
-      const r=await db.from('importb2b_customers').insert({owner_id:u.id,active:true,source:'quick_sale',full_name:fullName,source_payload:{incomplete_profile:true,created_from:'sale_customer_search'}}).select().single(); assert(r); return r.data;
+      const r=await db.from('importb2b_customers').insert({owner_id:companyOwnerId(),active:true,source:'quick_sale',full_name:fullName,source_payload:{incomplete_profile:true,created_from:'sale_customer_search'}}).select().single(); assert(r); return r.data;
     },
     async updateCustomer(id,payload){ const r=await db.from('importb2b_customers').update(payload).eq('id',id); assert(r); },
 
@@ -314,7 +314,7 @@
     },
     async deliverClubReward(claimId,notes=''){ const r=await db.rpc('importb2b_club_deliver_reward',{p_claim_id:claimId,p_notes:notes||null});assert(r);return r.data; },
     async importLegacyClub(payload){ const r=await db.rpc('importb2b_import_legacy_club',{p_payload:payload});assert(r);return r.data; },
-    async legacyClubMap(){ const u=await authUser();const r=await db.from('importb2b_club_legacy_customer_map').select('*').eq('owner_id',u.id).order('migrated_at',{ascending:false});assert(r);return r.data||[]; },
+    async legacyClubMap(){ const u=await authUser();const r=await db.from('importb2b_club_legacy_customer_map').select('*').eq('owner_id',companyOwnerId()).order('migrated_at',{ascending:false});assert(r);return r.data||[]; },
     async pdfCatalogProducts(){
       const products=await this.products('','','all');
       const ids=products.map(x=>x.id);if(!ids.length)return [];
@@ -329,11 +329,11 @@
     async clubOverview(q=''){
       const u=await authUser();
       const [ov,mr,cr,pr,rr]=await Promise.all([
-        db.from('importb2b_club_overview').select('*').eq('owner_id',u.id).maybeSingle(),
-        db.from('importb2b_club_memberships').select('*').eq('owner_id',u.id).eq('active',true).order('updated_at',{ascending:false}),
-        db.from('importb2b_customer_360').select('id,full_name,phone,instagram_username,completed_sales,total_spent_ars,pending_receivable_ars,club_points,pending_rewards,member_code,club_access_token').eq('owner_id',u.id).eq('active',true).order('full_name'),
-        db.from('importb2b_club_profiles').select('*').eq('owner_id',u.id).eq('active',true),
-        db.from('importb2b_club_reward_claims').select('*').eq('owner_id',u.id).eq('status','pending').order('unlocked_at',{ascending:false})
+        db.from('importb2b_club_overview').select('*').eq('owner_id',companyOwnerId()).maybeSingle(),
+        db.from('importb2b_club_memberships').select('*').eq('owner_id',companyOwnerId()).eq('active',true).order('updated_at',{ascending:false}),
+        db.from('importb2b_customer_360').select('id,full_name,phone,instagram_username,completed_sales,total_spent_ars,pending_receivable_ars,club_points,pending_rewards,member_code,club_access_token').eq('owner_id',companyOwnerId()).eq('active',true).order('full_name'),
+        db.from('importb2b_club_profiles').select('*').eq('owner_id',companyOwnerId()).eq('active',true),
+        db.from('importb2b_club_reward_claims').select('*').eq('owner_id',companyOwnerId()).eq('status','pending').order('unlocked_at',{ascending:false})
       ]);[ov,mr,cr,pr,rr].forEach(assert);
       const customers=cr.data||[], cmap=new Map(customers.map(x=>[x.id,x])), pmap=new Map((pr.data||[]).map(x=>[x.customer_id,x])), mmap=new Map();
       for(const m of (mr.data||[])){const a=mmap.get(m.customer_id)||[];a.push(m);mmap.set(m.customer_id,a);}
@@ -371,7 +371,7 @@
     },
     async createShipment(orderId,tracking,carrier='Via Cargo'){
       const u=await authUser();
-      const ins=await db.from('importb2b_shipments').insert({owner_id:u.id,order_id:Number(orderId),carrier_name:carrier,tracking_number:String(tracking).trim(),tracking_provider:'17TRACK',normalized_status:'NO_UPDATES'}).select().single();assert(ins);
+      const ins=await db.from('importb2b_shipments').insert({owner_id:companyOwnerId(),order_id:Number(orderId),carrier_name:carrier,tracking_number:String(tracking).trim(),tracking_provider:'17TRACK',normalized_status:'NO_UPDATES'}).select().single();assert(ins);
       await db.from('importb2b_orders').update({purchase_status:'in_transit',updated_at:new Date().toISOString()}).eq('id',Number(orderId));
       const reg=await db.functions.invoke('seventeen-track-register',{body:{shipment_id:ins.data.id}});
       if(reg.error) return {...ins.data,register_error:reg.error.message};
@@ -390,7 +390,7 @@
     },
     async saveMargins(rows){
       const u=await authUser();
-      const data=rows.map(x=>({owner_id:u.id,category:x.category,retail:Number(x.retail||0),wholesale_6:Number(x.wholesale_6||0),wholesale_12:Number(x.wholesale_12||0),wholesale_36:Number(x.wholesale_36||0),updated_at:new Date().toISOString()}));
+      const data=rows.map(x=>({owner_id:companyOwnerId(),category:x.category,retail:Number(x.retail||0),wholesale_6:Number(x.wholesale_6||0),wholesale_12:Number(x.wholesale_12||0),wholesale_36:Number(x.wholesale_36||0),updated_at:new Date().toISOString()}));
       const r=await db.from('importb2b_margins').upsert(data,{onConflict:'owner_id,category'});assert(r);return true;
     },
     async saveWholesalePrice(variantId,minQty,price){ const r=await db.rpc('importb2b_save_wholesale_price',{p_variant_id:variantId,p_min_quantity:Number(minQty),p_price_ars:Number(price)});assert(r);return r.data; },
@@ -487,7 +487,7 @@
       const pub=db.storage.from('importb2b-catalog').getPublicUrl(mainPath).data.publicUrl;
       const thumbPub=db.storage.from('importb2b-catalog').getPublicUrl(thumbPath).data.publicUrl;
       if(isPrimary){ const x=await db.from('importb2b_product_images').update({is_primary:false}).eq('product_id',productId);assert(x); }
-      const ins=await db.from('importb2b_product_images').insert({owner_id:u.id,product_id:productId,image_url:pub,storage_path:mainPath,thumbnail_url:thumbPub,thumbnail_storage_path:thumbPath,alt_text:prepared.originalName,is_primary:isPrimary,sort_order:0,original_size_bytes:prepared.originalSize,optimized_size_bytes:prepared.main.blob.size,width:prepared.main.width,height:prepared.main.height,mime_type:prepared.main.blob.type||'image/webp'}).select().single();assert(ins);
+      const ins=await db.from('importb2b_product_images').insert({owner_id:companyOwnerId(),product_id:productId,image_url:pub,storage_path:mainPath,thumbnail_url:thumbPub,thumbnail_storage_path:thumbPath,alt_text:prepared.originalName,is_primary:isPrimary,sort_order:0,original_size_bytes:prepared.originalSize,optimized_size_bytes:prepared.main.blob.size,width:prepared.main.width,height:prepared.main.height,mime_type:prepared.main.blob.type||'image/webp'}).select().single();assert(ins);
       if(isPrimary){ const r=await db.from('importb2b_products').update({primary_image_url:pub}).eq('id',productId);assert(r); }
       return ins.data;
     },
@@ -515,8 +515,8 @@
       }
     },
 
-    async catalogSettings(){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').select('*').eq('owner_id',u.id).single();assert(r);return r.data; },
-    async saveCatalogSettings(payload){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').upsert({owner_id:u.id,...payload},{onConflict:'owner_id'}).select().single();assert(r);return r.data; },
+    async catalogSettings(){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').select('*').eq('owner_id',companyOwnerId()).single();assert(r);return r.data; },
+    async saveCatalogSettings(payload){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').upsert({owner_id:companyOwnerId(),...payload},{onConflict:'owner_id'}).select().single();assert(r);return r.data; },
     async webOrders(status='all'){
       let q=db.from('importb2b_web_orders').select('*').order('created_at',{ascending:false}).limit(150);if(status!=='all')q=q.eq('status',status);const r=await q;assert(r);return r.data||[];
     },
