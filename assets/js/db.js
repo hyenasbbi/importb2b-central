@@ -449,6 +449,14 @@
       for(const p of payments){ const arr=pmap.get(p.sale_id)||[]; arr.push({...p,method:mmap.get(p.payment_method_id)||null}); pmap.set(p.sale_id,arr); }
       return sales.map(s=>({...s,customer:cmap.get(s.customer_id)||null,payments:pmap.get(s.id)||[]}));
     },
+    async linkSaleCustomer(saleId,customerId){
+      const id=String(saleId||''),cid=String(customerId||'');
+      if(!id||!cid)throw new Error('Seleccioná una venta y un cliente');
+      const cr=await db.from('importb2b_customers').select('id').eq('id',cid).eq('active',true).single();assert(cr);
+      const sr=await db.from('importb2b_sales').update({customer_id:cid,updated_at:new Date().toISOString()}).eq('id',id).is('customer_id',null).select('id,customer_id').maybeSingle();assert(sr);
+      if(!sr.data)throw new Error('La venta ya tiene un cliente vinculado o no se pudo actualizar. Recargá el detalle.');
+      return sr.data;
+    },
     async saleDetail(id){
       const [s,i]=await Promise.all([
         db.from('importb2b_sales').select('*').eq('id',id).single(),
