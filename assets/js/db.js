@@ -46,7 +46,10 @@
     return {main,thumb,originalSize:Number(file.size||0),originalName:file.name||'producto'};
   }
 
-  // One company workspace; authentication remains individual for attribution.\n  const companyOwnerId=()=> '9503c97f-e84e-467c-b22e-14745e6f62d9';\n\n  window.DB={
+  // One company workspace; authentication remains individual for attribution.
+  const companyOwnerId=()=> '9503c97f-e84e-467c-b22e-14745e6f62d9';
+
+  window.DB={
     async user(){ try{return await authUser()}catch{return null} },
 
     async dashboard(){
@@ -161,7 +164,7 @@
     async duplicateProduct(productId){
       const p=await this.productDetail(productId),u=await authUser();
       const baseSku=p.sku?`${p.sku}-COPY`:null;
-      let r=await db.from('importb2b_products').insert({owner_id:companyOwnerId(),name:`${p.name} - copia`,sku:baseSku,category:p.category,sleeve_type:p.sleeve_type||((String(p.category||'').toLowerCase()==='camisetas')?'short':null),active:true,catalog_visible:false,new_arrival:false,featured:false,catalog_priority:100,primary_image_url:null}).select().single();assert(r);
+      let r=await db.from('importb2b_products').insert({owner_id:companyOwnerId(),name:`${p.name} - copia`,sku:baseSku,category:p.category,subcategory:p.subcategory||null,sleeve_type:p.sleeve_type||((String(p.category||'').toLowerCase()==='camisetas')?'short':null),active:true,catalog_visible:false,new_arrival:false,featured:false,catalog_priority:100,primary_image_url:null}).select().single();assert(r);
       const copy=r.data;
       for(const v of p.variants){
         const vr=await db.from('importb2b_product_variants').insert({owner_id:companyOwnerId(),product_id:copy.id,variant_name:v.variant_name,sku:v.sku?`${v.sku}-COPY`:null,cost_ars:v.cost_ars,price_ars:v.price_ars,sale_price_ars:v.sale_price_ars||null,wholesale_price_ars:v.wholesale_price_ars,stock_min:v.stock_min,active:true,attributes:v.attributes||{}});assert(vr);
@@ -170,7 +173,7 @@
     },
 
     async products(q='',category='',stockFilter='all'){
-      let req=db.from('importb2b_products').select('id,sku,name,category,sleeve_type,active,catalog_visible,new_arrival,featured,catalog_priority,primary_image_url,created_at').eq('active',true).order('name');
+      let req=db.from('importb2b_products').select('id,sku,name,category,subcategory,sleeve_type,active,catalog_visible,new_arrival,featured,catalog_priority,primary_image_url,created_at').eq('active',true).order('name');
       if(category) req=req.eq('category',category);
       const pr=await req.limit(1200); assert(pr);
       const products=pr.data||[], ids=products.map(x=>x.id); if(!ids.length) return [];
@@ -189,7 +192,7 @@
       let out=products.map(p=>{const img=im.get(p.id)||{};return {...p,thumbnail_url:img.thumbnail_url||img.image_url||p.primary_image_url||null,variants:vm.get(p.id)||[]}});
       const term=String(q||'').trim().toLowerCase();
       if(term) out=out.filter(p=>[
-        p.name,p.sku,p.category,
+        p.name,p.sku,p.category,p.subcategory,
         ...p.variants.flatMap(v=>[v.variant_name,v.sku,Object.values(v.attributes||{}).join(' ')])
       ].join(' ').toLowerCase().includes(term));
       if(stockFilter!=='all') out=out.filter(p=>{
