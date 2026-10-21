@@ -1581,7 +1581,12 @@ El stock y el historial se conservan.`))return;
   }
   async function openNotificationInbox(){
     const rows=await DB.notifications();
-    openModal('<div class="section-title"><h3>Avisos</h3><button class="modal-close modal-x">×</button></div><div class="notification-list">'+rows.map(n=>'<button class="notification-item '+(n.read_at?'':'unread')+'" data-notice="'+n.id+'"><b>'+esc(n.title)+'</b><span>'+esc(n.body)+'</span><small>'+safeDate(n.created_at)+'</small></button>').join('')+'</div>');
+    openModal('<div class="section-title"><h3>Avisos</h3><button class="modal-close modal-x">×</button></div><button id="readAllNotifications" class="btn">Marcar todas como leídas</button><p class="muted">Los avisos leídos se eliminan después de 24 horas.</p><div class="notification-list">'+rows.map(n=>'<button class="notification-item '+(n.read_at?'':'unread')+'" data-notice="'+n.id+'"><b>'+esc(n.title)+'</b><span>'+esc(n.body)+'</span><small>'+safeDate(n.created_at)+'</small></button>').join('')+'</div>');
+    document.getElementById('readAllNotifications').addEventListener('click',async()=>{
+      const button=document.getElementById('readAllNotifications');button.disabled=true;
+      try{await DB.readAllNotifications();await refreshOperationalIndicators();await openNotificationInbox()}
+      catch(e){alert(e.message||'No se pudieron marcar los avisos');button.disabled=false}
+    });
     document.querySelectorAll('[data-notice]').forEach(button=>button.addEventListener('click',async()=>{
       const n=rows.find(x=>String(x.id)===button.dataset.notice);if(!n)return;
       await DB.readNotification(n.id);closeModal();await refreshOperationalIndicators();

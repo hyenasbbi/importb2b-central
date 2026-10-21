@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const source=fs.readFileSync(new URL('../assets/js/db.js',import.meta.url),'utf8');
+const start=source.indexOf('    async readNotification(id)');
+const methods=source.slice(start,source.indexOf('    async webOrders',start));
+let rows=Array.from({length:75},(_,i)=>({id:i,owner_id:'self',read_at:null}));
+rows.push({id:76,owner_id:'other',read_at:null},{id:77,owner_id:'self',read_at:'2026-10-20T00:00:00Z'});
+const db={from(table){assert.equal(table,'notifications');let values,filters=[];return {update(v){values=v;return this},eq(k,v){filters.push(r=>r[k]===v);return this},is(k,v){filters.push(r=>r[k]===v);return this},then(resolve){for(const r of rows)if(filters.every(f=>f(r)))Object.assign(r,values);resolve({error:null})}}}};
+const context=vm.createContext({db,authUser:async()=>({id:'self'}),assert:r=>{if(r.error)throw r.error}});
+vm.runInContext('globalThis.DB={'+methods+'}',context);
+await context.DB.readAllNotifications();
+assert.equal(rows.filter(r=>r.owner_id==='self'&&r.read_at===null).length,0,'Marks all 75, beyond display limit');
+assert.equal(rows.find(r=>r.owner_id==='other').read_at,null,'Other admin retains unread notice');
+assert.equal(rows.find(r=>r.id===77).read_at,'2026-10-20T00:00:00Z','Existing read timestamp stays unchanged');
+const previous=rows[0].read_at;await context.DB.readNotification(0);assert.equal(rows[0].read_at,previous,'Opening again does not postpone deletion');
+console.log('Inbox: bulk read, owner isolation, and stable expiry passed');
