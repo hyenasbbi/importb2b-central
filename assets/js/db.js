@@ -595,6 +595,14 @@
       if(!r.data?.publicKey)throw new Error('No se pudo obtener la clave de notificaciones');
       return r.data.publicKey;
     },
+    async testPushNotification(subscriptionId){
+      const r=await db.functions.invoke('importb2b-push-test',{body:{subscription_id:subscriptionId}});
+      if(r.error){
+        let detail;try{detail=await r.error.context?.json()}catch{}
+        throw new Error(detail?.error||r.error.message||'No se pudo contactar al servicio de prueba');
+      }
+      return r.data;
+    },
     async savePushSubscription(subscription){
       const u=await authUser();
       const r=await db.from('importb2b_push_subscriptions').upsert({

@@ -81,18 +81,22 @@
   }
   async function ensurePushSubscription(requestPermission=false){
     if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)) throw new Error('Este dispositivo no soporta notificaciones web.');
-    const registration=await navigator.serviceWorker.register('/sw.js?v=7.2.10',{scope:'/'});
+
     let permission=Notification.permission;
     if(permission==='default'&&requestPermission)permission=await Notification.requestPermission();
     if(permission!=='granted')return {enabled:false,permission};
+    await navigator.serviceWorker.register('/sw.js?v=push-test-20261021',{scope:'/'});
+    let readyTimer;
+    const registration=await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>{readyTimer=setTimeout(()=>reject(new Error('El servicio de notificaciones no se activó. Recargá la app.')),15000)})]).finally(()=>clearTimeout(readyTimer));
     const publicKey=await DB.pushPublicKey();
     let subscription=await registration.pushManager.getSubscription();
+    if(subscription&&requestPermission){await subscription.unsubscribe();subscription=null;}
     if(!subscription){
       subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(publicKey)});
     }
     const data=subscription.toJSON();
-    await DB.savePushSubscription({endpoint:subscription.endpoint,p256dh:data.keys?.p256dh,auth:data.keys?.auth});
-    return {enabled:true,permission:'granted'};
+    const saved=await DB.savePushSubscription({endpoint:subscription.endpoint,p256dh:data.keys?.p256dh,auth:data.keys?.auth});
+    return {enabled:true,permission:'granted',subscriptionId:saved.id};
   }
 
   async function start(){
@@ -1546,8 +1550,18 @@ El stock y el historial se conservan.`))return;
   async function renderSettings(){
     const pushSupported='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
     const pushPermission=pushSupported?Notification.permission:'unsupported';
-    const pushTitle=pushPermission==='granted'?'Notificaciones activas':pushPermission==='denied'?'Notificaciones bloqueadas':'Activar notificaciones';
-    content.innerHTML=`<div class="section-title"><div><span class="eyebrow">CONFIGURACIÓN</span><h3>Administración del sistema</h3><p class="muted">Herramientas de mantenimiento que no necesitás en la operación diaria.</p></div><span class="pill">v7.2.10</span></div><div class="settings-grid"><button id="settingsKyte" class="settings-card"><span>IMPORTACIONES</span><b>Importar Kyte</b><small>Migraciones, auditoría y consolidación de archivos históricos.</small><i>›</i></button><button id="settingsPush" class="settings-card" ${pushSupported?'':'disabled'}><span>NOTIFICACIONES</span><b>${esc(pushTitle)}</b><small>Control financiero cada 3 días cerca de las 14:00 · recordatorio de ventas de lunes a viernes cerca de las 17:30.</small><i>${pushPermission==='granted'?'✓':'›'}</i></button><article class="settings-card static"><span>SISTEMA</span><b>IMPORTB2B Central</b><small>Supabase · Inventario · POS · Finanzas · Club · Catálogo</small></article></div>`;
+    const pushTitle=pushPermission==='granted'?'Permiso concedido · renovar dispositivo':pushPermission==='denied'?'Notificaciones bloqueadas':'Activar notificaciones';
+    content.innerHTML=`<div class="section-title"><div><span class="eyebrow">CONFIGURACIÓN</span><h3>Administración del sistema</h3><p class="muted">Herramientas de mantenimiento que no necesitás en la operación diaria.</p></div><span class="pill">v7.2.10</span></div><div class="settings-grid"><button id="settingsKyte" class="settings-card"><span>IMPORTACIONES</span><b>Importar Kyte</b><small>Migraciones, auditoría y consolidación de archivos históricos.</small><i>›</i></button><button id="settingsPush" class="settings-card" ${pushSupported?'':'disabled'}><span>NOTIFICACIONES</span><b>${esc(pushTitle)}</b><small>Control financiero cada 3 días cerca de las 14:00 · recordatorio de ventas de lunes a viernes cerca de las 17:30.</small><i>${pushPermission==='granted'?'✓':'›'}</i></button><button id="settingsPushTest" class="settings-card" ${pushSupported?'':'disabled'}><span>PRUEBA DE NOTIFICACIONES</span><b>Enviar prueba a este dispositivo</b><small>Comprobá si el servidor acepta el envío y si aparece el aviso. No modifica tus finanzas.</small><i>›</i></button><article class="settings-card static"><span>SISTEMA</span><b>IMPORTB2B Central</b><small>Supabase · Inventario · POS · Finanzas · Club · Catálogo</small></article></div>`;
+    $('#settingsPushTest')?.addEventListener('click',async()=>{
+      const button=$('#settingsPushTest');button.disabled=true;
+      try{
+        const device=await ensurePushSubscription(false);
+        if(!device.enabled)throw new Error('Primero activá las notificaciones y permitilas en este navegador. En iPhone, abrí la app instalada desde la pantalla de inicio.');
+        const result=await DB.testPushNotification(device.subscriptionId);
+        if(!result.accepted)throw new Error([result.error,result.status?'Código '+result.status:'',result.reason||''].filter(Boolean).join(' · '));
+        alert(result.message);
+      }catch(e){alert(e.message||'No se pudo probar el envío')}finally{button.disabled=false}
+    });
     $('#settingsKyte')?.addEventListener('click',()=>setView('imports'));
     $('#settingsPush')?.addEventListener('click',async()=>{
       const b=$('#settingsPush');b.disabled=true;
@@ -1557,13 +1571,13 @@ El stock y el historial se conservan.`))return;
           if(result.permission==='denied')alert('Las notificaciones están bloqueadas para esta app. Habilitalas desde los ajustes del dispositivo.');
           else alert('No se activaron las notificaciones.');
         }else{
-          alert('Notificaciones activadas para IMPORTB2B Central.');
+          alert('Dispositivo registrado. Ahora usá Enviar prueba para comprobar que llegue.');
           await renderSettings();
         }
       }catch(e){
         alert(e.message||'No se pudieron activar las notificaciones. En iPhone abrí la app instalada desde la pantalla de inicio.');
         b.disabled=false;
-      }
+      }finally{b.disabled=false}
     });
   }
 
