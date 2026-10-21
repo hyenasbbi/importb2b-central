@@ -10,7 +10,7 @@ assert.equal(utils.phone('3424425792'),'5493424425792');
 assert.equal(utils.phone('+54 342 5575323'),'5493425575323');
 assert.equal(utils.phone('+5493425575323'),'5493425575323');
 const msg=utils.summary({order_code:'WEB-TEST',customer_name:'Prueba',customer_phone:'3420000000',payment_method:'Transferencia',delivery_type:'shipping',delivery_address:'Dirección de prueba',subtotal_ars:20000,shipping_ars:1000,adjustment_ars:0,total_ars:21000},[{quantity:1,product_name:'Short',variant_name:'XL',unit_price_ars:20000}]);
-for(const s of ['WEB-TEST','1x Short · XL','Prueba','Dirección de prueba','Transferencia','21.000','todavía no es una venta'])assert.ok(msg.includes(s),s);
+for(const s of ['WEB-TEST','1x Short · XL','Prueba','Dirección de prueba','Transferencia','21.000','Pedido registrado en el catálogo'])assert.ok(msg.includes(s),s);
 assert.equal(new URL(utils.link('3420000000',msg)).searchParams.get('text'),msg);
 const app=read('assets/js/app.js');
 const detail=app.slice(app.indexOf('  async function openWebOrder(id)'),app.indexOf('  /* -------------------- PHASE',app.indexOf('  async function openWebOrder(id)')));

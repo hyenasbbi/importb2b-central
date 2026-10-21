@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const source=fs.readFileSync(new URL('../assets/js/catalog.js',import.meta.url),'utf8');
+const start=source.indexOf("    view.querySelector('#productWhatsappButton').addEventListener");
+const end=source.indexOf("    view.querySelector('#productAddButton').addEventListener",start);
+let handler,opened=0,scrolled=0,added=0;
+const cart=[];
+const ctx=vm.createContext({selectedVariant:'XL',pid:'shirt',cart,view:{querySelector:()=>({addEventListener:(event,fn)=>handler=fn,scrollIntoView:()=>scrolled++})},add:(pid,vid)=>{added++;cart.push({variant_id:vid,quantity:1})},openCheckout:()=>opened++});
+vm.runInContext(source.slice(start,end),ctx);
+handler();assert.equal(added,1);assert.equal(opened,1);
+handler();assert.equal(added,1,'Does not duplicate an item already in cart');assert.equal(cart[0].quantity,1);
+cart.push({variant_id:'other',quantity:2});handler();assert.equal(cart.length,2,'Preserves other products');
+ctx.selectedVariant='';handler();assert.equal(scrolled,1);assert.equal(opened,3,'Variant selection required');
+assert.ok(!source.includes('Me interesa comprar'));
+assert.ok(source.includes('x.quantity} × ${esc(x.product_name)}'));
+console.log('PASS: WhatsApp purchase opens complete checkout, requires variant, preserves cart, prevents duplicates');
