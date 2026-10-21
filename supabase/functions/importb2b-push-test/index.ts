@@ -13,7 +13,9 @@ Deno.serve(async req=>{
     const {data:{user},error:authError}=await admin.auth.getUser(jwt);
     if(authError||!user)return json({error:"Sesión no válida"},401);
     const input=await req.json().catch(()=>({}));
-    if(typeof input.subscription_id!=="string")return json({error:"Falta registrar este dispositivo"},400);
+    const id=input.subscription_id;
+    if(!((typeof id==="number"&&Number.isSafeInteger(id)&&id>0)||
+      (typeof id==="string"&&/^[1-9][0-9]*$/.test(id))))return json({error:"Falta registrar este dispositivo"},400);
     // Never send to an arbitrary endpoint or another account.
     const {data:sub,error:subError}=await admin.from("importb2b_push_subscriptions")
       .select("id,endpoint,p256dh,auth").eq("id",input.subscription_id)

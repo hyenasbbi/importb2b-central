@@ -605,16 +605,17 @@
     },
     async savePushSubscription(subscription){
       const u=await authUser();
-      const r=await db.from('importb2b_push_subscriptions').upsert({
-        owner_id:u.id,
-        endpoint:subscription.endpoint,
-        p256dh:subscription.p256dh,
-        auth:subscription.auth,
-        user_agent:navigator.userAgent,
-        active:true,
-        app_source:'central',
-        updated_at:new Date().toISOString()
-      },{onConflict:'owner_id,endpoint'}).select().single();
+      // The database has a global endpoint constraint. Its existing authenticated
+      // registration RPC updates that single row, including on shared devices.
+      const registered=await db.rpc('register_importb2b_push_subscription',{
+        p_endpoint:subscription.endpoint,p_p256dh:subscription.p256dh,
+        p_auth:subscription.auth,p_user_agent:navigator.userAgent
+      });
+      assert(registered);
+      if(!registered.data?.id)throw new Error('No se pudo registrar el dispositivo');
+      const r=await db.from('importb2b_push_subscriptions')
+        .update({app_source:'central',active:true,updated_at:new Date().toISOString()})
+        .eq('id',registered.data.id).eq('owner_id',u.id).select('id').single();
       assert(r);return r.data;
     },
     async financeData(limit=400){
