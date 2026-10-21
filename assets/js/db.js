@@ -528,6 +528,10 @@
 
     async catalogSettings(){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').select('*').eq('owner_id',companyOwnerId()).single();assert(r);return r.data; },
     async saveCatalogSettings(payload){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').upsert({owner_id:companyOwnerId(),...payload},{onConflict:'owner_id'}).select().single();assert(r);return r.data; },
+    async notifications(){const r=await db.from('notifications').select('id,type,title,body,data,created_at,read_at').order('created_at',{ascending:false}).limit(60);assert(r);return r.data||[];},
+    async unreadNotificationsCount(){const r=await db.from('notifications').select('id',{count:'exact',head:true}).is('read_at',null);assert(r);return r.count||0;},
+    async openWebOrderCount(){const r=await db.from('importb2b_web_orders').select('id',{count:'exact',head:true}).in('status',['pending','accepted']);assert(r);return r.count||0;},
+    async readNotification(id){const r=await db.from('notifications').update({read_at:new Date().toISOString()}).eq('id',id);assert(r);},
     async webOrders(status='all'){
       let q=db.from('importb2b_web_orders').select('*').order('created_at',{ascending:false}).limit(150);if(status!=='all')q=q.eq('status',status);const r=await q;assert(r);return r.data||[];
     },
@@ -539,9 +543,9 @@
       ]);[o,i,m].forEach(assert);const mm=new Map((m.data||[]).map(x=>[x.id,x]));return {...o.data,items:i.data||[],payment_method:mm.get(o.data.payment_method_id)||null};
     },
     async webOrderAction(id,action,reason='',holder=null){
-      const fn=action==='confirm'?'importb2b_confirm_web_order':action==='cancel'?'importb2b_cancel_web_order':null;
+      const fn={confirm:'importb2b_confirm_web_order',cancel:'importb2b_cancel_web_order',accept:'importb2b_accept_web_order',deliver:'importb2b_deliver_web_order'}[action];
       if(!fn) throw new Error('Acción inválida');
-      const params=action==='confirm'?{p_order_id:id,p_holder:holder||null}:{p_order_id:id,p_reason:reason||null};
+      const params=action==='confirm'?{p_order_id:id,p_holder:holder||null}:action==='cancel'?{p_order_id:id,p_reason:reason||null}:{p_order_id:id};
       const r=await db.rpc(fn,params);assert(r);return r.data;
     },
 

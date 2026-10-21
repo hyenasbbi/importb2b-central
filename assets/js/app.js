@@ -113,10 +113,13 @@
     const allowedViews=new Set(['dashboard','sell','products','orders','finance','wholesale','customers','catalog','stats','users','settings']);
     if(deepView&&allowedViews.has(deepView))currentView=deepView;
     if(currentView==='finance')financeTab='summary';
-    if(currentView==='orders'&&params.get('tab')==='web'){operationsTab='web';webOrderStatusFilter='pending'}
+    if(currentView==='orders'&&params.get('tab')==='web'){operationsTab='web';webOrderStatusFilter='all'}
+    if(currentView==='orders'&&params.get('tab')==='tracking')operationsTab='tracking';
     const deepOrderId=currentView==='orders'&&operationsTab==='web'?params.get('order'):null;
     await render();
     ensurePushSubscription(false).catch(()=>{});
+    clearInterval(operationalTimer);await refreshOperationalIndicators();
+    operationalTimer=setInterval(()=>{if(!document.hidden)refreshOperationalIndicators()},30000);
     if(deepView==='finance'&&params.get('action')==='recount')setTimeout(()=>openFinanceRecount(),120);
     if(deepOrderId)setTimeout(()=>openWebOrder(deepOrderId),140);
     if(deepView){
@@ -125,7 +128,7 @@
       history.replaceState({},'',clean.pathname+clean.search+clean.hash);
     }
   }
-  function leave(){ window.currentUser=null; $('#appView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); }
+  function leave(){ clearInterval(operationalTimer);$('#operationalInbox')?.remove();window.__lastOperationalOrderCount=undefined;window.currentUser=null; $('#appView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); }
   $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#loginError').textContent='';const {error}=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(error)$('#loginError').textContent=error.message});
   $('#logoutBtn').addEventListener('click',()=>db.auth.signOut());
   // iOS/mobile viewport lock: overlays never move the page underneath them.
@@ -189,7 +192,7 @@
     if(currentView==='wholesale'){wholesaleSearch=v;renderWholesale();}
   });
   function navView(v){if(v==='club')return 'customers';if(v==='pdfs')return 'wholesale';if(v==='imports')return 'settings';return v;}
-  function setView(v){currentView=v;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===navView(v)));render();}
+  function setView(v){currentView=v;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===navView(v)));return render();}
 
   async function render(){
     document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===navView(currentView)));
@@ -1115,7 +1118,7 @@ El stock y el historial se conservan.`))return;
   async function renderOrders(){
     const [rows,webAll]=await Promise.all([DB.recentOrders(),DB.webOrders('all')]);
     const webFiltered=webOrderStatusFilter==='all'?webAll:webAll.filter(x=>x.status===webOrderStatusFilter);
-    const webPending=webAll.filter(x=>x.status==='pending').length;
+    const webPending=webAll.filter(x=>['pending','accepted'].includes(x.status)).length;
     const purchaseHistorical=rows.filter(o=>o.items.length&&o.items.every(i=>i.stock_link_status==='historical')).length;
     const purchaseActive=rows.length-purchaseHistorical;
     let extra=null;
@@ -1175,9 +1178,9 @@ El stock y el historial se conservan.`))return;
   }
 
   function renderWebOrderAccordions(rows){
-    const filter=`<div class="toolbar operations-filter"><select id="webOpsStatus"><option value="pending" ${webOrderStatusFilter==='pending'?'selected':''}>Pendientes</option><option value="confirmed" ${webOrderStatusFilter==='confirmed'?'selected':''}>Confirmados</option><option value="cancelled" ${webOrderStatusFilter==='cancelled'?'selected':''}>Cancelados</option><option value="all" ${webOrderStatusFilter==='all'?'selected':''}>Todos</option></select></div>`;
+    const filter=`<div class="toolbar operations-filter"><select id="webOpsStatus"><option value="pending" ${webOrderStatusFilter==='pending'?'selected':''}>Pendientes</option><option value="accepted" ${webOrderStatusFilter==='accepted'?'selected':''}>Pedido confirmado / Reservado</option><option value="confirmed" ${webOrderStatusFilter==='confirmed'?'selected':''}>Venta confirmada</option><option value="completed" ${webOrderStatusFilter==='completed'?'selected':''}>Entregados</option><option value="cancelled" ${webOrderStatusFilter==='cancelled'?'selected':''}>Cancelados</option><option value="all" ${webOrderStatusFilter==='all'?'selected':''}>Todos</option></select></div>`;
     if(!rows.length)return `${filter}<div class="card empty">No hay pedidos del catálogo en este estado.</div>`;
-    return `${filter}<div class="order-stack">${rows.map(o=>`<details class="card order-card operation-accordion web-operation"><summary class="operation-summary"><div class="operation-summary-main"><span class="eyebrow">${esc(o.order_code)}</span><h3>${esc(o.customer_name)}</h3><small>${safeDate(o.created_at)} · ${esc(o.customer_phone||'')}</small></div><div class="operation-summary-side"><strong>${money(o.total_ars)}</strong>${statusPill(o.status)}<span class="accordion-chevron">⌄</span></div></summary><div class="operation-body web-operation-body"><div class="operation-kv"><div><small>Entrega</small><b>${o.delivery_type==='shipping'?'Envío':'Retiro'}</b></div><div><small>Total</small><b>${money(o.total_ars)}</b></div><div><small>Estado</small>${statusPill(o.status)}</div>${o.delivery_address?`<div><small>Dirección</small><b>${esc(o.delivery_address)}</b></div>`:''}</div><div class="modal-actions"><button class="btn ${o.status==='pending'?'primary':'ghost'} open-web-order" data-id="${o.id}">${o.status==='pending'?'Gestionar pedido':'Ver detalle'}</button></div></div></details>`).join('')}</div>`;
+    return `${filter}<div class="order-stack">${rows.map(o=>`<details class="card order-card operation-accordion web-operation ${o.status==='accepted'?'web-order-reserved':''}"><summary class="operation-summary"><div class="operation-summary-main"><span class="eyebrow">${esc(o.order_code)}</span><h3>${esc(o.customer_name)}</h3><small>${safeDate(o.created_at)} · ${esc(o.customer_phone||'')} ${orderWhatsapp(o)}</small></div><div class="operation-summary-side"><strong>${money(o.total_ars)}</strong>${statusPill(o.status)}<span class="accordion-chevron">⌄</span></div></summary><div class="operation-body web-operation-body"><div class="operation-kv"><div><small>Entrega</small><b>${o.delivery_type==='shipping'?'Envío':'Retiro'}</b></div><div><small>Total</small><b>${money(o.total_ars)}</b></div><div><small>Estado</small>${statusPill(o.status)}</div>${o.delivery_address?`<div><small>Dirección</small><b>${esc(o.delivery_address)}</b></div>`:''}</div><div class="modal-actions"><button class="btn ${o.status==='pending'?'primary':'ghost'} open-web-order" data-id="${o.id}">${o.status==='pending'?'Gestionar pedido':'Ver detalle'}</button></div></div></details>`).join('')}</div>`;
   }
 
   function renderOrderItem(i){
@@ -1519,14 +1522,23 @@ El stock y el historial se conservan.`))return;
   }
   async function openWebOrder(id){
     const o=await DB.webOrderDetail(id);
-    openModal(`<div class="section-title"><div><span class="eyebrow">${esc(o.order_code)}</span><h3>${esc(o.customer_name)}</h3><small class="muted">${safeDate(o.created_at)} · ${esc(o.customer_phone)}</small></div><button class="modal-close modal-x">×</button></div>
+    openModal(`<div class="section-title"><div><span class="eyebrow">${esc(o.order_code)}</span><h3>${esc(o.customer_name)}</h3><small class="muted">${safeDate(o.created_at)} · ${esc(o.customer_phone)} ${orderWhatsapp(o)}</small></div><button class="modal-close modal-x">×</button></div>
       <div class="grid mini-grid"><div class="card metric"><small>Estado</small><b style="font-size:18px">${statusPill(o.status)}</b></div><div class="card metric"><small>Total</small><b style="font-size:24px">${money(o.total_ars)}</b></div><div class="card metric"><small>Pago</small><b style="font-size:18px">${esc(o.payment_method?.name||'—')}</b></div><div class="card metric"><small>Entrega</small><b style="font-size:18px">${o.delivery_type==='shipping'?'Envío':'Retiro'}</b></div></div>
       ${o.delivery_address?`<div class="notice" style="margin-top:12px">Dirección: ${esc(o.delivery_address)}</div>`:''}
       <div class="table-wrap" style="margin-top:14px"><table class="table"><thead><tr><th>Producto</th><th>Variante</th><th>Cant.</th><th>Precio</th><th>Total</th></tr></thead><tbody>${o.items.map(i=>`<tr><td><b>${esc(i.product_name)}</b></td><td>${esc(i.variant_name)}</td><td>${number(i.quantity)}</td><td>${money(i.unit_price_ars)}</td><td>${money(i.line_total_ars)}</td></tr>`).join('')}</tbody></table></div>
       <div class="order-total-lines"><div><span>Subtotal</span><b>${money(o.subtotal_ars)}</b></div><div><span>Envío</span><b>${money(o.shipping_ars)}</b></div>${Number(o.adjustment_ars)?`<div><span>Ajuste de pago</span><b>${money(o.adjustment_ars)}</b></div>`:''}<div class="grand"><span>Total</span><b>${money(o.total_ars)}</b></div></div>
       ${o.notes?`<div class="notice" style="margin-top:12px">${esc(o.notes)}</div>`:''}
-      ${o.status==='pending'&&o.payment_method?.finance_mode==='movement'?`<div class="card web-order-holder-card" style="margin-top:12px"><span class="eyebrow">DESTINO DEL DINERO</span><label style="margin-top:10px">¿Quién recibe esta venta?<select id="webOrderHolder"><option value="nahuel" ${posHolder==='nahuel'?'selected':''}>Nahuel</option><option value="esteban" ${posHolder==='esteban'?'selected':''}>Esteban</option></select></label><small class="muted">Se guardará junto a ${esc(o.payment_method.finance_payment_method==='efectivo'?'Efectivo':'Transferencia')} para que Finanzas sepa dónde quedó el dinero.</small></div>`:''}
-      <div class="modal-actions">${o.status==='pending'?`<button id="cancelWebOrder" class="btn danger-btn">Cancelar pedido</button><button id="confirmWebOrder" class="btn primary">Confirmar → Venta</button>`:`<button class="btn ghost modal-close">Cerrar</button>`}</div>`);
+      ${o.status==='accepted'&&o.payment_method?.finance_mode==='movement'?`<div class="card web-order-holder-card" style="margin-top:12px"><span class="eyebrow">DESTINO DEL DINERO</span><label style="margin-top:10px">¿Quién recibe esta venta?<select id="webOrderHolder"><option value="nahuel" ${posHolder==='nahuel'?'selected':''}>Nahuel</option><option value="esteban" ${posHolder==='esteban'?'selected':''}>Esteban</option></select></label><small class="muted">Se guardará junto a ${esc(o.payment_method.finance_payment_method==='efectivo'?'Efectivo':'Transferencia')} para que Finanzas sepa dónde quedó el dinero.</small></div>`:''}
+      <div class="modal-actions">${o.status==='pending'?`<button id="cancelWebOrder" class="btn danger-btn">Cancelar pedido</button><button id="acceptWebOrder" class="btn good">Confirmar pedido · Reservar</button>` : o.status==='accepted'?`<button id="cancelWebOrder" class="btn danger-btn">Cancelar pedido</button><button id="confirmWebOrder" class="btn primary">Confirmar venta</button>`:o.status==='confirmed'?`<button id="deliverWebOrder" class="btn good">Confirmar entrega</button>`:`<button class="btn ghost modal-close">Cerrar</button>`}</div>`);
+    $('#acceptWebOrder')?.addEventListener('click',async()=>{
+      if(!confirm('¿Confirmar el pedido y reservar sus productos? Todavía no registra una venta ni ingresos.'))return;
+      const button=$('#acceptWebOrder');button.disabled=true;
+      try{await DB.webOrderAction(o.id,'accept');await openWebOrder(o.id);await refreshOperationalIndicators()}catch(e){alert(e.message);button.disabled=false}
+    });
+    $('#deliverWebOrder')?.addEventListener('click',async()=>{
+      if(!confirm('¿Confirmar que el cliente recibió el pedido?'))return;
+      try{await DB.webOrderAction(o.id,'deliver');await openWebOrder(o.id);await refreshOperationalIndicators()}catch(e){alert(e.message)}
+    });
     $('#confirmWebOrder')?.addEventListener('click',async()=>{const holder=o.payment_method?.finance_mode==='movement'?($('#webOrderHolder')?.value||null):null;if(o.payment_method?.finance_mode==='movement'&&!holder)return alert('Elegí quién recibe el dinero.');if(holder){posHolder=holder;localStorage.setItem('importb2b-pos-holder',holder)}if(!confirm('¿Confirmar este pedido y convertirlo en venta real? Se descontará stock y se registrará en Finanzas.'))return;const b=$('#confirmWebOrder');b.disabled=true;try{const r=await DB.webOrderAction(o.id,'confirm','',holder);alert(`Venta ${r.sale?.sale_code||''} confirmada`);closeModal();if(currentView==='orders')await renderOrders();else await renderCatalogAdmin()}catch(e){alert(e.message);b.disabled=false}});
     $('#cancelWebOrder')?.addEventListener('click',async()=>{const reason=prompt('Motivo de cancelación:','Cliente canceló')||'';if(!confirm('¿Cancelar y liberar el stock reservado?'))return;try{await DB.webOrderAction(o.id,'cancel',reason);closeModal();if(currentView==='orders')await renderOrders();else await renderCatalogAdmin()}catch(e){alert(e.message)}});
   }
@@ -1546,6 +1558,39 @@ El stock y el historial se conservan.`))return;
     const rows=await DB.users();
     content.innerHTML=`<div class="section-title"><div><span class="eyebrow">ADMINISTRACIÓN</span><h3>Usuarios</h3><p class="muted">Perfiles habilitados para operar IMPORTB2B Central.</p></div><span class="pill blue">${rows.length} usuario${rows.length===1?'':'s'}</span></div><div class="users-grid">${rows.map(u=>`<article class="user-card"><div class="user-avatar">${esc((u.full_name||'U').slice(0,1).toUpperCase())}</div><div><b>${esc(u.full_name||'Usuario')}</b><small>${esc(u.role||'sin rol')}</small><span>Alta ${new Date(u.created_at).toLocaleDateString('es-AR')}</span></div><span class="pill ${u.role==='admin'?'red':'blue'}">${esc((u.role||'usuario').toUpperCase())}</span></article>`).join('')||'<div class="card empty">No hay perfiles visibles para esta sesión.</div>'}</div><div class="notice" style="margin-top:14px">Los permisos finos por módulo se incorporarán sobre esta misma sección; por ahora se muestra el rol registrado en Supabase.</div>`;
   }
+
+
+  function orderWhatsapp(o){
+    if(!o.customer_phone)return '';
+    const href=Importb2bOrderUtils.link(o.customer_phone,'Hola '+o.customer_name+', te contactamos de IMPORTB2B por tu pedido '+o.order_code+'.');
+    return '<a class="btn tiny good order-whatsapp" href="'+esc(href)+'" target="_blank" rel="noopener" aria-label="Contactar al cliente por WhatsApp" onclick="event.stopPropagation()">'+Importb2bOrderUtils.icon+'<span>WhatsApp</span></a>';
+  }
+  let operationalTimer=null;
+  async function refreshOperationalIndicators(){
+    if(!window.currentUser)return;
+    try{
+      const [noticeCount,orders]=await Promise.all([DB.unreadNotificationsCount(),DB.openWebOrderCount()]);
+      let button=$('#operationalInbox');
+      if(!button){button=document.createElement('button');button.id='operationalInbox';button.className='btn ghost operational-inbox';document.querySelector('.topbar')?.append(button);button.addEventListener('click',openNotificationInbox);}
+      button.textContent='Avisos '+noticeCount;
+      const nav=document.querySelector('[data-view="orders"] .nav-label');
+      if(nav)nav.innerHTML='Operaciones'+(orders?' <b class="nav-order-count">'+orders+'</b>':'');
+      const before=window.__lastOperationalOrderCount;window.__lastOperationalOrderCount=orders;
+      if(before!==undefined&&orders>before&&currentView==='orders')await renderOrders();
+    }catch(e){console.warn('No se pudo actualizar el contador de avisos');}
+  }
+  async function openNotificationInbox(){
+    const rows=await DB.notifications();
+    openModal('<div class="section-title"><h3>Avisos</h3><button class="modal-close modal-x">×</button></div><div class="notification-list">'+rows.map(n=>'<button class="notification-item '+(n.read_at?'':'unread')+'" data-notice="'+n.id+'"><b>'+esc(n.title)+'</b><span>'+esc(n.body)+'</span><small>'+safeDate(n.created_at)+'</small></button>').join('')+'</div>');
+    document.querySelectorAll('[data-notice]').forEach(button=>button.addEventListener('click',async()=>{
+      const n=rows.find(x=>String(x.id)===button.dataset.notice);if(!n)return;
+      await DB.readNotification(n.id);closeModal();await refreshOperationalIndicators();
+      if(n.data?.order_id){operationsTab='web';webOrderStatusFilter='all';await setView('orders');await openWebOrder(n.data.order_id)}
+      else if(n.data?.shipment_id){operationsTab='tracking';await setView('orders')}
+      else if(n.type==='financial_reminder'){await setView('finance')}
+    }));
+  }
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshOperationalIndicators()});
 
   async function renderSettings(){
     const pushSupported='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
