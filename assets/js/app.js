@@ -1533,11 +1533,11 @@ El stock y el historial se conservan.`))return;
     $('#acceptWebOrder')?.addEventListener('click',async()=>{
       if(!confirm('¿Confirmar el pedido y reservar sus productos? Todavía no registra una venta ni ingresos.'))return;
       const button=$('#acceptWebOrder');button.disabled=true;
-      try{await DB.webOrderAction(o.id,'accept');await openWebOrder(o.id);await refreshOperationalIndicators()}catch(e){alert(e.message);button.disabled=false}
+      try{await DB.webOrderAction(o.id,'accept');webOrderStatusFilter='accepted';if(currentView==='orders')await renderOrders();await openWebOrder(o.id);await refreshOperationalIndicators()}catch(e){alert(e.message);button.disabled=false}
     });
     $('#deliverWebOrder')?.addEventListener('click',async()=>{
       if(!confirm('¿Confirmar que el cliente recibió el pedido?'))return;
-      try{await DB.webOrderAction(o.id,'deliver');await openWebOrder(o.id);await refreshOperationalIndicators()}catch(e){alert(e.message)}
+      try{await DB.webOrderAction(o.id,'deliver');webOrderStatusFilter='completed';if(currentView==='orders')await renderOrders();await openWebOrder(o.id);await refreshOperationalIndicators()}catch(e){alert(e.message)}
     });
     $('#confirmWebOrder')?.addEventListener('click',async()=>{const holder=o.payment_method?.finance_mode==='movement'?($('#webOrderHolder')?.value||null):null;if(o.payment_method?.finance_mode==='movement'&&!holder)return alert('Elegí quién recibe el dinero.');if(holder){posHolder=holder;localStorage.setItem('importb2b-pos-holder',holder)}if(!confirm('¿Confirmar este pedido y convertirlo en venta real? Se descontará stock y se registrará en Finanzas.'))return;const b=$('#confirmWebOrder');b.disabled=true;try{const r=await DB.webOrderAction(o.id,'confirm','',holder);alert(`Venta ${r.sale?.sale_code||''} confirmada`);closeModal();if(currentView==='orders')await renderOrders();else await renderCatalogAdmin()}catch(e){alert(e.message);b.disabled=false}});
     $('#cancelWebOrder')?.addEventListener('click',async()=>{const reason=prompt('Motivo de cancelación:','Cliente canceló')||'';if(!confirm('¿Cancelar y liberar el stock reservado?'))return;try{await DB.webOrderAction(o.id,'cancel',reason);closeModal();if(currentView==='orders')await renderOrders();else await renderCatalogAdmin()}catch(e){alert(e.message)}});
