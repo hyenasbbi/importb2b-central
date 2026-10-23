@@ -255,6 +255,9 @@
     async recentOrders(){
       const or=await db.from('importb2b_orders').select('id,order_number,order_date,total_units,investment_usd,merchandise_usdt,shipping_input_amount,shipping_input_currency,shipping_usdt,usdt_rate_ars,shipping_usdt_per_unit,note,provider,purchase_status,purchase_payment_method,purchase_payment_holder,purchase_payment_amount_ars,purchase_paid_at').order('order_date',{ascending:false}).limit(80); assert(or);
       const orders=or.data||[], orderIds=orders.map(x=>x.id); if(!orderIds.length) return [];
+      const ps=await db.from('importb2b_purchase_payment_status').select('*').in('order_id',orderIds);assert(ps);
+      const paymentMap=new Map((ps.data||[]).map(x=>[Number(x.order_id),x]));
+      orders.forEach(o=>{o.payment_status=paymentMap.get(Number(o.id));});
       const ir=await db.from('importb2b_order_items').select('id,order_id,product,detail,category,quantity,cost_ars,cost_usd,excluded_from_stock,product_id,variant_id,received_quantity,stock_link_status').in('order_id',orderIds).order('id'); assert(ir);
       const items=ir.data||[], itemIds=items.map(x=>x.id);
       let allocations=[];
@@ -358,8 +361,10 @@
         p_shipping_currency:payload.shippingCurrency||'USDT',p_provider:payload.provider||null,p_note:payload.note||null,p_items:payload.items||[]
       });assert(r);return r.data;
     },
-    async registerPurchasePayment(orderId,amount,method,holder){ const r=await db.rpc('importb2b_register_purchase_payment',{p_order_id:Number(orderId),p_amount_ars:Number(amount),p_method:method,p_holder:holder});assert(r);return r.data; },
+    async purchasePaymentStatus(orderId){const r=await db.from('importb2b_purchase_payment_status').select('*').eq('order_id',Number(orderId)).single();assert(r);return r.data;},
+    async registerPurchasePayment(orderId,amount,method,holder,requestId){ const r=await db.rpc('importb2b_register_purchase_payment_safe',{p_order_id:Number(orderId),p_amount_ars:Number(amount),p_method:method,p_holder:holder,p_request_id:requestId});assert(r);return r.data; },
     async createExpense(payload){ const r=await db.rpc('importb2b_create_expense',{p_date:payload.date,p_type:payload.type,p_provider:payload.provider||null,p_description:payload.description||null,p_amount_ars:Number(payload.amountArs||0),p_amount_usd:payload.amountUsd==null?null:Number(payload.amountUsd),p_dollar_rate:payload.dollarRate==null?null:Number(payload.dollarRate),p_order_id:payload.orderId?Number(payload.orderId):null,p_product_id:payload.productId||null,p_payment_method:payload.paymentMethod||null,p_holder:payload.holder||null});assert(r);return r.data; },
+    async linkedExpenses(orderIds){if(!orderIds.length)return [];const r=await db.from('importb2b_expenses').select('*').in('order_id',orderIds);assert(r);return r.data||[];},
     async expenses(){ const r=await db.from('importb2b_expenses').select('*').order('expense_date',{ascending:false}).order('id',{ascending:false}).limit(500);assert(r);return r.data||[]; },
     async deleteExpense(id){
       const e=await db.from('importb2b_expenses').select('*').eq('id',Number(id)).single();assert(e);
