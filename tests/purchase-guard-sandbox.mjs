@@ -1,7 +1,7 @@
 // Prints a transaction that tests the actual migration against temporary tables only.
 // No inserts, updates, deletes or sequence calls target public business tables.
 import {readFileSync} from 'node:fs';
-const migration=readFileSync(new URL('../supabase/migrations/20261023121723_purchase_expense_guard.sql',import.meta.url),'utf8');
+const migration=readFileSync(new URL('../supabase/migrations/20261023122257_purchase_expense_guard.sql',import.meta.url),'utf8');
 console.log(`begin;
 create temp table importb2b_orders as select * from public.importb2b_orders with no data;
 create temp table importb2b_expenses as select * from public.importb2b_expenses with no data;
