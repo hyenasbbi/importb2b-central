@@ -32,6 +32,12 @@
   let clubSearch='';
   let pdfSearch='';
   let pdfCategory='';
+  let pdfSize='';
+  let pdfCatalogCache=null;
+  let pdfRenderVersion=0;
+  let pdfExactStock=false;
+  let pdfTitle='CATÁLOGO IMPORTB2B';
+  let pdfSubtitle='Stock disponible';
   let pdfOnlyStock=true;
   let pdfSelected=new Set();
   let pdfWholesaleTier=6;
@@ -211,7 +217,7 @@
       else if(currentView==='orders') await renderOrders();
       else if(currentView==='customers') await renderCustomers($('#globalSearch').value);
       else if(currentView==='club') await renderClub(clubSearch||$('#globalSearch').value);
-      else if(currentView==='pdfs') await renderPdfBuilder();
+      else if(currentView==='pdfs'){pdfCatalogCache=null;await renderPdfBuilder();}
       else if(currentView==='wholesale') await renderWholesale();
       else if(currentView==='finance') await renderFinance();
       else if(currentView==='catalog') await renderCatalogAdmin();
@@ -864,16 +870,35 @@ El stock y el historial se conservan.`))return;
   }
 
   /* -------------------- PHASE 6.2 · PDF SELECTIVO + BRANDING -------------------- */
-  async function renderPdfBuilder(){
-    const [cats,all]=await Promise.all([DB.categories(),DB.pdfCatalogProducts()]);
-    let rows=all.filter(p=>p.catalog_visible!==false);
-    if(pdfCategory)rows=rows.filter(p=>p.category===pdfCategory);
-    if(pdfOnlyStock)rows=rows.filter(p=>p.variants.some(v=>Number(v.stock?.available||0)>0));
-    const term=String(pdfSearch||'').trim().toLowerCase();
-    if(term)rows=rows.filter(p=>[p.name,p.sku,p.category,...p.variants.flatMap(v=>[v.variant_name,v.sku])].join(' ').toLowerCase().includes(term));
+  function pdfVariantSizes(v){
+    const normalize=x=>String(x||'').trim().toUpperCase();
+    const explicit=[v.attributes?.talle,v.attributes?.talla,v.attributes?.size].filter(Boolean).map(normalize);
+    const tokens=normalize(v.variant_name).match(/(?:^|[^A-Z0-9])(XXXS|XXS|XS|S|M|L|XL|XXL|XXXL|[2-6]XL|[2-6]XS|[0-9]{1,3})(?=$|[^A-Z0-9])/g)||[];
+    return [...new Set([...explicit,...tokens.map(x=>x.replace(/^[^A-Z0-9]+/,''))])];
+  }
 
-    const selectedTotal=all.filter(x=>pdfSelected.has(x.id)).length;
-    const selectedVisible=rows.filter(x=>pdfSelected.has(x.id)).length;
+  function filterPdfProducts(all,{search='',category='',size='',onlyStock=true}={}){
+    const term=String(search).trim().toLowerCase();
+    const sizeQuery=term.match(/^(?:talle\s+)?(xxxs|xxs|xs|s|m|l|xl|xxl|xxxl|[2-6]xl|[2-6]xs)$/i)?.[1]?.toUpperCase();
+    return all.filter(p=>p.catalog_visible!==false&&(!category||p.category===category)).map(p=>{
+      const productMatches=[p.name,p.sku,p.category].join(' ').toLowerCase().includes(term);
+      const variants=p.variants.filter(v=>(!onlyStock||Number(v.stock?.available||0)>0)
+        &&(!size||pdfVariantSizes(v).includes(size))
+        &&(!term||(sizeQuery?pdfVariantSizes(v).includes(sizeQuery):productMatches||[v.variant_name,v.sku,...Object.values(v.attributes||{})].join(' ').toLowerCase().includes(term))));
+      return {...p,variants};
+    }).filter(p=>p.variants.length);
+  }
+
+  async function renderPdfBuilder(){
+    const version=++pdfRenderVersion;
+    const focused=document.activeElement?.id,caret=document.activeElement?.selectionStart;
+    if(!pdfCatalogCache)pdfCatalogCache=Promise.all([DB.categories(),DB.pdfCatalogProducts()]).catch(e=>{pdfCatalogCache=null;throw e});
+    const [cats,all]=await pdfCatalogCache;
+    if(version!==pdfRenderVersion||currentView!=='pdfs')return;
+    const rows=filterPdfProducts(all,{search:pdfSearch,category:pdfCategory,size:pdfSize,onlyStock:pdfOnlyStock});
+    const sizes=[...new Set(all.flatMap(p=>p.variants.flatMap(pdfVariantSizes)))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+    const selectedTotal=rows.filter(x=>pdfSelected.has(x.id)).length;
+    const selectedVisible=selectedTotal;
 
     content.innerHTML=`<div class="module-switch"><button data-combined-view="wholesale">Mayorista</button><button class="active" data-combined-view="pdfs">PDF Catálogos</button></div>
       <div class="pdf-builder-head card">
@@ -889,13 +914,14 @@ El stock y el historial se conservan.`))return;
       </div>
       <div class="pdf-builder-grid">
         <aside class="card pdf-controls">
-          <label>Buscar<input id="pdfSearch" value="${esc(pdfSearch)}" placeholder="Producto, talle, sabor…"></label>
+          <label>Buscar<input id="pdfSearch" value="${esc(pdfSearch)}" placeholder="Producto, talle L, sabor…"></label>
           <label>Categoría<select id="pdfCategory"><option value="">Todas</option>${cats.map(c=>`<option value="${esc(c)}" ${pdfCategory===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+          <label>Talle<select id="pdfSize"><option value="">Todos los talles</option>${sizes.map(size=>`<option value="${esc(size)}" ${pdfSize===size?'selected':''}>${esc(size)}</option>`).join('')}</select></label>
           <label class="check"><input id="pdfOnlyStock" type="checkbox" ${pdfOnlyStock?'checked':''}> Solo productos con stock</label>
-          <label class="check"><input id="pdfExactStock" type="checkbox"> Mostrar cantidad exacta</label>
+          <label class="check"><input id="pdfExactStock" type="checkbox" ${pdfExactStock?'checked':''}> Mostrar cantidad exacta</label>
           <label>Precio mayorista<select id="pdfWholesaleTier"><option value="6" ${pdfWholesaleTier===6?'selected':''}>Mayorista 6+</option><option value="12" ${pdfWholesaleTier===12?'selected':''}>Mayorista 12+</option><option value="36" ${pdfWholesaleTier===36?'selected':''}>Mayorista 36+</option></select></label>
-          <label>Título<input id="pdfTitle" value="CATÁLOGO IMPORTB2B"></label>
-          <label>Subtítulo<input id="pdfSubtitle" value="Stock disponible"></label>
+          <label>Título<input id="pdfTitle" value="${esc(pdfTitle)}"></label>
+          <label>Subtítulo<input id="pdfSubtitle" value="${esc(pdfSubtitle)}"></label>
 
           <div class="pdf-selection-summary">
             <small>Seleccionados</small>
@@ -906,7 +932,7 @@ El stock y el historial se conservan.`))return;
             <button id="pdfSelectAll" class="btn ghost full">Seleccionar visibles</button>
             <button id="pdfClear" class="btn ghost full">Limpiar selección</button>
           </div>
-          <div class="pdf-selection-note">Solo se exportan los productos tildados. Los filtros no agregan productos automáticamente.</div>
+          <div class="pdf-selection-note">Se exportan los productos tildados que coinciden con los filtros y solo sus variantes visibles. Usá “Seleccionar visibles” para incluir los resultados.</div>
         </aside>
 
         <section class="card">
@@ -922,7 +948,7 @@ El stock y el historial se conservan.`))return;
               return `<label class="pdf-product-row ${checked?'selected':''}">
                 <input class="pdf-product-check" data-id="${p.id}" type="checkbox" ${checked?'checked':''}>
                 <span class="pdf-product-thumb">${p.pdf_image_url?`<img src="${esc(p.pdf_image_url)}" alt="">`:'<i>IB</i>'}</span>
-                <span class="grow"><b>${esc(p.name)}</b><small>${esc(p.category||'Sin categoría')} · ${number(av)} disponibles · ${p.variants.length} variantes</small></span>
+                <span class="grow"><b>${esc(p.name)}</b><small>${esc(p.category||'Sin categoría')} · ${number(av)} disponibles · ${p.variants.length} variantes · ${esc(p.variants.map(v=>v.variant_name||'Única').join(', '))}</small></span>
                 <strong>${prices.length?money(Math.min(...prices)):'—'}</strong>
               </label>`
             }).join('')||'<div class="empty">No hay productos con estos filtros.</div>'}
@@ -931,7 +957,7 @@ El stock y el historial se conservan.`))return;
       </div>`;
 
     const syncSelectionUi=()=>{
-      const total=all.filter(x=>pdfSelected.has(x.id)).length;
+      const total=rows.filter(x=>pdfSelected.has(x.id)).length;
       const visible=rows.filter(x=>pdfSelected.has(x.id)).length;
       $('#pdfSelectedCount').textContent=String(total);
       $('#pdfSelectedMeta').textContent=`${visible} visibles de ${rows.length} · ${total} total`;
@@ -941,7 +967,12 @@ El stock y el historial se conservan.`))return;
       $('#pdfReseller').textContent=`PDF Revendedores · ${total}`;
     };
 
-    $('#pdfSearch').addEventListener('input',e=>{pdfSearch=e.target.value;$('#globalSearch').value=pdfSearch;clearTimeout(timer);timer=setTimeout(renderPdfBuilder,160)});
+    $('#pdfSearch').addEventListener('input',e=>{pdfSearch=e.target.value;$('#globalSearch').value=pdfSearch;renderPdfBuilder()});
+    $('#pdfSize').addEventListener('change',e=>{pdfSize=e.target.value;renderPdfBuilder()});
+    $('#pdfExactStock').addEventListener('change',e=>{pdfExactStock=e.target.checked});
+    $('#pdfTitle').addEventListener('input',e=>{pdfTitle=e.target.value});
+    $('#pdfSubtitle').addEventListener('input',e=>{pdfSubtitle=e.target.value});
+    if(focused==='pdfSearch'){const input=$('#pdfSearch');input.focus({preventScroll:true});if(caret!=null)input.setSelectionRange(caret,caret)}
     $('#pdfCategory').addEventListener('change',e=>{pdfCategory=e.target.value;renderPdfBuilder()});
     $('#pdfOnlyStock').addEventListener('change',e=>{pdfOnlyStock=e.target.checked;renderPdfBuilder()});
     $('#pdfWholesaleTier').addEventListener('change',e=>{pdfWholesaleTier=Number(e.target.value);});
@@ -952,8 +983,8 @@ El stock y el historial se conservan.`))return;
     }));
     $('#pdfSelectAll').addEventListener('click',()=>{rows.forEach(x=>pdfSelected.add(x.id));renderPdfBuilder()});
     $('#pdfClear').addEventListener('click',()=>{pdfSelected.clear();renderPdfBuilder()});
-    $('#pdfClient').addEventListener('click',()=>generateStockPdf(all.filter(x=>pdfSelected.has(x.id)),{mode:'client',exactStock:$('#pdfExactStock').checked,title:$('#pdfTitle').value.trim()||'CATÁLOGO IMPORTB2B',subtitle:$('#pdfSubtitle').value.trim()}));
-    $('#pdfReseller').addEventListener('click',()=>generateStockPdf(all.filter(x=>pdfSelected.has(x.id)),{mode:'reseller',wholesaleTier:pdfWholesaleTier,exactStock:$('#pdfExactStock').checked,title:'CATÁLOGO MAYORISTA',subtitle:`Mayorista ${pdfWholesaleTier}+ · ${$('#pdfSubtitle').value.trim()}`}));
+    $('#pdfClient').addEventListener('click',()=>generateStockPdf(rows.filter(x=>pdfSelected.has(x.id)),{mode:'client',exactStock:$('#pdfExactStock').checked,title:$('#pdfTitle').value.trim()||'CATÁLOGO IMPORTB2B',subtitle:$('#pdfSubtitle').value.trim()}));
+    $('#pdfReseller').addEventListener('click',()=>generateStockPdf(rows.filter(x=>pdfSelected.has(x.id)),{mode:'reseller',wholesaleTier:pdfWholesaleTier,exactStock:$('#pdfExactStock').checked,title:'CATÁLOGO MAYORISTA',subtitle:`Mayorista ${pdfWholesaleTier}+ · ${$('#pdfSubtitle').value.trim()}`}));
   }
 
   async function generateStockPdf(products,opts){
