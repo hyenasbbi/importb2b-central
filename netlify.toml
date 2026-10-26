@@ -1,5 +1,6 @@
 [build]
-  publish = "."
+  command = "node scripts/build-public.mjs"
+  publish = "dist"
   functions = "netlify/functions"
 
 [[redirects]]
@@ -38,3 +39,12 @@
   for = "/*.html"
   [headers.values]
     Cache-Control = "no-cache, must-revalidate"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://jgjvzqfxakvogaeqfual.supabase.co wss://jgjvzqfxakvogaeqfual.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"

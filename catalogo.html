@@ -7,7 +7,7 @@
   <title>IMPORTB2B · Catálogo</title>
   <link rel="icon" href="./assets/img/app-icon-512.png">
   <link rel="stylesheet" href="./assets/css/catalog.css?v=checkout-responsive-20261026">
-</head>
+<link rel="stylesheet" href="/assets/css/legal.css"><meta name="referrer" content="no-referrer"></head>
 <body>
   <header class="store-header">
     <a class="store-brand" href="./catalogo.html"><img src="./assets/img/logo-importb2b.png" alt="IMPORTB2B"><div><b id="storeTitle">IMPORTB2B</b><small id="storeSubtitle">Catálogo online</small></div></a>
@@ -29,6 +29,7 @@
     </div>
     <select id="catalogCategory" class="catalog-category-native" aria-label="Categoría"><option value="">Todas las categorías</option></select>
   </header>
+  <nav class="legal-links" aria-label="Derechos de compra"><a href="/arrepentimiento.html">BOTÓN DE ARREPENTIMIENTO</a></nav>
   <main id="catalogMain" class="store-main">
     <nav id="catalogCategoryHome" class="catalog-category-home" aria-label="Categorías">
       <div id="catalogCategoryChips" class="catalog-category-chips"></div>
@@ -51,7 +52,7 @@
           <span>Instagram</span>
         </a>
       </div>
-    </footer>
+<nav class="legal-links" aria-label="Información legal"><a href="/privacidad.html">Privacidad</a><a href="/terminos.html">Términos y condiciones</a><a href="/datos-personales.html">Eliminar mis datos</a><a href="/arrepentimiento.html">BOTÓN DE ARREPENTIMIENTO</a></nav>    </footer>
   </main>
   <section id="catalogProductView" class="catalog-product-view hidden"></section>
 
@@ -79,6 +80,7 @@
         <div id="addressLabel" class="wide hidden checkout-delivery-address"><label>Dirección<input id="checkoutAddress" autocomplete="street-address" placeholder="Calle, número, piso/depto si corresponde"></label><div class="checkout-city-pills"><button type="button" data-city="Santa Fe">Santa Fe</button><button type="button" data-city="Santo Tomé">Santo Tomé</button></div></div>
         <div class="wide"><h3>3. Elegí cómo pagar</h3><label class="checkout-payment-select">Forma de pago<select id="checkoutPayment"></select></label><div id="checkoutPaymentCards" class="checkout-payment-cards"></div><p id="checkoutPaymentHint" class="checkout-help" aria-live="polite"></p></div>
         <label class="wide">Observaciones<textarea id="checkoutNotes" rows="3"></textarea></label>
+      <div class="wide privacy-notice"><label class="privacy-choice"><input id="checkoutPrivacy" type="checkbox"><span>Leí la <a href="/privacidad.html" target="_blank" rel="noopener noreferrer">política de privacidad</a> y acepto los <a href="/terminos.html" target="_blank" rel="noopener noreferrer">términos de venta</a>.</span></label><p>Usamos los datos necesarios para gestionar tu pedido. Al confirmar, se abrirá WhatsApp con el resumen y tus datos de contacto y entrega. Esta casilla no autoriza publicidad. <a href="/datos-personales.html">Ejercer mis derechos</a>.</p></div>
       </div>
       </section><aside class="checkout-order-summary"><span class="checkout-eyebrow">TU COMPRA</span><h3>Resumen del pedido</h3><div id="checkoutTotals" class="store-summary checkout-summary" aria-live="polite"></div>
       <div id="checkoutError" class="store-error" role="alert"></div>
