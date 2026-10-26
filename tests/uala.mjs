@@ -50,3 +50,8 @@ test('checkout stays blocked even if env switches, callbacks or installment requ
  }
  assert.equal(READINESS.enabled,false);assert.deepEqual(READINESS.plans,[]);
 });
+
+test('observed sandbox pesos response cannot pass a cents expectation without a verified conversion',()=>{
+ const expected={provider_id:'sandbox',external_reference:'test-ref',final_cents:6200};
+ assert.throws(()=>verifiedOrder({uuid:'sandbox',external_reference:'test-ref',amount:62,status:'APPROVED'},expected),/no coincide/);
+});
