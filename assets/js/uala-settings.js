@@ -1,5 +1,6 @@
 (function(){
- const fields=[['vat_bps','IVA'],['processing_bps','Procesamiento débito / crédito'],['financing_3_bps','Financiación 3 cuotas'],['financing_6_naranja_bps','Financiación 6 cuotas Naranja promo'],['financing_9_bps','Financiación 9 cuotas']];
+ // Keep the legacy database key for compatibility; six installments are no longer Naranja-only.
+ const fields=[['vat_bps','IVA'],['processing_bps','Procesamiento débito / crédito'],['financing_3_bps','Financiación 3 cuotas'],['financing_6_naranja_bps','Financiación 6 cuotas (tarjetas compatibles)']];
  window.renderUalaSettings=async function(container){
   const panel=document.createElement('article');panel.className='card';container.appendChild(panel);
   panel.innerHTML='<h3>Ualá Bis · Tienda Online</h3><p class="muted">Cargando configuración…</p>';
@@ -7,7 +8,7 @@
    const r=await window.db.from('importb2b_uala_settings').select('*').limit(1).single();
    if(r.error)throw r.error;
    const cfg=r.data;
-   panel.innerHTML='<h3>Ualá Bis · Tienda Online</h3><p>Cobros con tarjeta todavía no habilitados. Los planes requieren confirmación de Ualá.</p><p class="muted">El precio base es el neto deseado. El IVA se aplica por separado a procesamiento y financiación.</p>';
+   panel.innerHTML='<h3>Ualá Bis · Tienda Online</h3><p>Planes habilitados en la app de Ualá, según el comercio: 3 y 6 cuotas para tarjetas compatibles. Las 9 cuotas no están habilitadas. Los cobros del sitio siguen pendientes de pruebas e integración.</p><p class="muted">El precio base es el neto deseado. El IVA se aplica por separado a procesamiento y financiación.</p>';
    const form=document.createElement('form');form.className='form-grid';
    for(const [key,label] of fields){const l=document.createElement('label');l.textContent=label+' (%)';const input=document.createElement('input');input.name=key;input.type='number';input.min='0';input.max='100';input.step='0.01';input.required=true;input.value=cfg[key]/100;l.appendChild(input);form.appendChild(l);}
    const save=document.createElement('button');save.className='btn primary';save.type='submit';save.textContent='Guardar tasas';form.appendChild(save);
