@@ -34,6 +34,9 @@ begin
  exception when others then if sqlerrm not like '%no coincide%' then raise; end if; end;
  result:=public.importb2b_uala_apply_verified(attempt,provider,q->>'external_reference',total,'APPROVED',9,'VISA');
  if result->>'state'<>'review' then raise exception 'FAIL: wrong installments'; end if;
+ -- Sandbox returned 13 after selecting the UI label for 3: never infer a mapping.
+ result:=public.importb2b_uala_apply_verified(attempt,provider,q->>'external_reference',total,'APPROVED',13,'VISA');
+ if result->>'state'<>'review' then raise exception 'FAIL: undocumented plan code accepted as installment count'; end if;
  result:=public.importb2b_uala_apply_verified(attempt,provider,q->>'external_reference',total,'APPROVED',3,'VISA');
  if result->>'state'<>'approved' then raise exception 'FAIL: verified approval'; end if;
  perform public.importb2b_uala_apply_verified(attempt,provider,q->>'external_reference',total,'PENDING',null,null);
