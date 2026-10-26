@@ -34,6 +34,7 @@ export class UalaClient {
   constructor({environment,username,clientId,clientSecret,fetchImpl=fetch}){
     if(!['test','production'].includes(environment))throw new Error('Ambiente Ualá inválido');
     if(!username||!clientId||!clientSecret)throw new Error('Faltan credenciales Ualá');
+    this.environment=environment;
     const stage=environment==='test'?'.stage':'';
     this.auth=`https://auth${stage}.developers.ar.ua.la/v2/api/auth/token`;
     this.base=`https://checkout${stage}.developers.ar.ua.la/v2/api`;

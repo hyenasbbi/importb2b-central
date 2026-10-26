@@ -2,6 +2,8 @@
 
 Revisión oficial: 26 de octubre de 2026. Esta entrega **no habilita cobros**.
 
+Estado actualizado: la configuración inicial del PR #2 ya fue fusionada y publicada en Netlify. La siguiente etapa agrega el circuito transaccional de servidor, probado sin persistir ventas ficticias. Ver [estado actual y bloqueos de activación](uala-lifecycle.md); ese documento reemplaza los pendientes técnicos históricos enumerados abajo donde corresponda.
+
 Actualización de credenciales: el comercio proporcionó los valores originales en texto después del primer intento desde imagen. La autenticación oficial v2 de producción fue exitosa, sin crear órdenes ni imprimir el token. Se guardaron `UALA_USERNAME`, `UALA_CLIENT_ID`, `UALA_CLIENT_SECRET_ID` y `UALA_ENVIRONMENT` en Netlify / tiendaimport, marcadas como Secret values, exclusivamente en el contexto Production. Se verificó su presencia con los valores ocultos. Los secretos no están en Git. Esta actualización reemplaza el bloqueo de autenticación y la carga pendiente descritos en el historial del punto 2; los restantes requisitos de habilitación siguen pendientes.
 
 ## Implementado
