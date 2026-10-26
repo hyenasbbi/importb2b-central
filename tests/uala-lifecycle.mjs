@@ -60,3 +60,12 @@ test('environment is explicit and secrets stay out of returned errors',()=>{
  assert.throws(()=>clientFromEnvironment({UALA_USERNAME:'x',UALA_CLIENT_ID:'x',UALA_CLIENT_SECRET_ID:'sensitive'}),/Ambiente/);
  assert.equal(clientFromEnvironment({UALA_ENVIRONMENT:'test',UALA_USERNAME:'x',UALA_CLIENT_ID:'x',UALA_CLIENT_SECRET_ID:'x'}).environment,'test');
 });
+
+// Importing the scheduled route must never trigger network calls or payments.
+test('scheduled reconciliation is dormant until explicitly enabled',async()=>{
+ const {default:scheduled}=await import('../netlify/functions/uala-reconcile.mjs');
+ const previous=process.env.UALA_RECONCILIATION_ENABLED;
+ delete process.env.UALA_RECONCILIATION_ENABLED;
+ try{assert.equal((await scheduled({json:()=>{throw new Error('must not access input')}})).status,204)}
+ finally{if(previous===undefined)delete process.env.UALA_RECONCILIATION_ENABLED;else process.env.UALA_RECONCILIATION_ENABLED=previous}
+});

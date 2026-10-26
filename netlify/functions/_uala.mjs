@@ -1,5 +1,5 @@
 // API Cobros Online v2. Server-only; never import from browser assets.
-export const READINESS = Object.freeze({ enabled: false, plans: [], reason: 'Pendiente validación oficial de planes, reservas y liquidación. Cobros no habilitados.' });
+export const READINESS = Object.freeze({ enabled: false, plans: [], reason: 'Pendiente prueba integral, validación del plan efectivo y liquidación. Cobros no habilitados.' });
 const ceilDiv = (a,b) => (a+b-1n)/b;
 export function quote(netCents, processingBps=490, financingBps=0, vatBps=2100) {
   if (![netCents,processingBps,financingBps,vatBps].every(Number.isSafeInteger) || netCents<=0 || [processingBps,financingBps,vatBps].some(x=>x<0||x>10000)) throw new Error('Importe o tasas inválidas');

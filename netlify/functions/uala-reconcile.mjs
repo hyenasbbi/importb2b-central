@@ -4,6 +4,8 @@ import {clientFromEnvironment,supabaseStore,reconcileAttempt} from './_uala-life
 // Netlify scheduled invocation only. Caller cannot supply a provider UUID.
 export const config={schedule:'*/15 * * * *'};
 export default async function scheduled(req){
+  // Keep background provider calls off until private server access and sandbox are verified.
+  if(process.env.UALA_RECONCILIATION_ENABLED!=='true')return new Response(null,{status:204});
   // Netlify's schedule configuration disables direct HTTP invocation.
   const input=await req.json();
   if(!input || !Number.isFinite(Date.parse(input.next_run)))return new Response(null,{status:400});
