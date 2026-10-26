@@ -4,7 +4,7 @@ import {quote,verifiedOrder,UalaClient,READINESS} from '../netlify/functions/_ua
 import {handler} from '../netlify/functions/uala-checkout.mjs';
 
 test('all requested financing rates preserve net, including cent and rounding boundaries',()=>{
- for(const net of [2500,2501,9999,10000,10001,1000000,12345678])for(const financing of [0,1000,1700,2570])for(const vat of [0,2100,2700]){
+ for(const net of [2500,2501,9999,10000,10001,1000000,12345678])for(const financing of [0,1000,1700,1800,2570])for(const vat of [0,2100,2700]){
   const q=quote(net,490,financing,vat);
   assert.equal(q.final_cents%100,0);
   assert.ok(q.estimated_net_cents>=net);
