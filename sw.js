@@ -20,7 +20,7 @@ self.addEventListener('push',event=>{
 self.addEventListener('notificationclick',event=>{
   event.notification.close();
   const raw=event.notification?.data?.url||'/';
-  const target=new URL(raw,self.location.origin).href;
+  let target;try{const url=new URL(raw,self.location.origin);target=url.origin===self.location.origin?url.href:self.location.origin+'/';}catch{target=self.location.origin+'/';}
   event.waitUntil((async()=>{
     const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
     for(const client of windows){
