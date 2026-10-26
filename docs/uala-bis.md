@@ -2,6 +2,8 @@
 
 Revisión oficial: 26 de octubre de 2026. Esta entrega **no habilita cobros**.
 
+Actualización de credenciales: el comercio proporcionó los valores originales en texto después del primer intento desde imagen. La autenticación oficial v2 de producción fue exitosa, sin crear órdenes ni imprimir el token. Se guardaron `UALA_USERNAME`, `UALA_CLIENT_ID`, `UALA_CLIENT_SECRET_ID` y `UALA_ENVIRONMENT` en Netlify / tiendaimport, marcadas como Secret values, exclusivamente en el contexto Production. Se verificó su presencia con los valores ocultos. Los secretos no están en Git. Esta actualización reemplaza el bloqueo de autenticación y la carga pendiente descritos en el historial del punto 2; los restantes requisitos de habilitación siguen pendientes.
+
 ## Implementado
 
 - Configuración administrativa de IVA (21%), procesamiento (4,9%), financiación 3 cuotas (10%), 6 Naranja (17%) y 9 cuotas (25,7%). Son las tasas solicitadas por el comercio, no tarifas verificadas de la cuenta Ualá.
