@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#060708">
   <title>IMPORTB2B · Catálogo</title>
   <link rel="icon" href="./assets/img/app-icon-512.png">
-  <link rel="stylesheet" href="./assets/css/catalog.css?v=7.8.6">
+  <link rel="stylesheet" href="./assets/css/catalog.css?v=checkout-responsive-20261026">
 </head>
 <body>
   <header class="store-header">
@@ -68,26 +68,26 @@
     <button id="checkoutButton" class="store-primary">Continuar pedido</button>
   </aside>
 
-  <div id="checkoutModal" class="store-modal hidden">
+  <div id="checkoutModal" class="store-modal hidden" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">
     <div class="store-modal-card">
-      <div class="store-drawer-head"><div><span>FINALIZAR</span><h2>Datos del pedido</h2></div><button id="checkoutClose">×</button></div>
-      <div class="checkout-grid">
+      <div class="store-drawer-head"><div><span>FINALIZAR</span><h2 id="checkoutTitle">Finalizá tu pedido</h2></div><button id="checkoutClose" aria-label="Cerrar checkout">×</button></div>
+      <div class="checkout-layout"><section class="checkout-details"><h3>1. Tus datos</h3><div class="checkout-grid">
         <label>Nombre<input id="checkoutName" autocomplete="name"></label>
         <label>WhatsApp<input id="checkoutPhone" inputmode="tel" autocomplete="tel"></label>
         <label>Email (opcional)<input id="checkoutEmail" type="email" autocomplete="email"></label>
-        <label>Forma de entrega<select id="checkoutDelivery"></select></label>
+        <label class="wide checkout-section-label">2. Forma de entrega<select id="checkoutDelivery"></select></label>
         <div id="addressLabel" class="wide hidden checkout-delivery-address"><label>Dirección<input id="checkoutAddress" autocomplete="street-address" placeholder="Calle, número, piso/depto si corresponde"></label><div class="checkout-city-pills"><button type="button" data-city="Santa Fe">Santa Fe</button><button type="button" data-city="Santo Tomé">Santo Tomé</button></div></div>
-        <label>Forma de pago<select id="checkoutPayment"></select></label>
+        <div class="wide"><h3>3. Elegí cómo pagar</h3><label class="checkout-payment-select">Forma de pago<select id="checkoutPayment"></select></label><div id="checkoutPaymentCards" class="checkout-payment-cards"></div><p id="checkoutPaymentHint" class="checkout-help" aria-live="polite"></p></div>
         <label class="wide">Observaciones<textarea id="checkoutNotes" rows="3"></textarea></label>
       </div>
-      <div id="checkoutTotals" class="store-summary checkout-summary"></div>
-      <div id="checkoutError" class="store-error"></div>
-      <button id="placeOrderButton" class="store-primary">Realizar pedido</button>
+      </section><aside class="checkout-order-summary"><span class="checkout-eyebrow">TU COMPRA</span><h3>Resumen del pedido</h3><div id="checkoutTotals" class="store-summary checkout-summary" aria-live="polite"></div>
+      <div id="checkoutError" class="store-error" role="alert"></div>
+      <button id="placeOrderButton" class="store-primary">Confirmar pedido</button><p class="checkout-help">Revisá el total antes de confirmar. Coordinaremos el pago y la entrega por WhatsApp.</p></aside></div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
   <script src="./assets/js/config.js?v=7.8.6"></script>
   <script src="./assets/js/order-utils.js?v=checkout-wa-20261021"></script>
-  <script src="./assets/js/catalog.js?v=checkout-wa-20261021"></script>
+  <script src="./assets/js/catalog.js?v=checkout-responsive-20261026"></script>
 </body>
 </html>

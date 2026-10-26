@@ -1222,3 +1222,40 @@ body{
   .catalog-footer-social{flex-wrap:wrap!important}
   .catalog-footer-social .catalog-social-link{flex:1 1 100%!important}
 }
+
+/* Checkout: payment totals remain visible on desktop and mobile. */
+#checkoutModal .store-modal-card{width:min(1080px,100%);padding:28px;overscroll-behavior:contain}
+#checkoutModal .checkout-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:28px;margin-top:24px;align-items:start}
+#checkoutModal h3{font-size:17px;margin:0 0 16px}
+#checkoutModal .checkout-grid{margin-top:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+#checkoutModal .checkout-grid>label:nth-child(3){grid-column:1/-1}
+#checkoutModal input,#checkoutModal select,#checkoutModal textarea{min-width:0;width:100%;box-sizing:border-box;font-size:16px;min-height:46px}
+#checkoutModal .checkout-section-label{margin-top:8px;font-weight:700}
+#checkoutModal .checkout-order-summary{position:sticky;top:0;background:#14181d;border:1px solid #2b3137;border-radius:20px;padding:22px;min-width:0}
+#checkoutModal .checkout-eyebrow{color:#929ca8;font-size:11px;letter-spacing:2px;display:block;margin-bottom:10px}
+#checkoutModal .checkout-summary{margin:22px 0}
+#checkoutModal .checkout-summary>div{gap:14px;align-items:start}
+#checkoutModal .checkout-summary span{min-width:0;overflow-wrap:anywhere}
+#checkoutModal .checkout-summary b{flex-shrink:0}
+#checkoutModal .checkout-help{color:#a6afb9;font-size:12px;line-height:1.6;margin:12px 0 0}
+#checkoutModal .checkout-payment-cards{display:grid;gap:9px;margin-top:12px}
+#checkoutModal .checkout-payment-card{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid #303741;border-radius:13px;cursor:pointer;min-width:0}
+#checkoutModal .checkout-payment-card.selected{border-color:#ff3138;background:#ff31380b}
+#checkoutModal .checkout-payment-card:focus-within{outline:2px solid #fff;outline-offset:2px}
+#checkoutModal .checkout-payment-card input{width:18px;min-height:18px;flex:0 0 18px;accent-color:#ff3138;margin:0}
+#checkoutModal .checkout-payment-card span{flex:1;min-width:0}
+#checkoutModal .checkout-payment-card strong,#checkoutModal .checkout-payment-card small{display:block;overflow-wrap:anywhere}
+#checkoutModal .checkout-payment-card small{color:#a6afb9;font-size:11px;margin-top:4px}
+#checkoutModal .checkout-payment-card b{font-size:13px;white-space:nowrap}
+#checkoutModal .store-primary,#checkoutModal #checkoutClose{min-height:46px}
+#checkoutModal .grand{font-size:22px}
+@media(max-width:760px){
+ #checkoutModal{padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+ #checkoutModal .store-modal-card{padding:20px 16px;border-radius:18px;max-height:calc(100dvh - 16px);box-sizing:border-box}
+ #checkoutModal .checkout-layout{grid-template-columns:minmax(0,1fr);gap:24px;margin-top:20px}
+ #checkoutModal .checkout-order-summary{position:static;padding:18px}
+ #checkoutModal .checkout-grid{grid-template-columns:minmax(0,1fr)}
+ #checkoutModal .checkout-grid .wide{grid-column:1/-1}
+ #checkoutModal .store-drawer-head h2{font-size:23px}
+}
+#checkoutModal .checkout-payment-select:has(+.checkout-payment-cards input){display:none}
