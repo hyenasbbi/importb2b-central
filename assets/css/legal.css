@@ -1,2 +1,18 @@
 .legal-page{max-width:850px;margin:auto;padding:24px;color:#f6f7f8;background:#0d1013;font:16px/1.65 system-ui,sans-serif}.legal-page a,.legal-links a,.privacy-notice a{color:#9dd9ff}.legal-page h1{line-height:1.2}.legal-page section{margin:28px 0}.legal-page .pending{padding:16px;border:1px solid #ad8237;border-radius:12px}.legal-links{display:flex;flex-wrap:wrap;gap:12px;padding:18px;font:14px/1.5 system-ui,sans-serif}.privacy-notice{font:14px/1.5 system-ui,sans-serif;color:#cbd2da}.privacy-choice{display:flex!important;align-items:flex-start;gap:10px!important}.privacy-choice input{width:auto!important;flex:none;margin-top:5px}.legal-page input,.legal-page select,.legal-page textarea{box-sizing:border-box;width:100%;padding:12px;margin:5px 0 16px;background:#171b21;color:white;border:1px solid #64707d;border-radius:8px}.legal-page button,.legal-action{display:inline-block;padding:12px 18px;border-radius:8px;background:#b6222b;color:white!important;border:0;font:inherit}.legal-page label{display:block}
 #checkoutModal .privacy-choice input{width:18px!important;height:18px;min-height:18px;padding:0;margin:3px 0 0;flex:0 0 18px;accent-color:#ff3138}
+
+/* Legal navigation follows the storefront palette and keeps buyer rights visible. */
+.legal-page a,.legal-links a,.privacy-notice a{color:#dce1e6;text-underline-offset:4px;text-decoration-color:#59616a;transition:color .18s,border-color .18s,background .18s}
+.legal-page a:hover,.legal-links a:hover,.privacy-notice a:hover{color:#fff;text-decoration-color:#ff3138}
+.legal-links a:focus-visible,.privacy-notice a:focus-visible,.store-rights-shortcut:focus-visible,.legal-page a:focus-visible{outline:2px solid #ff3138;outline-offset:5px;border-radius:5px}
+.catalog-footer .legal-links{box-sizing:border-box;width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:22px 0 0;border-top:1px solid #252b31;text-align:center;font-family:inherit;font-size:12px;font-weight:500;line-height:1.5}
+.catalog-footer .legal-links>a{display:flex;align-items:center;justify-content:center;min-height:42px;padding:7px 5px;color:#aeb7c0;text-decoration:none;border-radius:10px;box-sizing:border-box}
+.catalog-footer .legal-links>a:hover{color:#fff;background:#171c21}
+.catalog-footer .legal-links .legal-withdrawal{grid-column:1/-1;justify-content:space-between;gap:16px;padding:14px 18px;margin-top:5px;border:1px solid #723139;background:linear-gradient(110deg,#251215,#121519);color:#f5e6e7;font-size:13px;font-weight:700;letter-spacing:.015em}
+.catalog-footer .legal-links .legal-withdrawal:hover{background:#31171c;border-color:#ff3138;color:#fff}
+.legal-withdrawal>span:last-child{font-size:19px;color:#ff777d}
+.store-rights-shortcut{position:fixed;left:20px;bottom:20px;z-index:45;display:inline-flex;align-items:center;gap:9px;box-sizing:border-box;max-width:calc(100vw - 100px);padding:11px 14px;border:1px solid #573036;border-radius:12px;background:rgba(14,17,20,.96);box-shadow:0 5px 22px #0005;color:#cfd5dc;text-decoration:none;font:600 12px/1.4 system-ui,sans-serif;transition:border-color .18s,background .18s,color .18s}
+.store-rights-shortcut svg{width:17px;height:17px;flex:none;fill:none;stroke:#f06a73;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.store-rights-shortcut:hover{background:#231419;border-color:#ff3138;color:#fff}
+.legal-page .legal-links{padding:22px 0;border-top:1px solid #252b31;margin-top:32px}
+@media(max-width:520px){.catalog-footer .legal-links{gap:6px;font-size:11px}.catalog-footer .legal-links>a{padding:8px 3px}.catalog-footer .legal-links .legal-withdrawal{padding:13px 15px;font-size:12px}.store-rights-shortcut{left:12px;bottom:calc(14px + env(safe-area-inset-bottom));padding:10px 12px;gap:7px;font-size:11px}}
