@@ -990,21 +990,69 @@ El stock y el historial se conservan.`))return;
   async function generateStockPdf(products,opts){
     if(!products.length)return alert('Seleccioná al menos un producto.');
     if(!window.jspdf?.jsPDF)return alert('No se pudo cargar el generador PDF.');
-    const onlyStock=pdfOnlyStock;
-    const usable=products.map(p=>({...p,variants:p.variants.filter(v=>!onlyStock||Number(v.stock?.available||0)>0)})).filter(p=>p.variants.length);
+    const usable=products.map(p=>({...p,variants:p.variants.filter(v=>!pdfOnlyStock||Number(v.stock?.available||0)>0)})).filter(p=>p.variants.length);
     if(!usable.length)return alert('No hay variantes disponibles para exportar.');
-
-    const {jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const logo=await loadPdfLogo('./assets/img/logo-importb2b-transparent.png').catch(()=>null);
-
+    const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const logo=opts.mode==='reseller'?null:await loadPdfLogo('./assets/img/logo-importb2b-transparent.png').catch(()=>null);
     drawPdfCover(doc,opts,usable.length,logo);
-    for(let i=0;i<usable.length;i++){
+    for(let i=0;i<usable.length;i+=2){
       doc.addPage();
-      await drawPdfProduct(doc,usable[i],opts,i+1,usable.length,logo);
+      doc.setFillColor(13,15,18);doc.rect(0,0,210,297,'F');
+      if(opts.mode!=='reseller'&&logo)addPdfLogo(doc,logo,12,5,30,10);
+      for(let j=0;j<2&&i+j<usable.length;j++){
+        await drawPdfCompactProduct(doc,usable[i+j],opts,12,18+j*132,186,126);
+      }
+      doc.setDrawColor(237,28,36);doc.line(12,284,198,284);
+      doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(175,178,182);
+      if(opts.mode!=='reseller')doc.text('IMPORTB2B',12,290);
+      doc.text(String(Math.floor(i/2)+1)+' / '+String(Math.ceil(usable.length/2)),198,290,{align:'right'});
     }
     const date=new Date().toISOString().slice(0,10);
-    doc.save(`${opts.mode==='client'?'IMPORTB2B':`IMPORTB2B-Mayorista-${opts.wholesaleTier||6}+`}-${date}.pdf`);
+    doc.save(`${opts.mode==='client'?'IMPORTB2B':`Catalogo-Revendedor-${opts.wholesaleTier||6}+`}-${date}.pdf`);
+  }
+
+  async function drawPdfCompactProduct(doc,p,opts,x,y,w,h){
+    doc.setFillColor(22,24,28);doc.roundedRect(x,y,w,h,3,3,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(255,255,255);
+    const name=doc.splitTextToSize(String(p.name||'Producto'),w-15).slice(0,2);
+    doc.text(name,x+6,y+9);
+    doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(176,180,185);
+    doc.text(String(p.category||'').slice(0,50),x+6,y+18);
+    const imgs=(p.pdf_image_urls?.length?p.pdf_image_urls:[p.pdf_image_url]).filter(Boolean).slice(0,6);
+    const imageTop=y+23,imageH=70;
+    if(imgs.length){
+      const cols=imgs.length===1?1:imgs.length<=4?2:3,rows=Math.ceil(imgs.length/cols),gap=2;
+      const cw=(w-12-(cols-1)*gap)/cols,ch=(imageH-(rows-1)*gap)/rows;
+      for(let k=0;k<imgs.length;k++){
+        const bx=x+6+(k%cols)*(cw+gap),by=imageTop+Math.floor(k/cols)*(ch+gap);
+        doc.setFillColor(255,255,255);doc.roundedRect(bx,by,cw,ch,1,1,'F');
+        try{
+          const data=await imageToData(imgs[k]);
+          const props=doc.getImageProperties(data),scale=Math.min((cw-2)/props.width,(ch-2)/props.height);
+          const iw=props.width*scale,ih=props.height*scale;
+          doc.addImage(data,'JPEG',bx+(cw-iw)/2,by+(ch-ih)/2,iw,ih,undefined,'MEDIUM');
+        }catch(e){console.warn('Imagen de PDF no disponible',e);}
+      }
+    }else{
+      doc.setTextColor(130,133,137);doc.setFontSize(10);doc.text('SIN FOTO',x+w/2,imageTop+35,{align:'center'});
+    }
+    let yy=y+100;
+    doc.setDrawColor(72,75,80);doc.line(x+6,yy-4,x+w-6,yy-4);
+    doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(180,183,188);
+    doc.text('VARIANTE',x+6,yy);doc.text('STOCK',x+w*.57,yy);
+    doc.text(opts.mode==='reseller'?'MAYORISTA':'PRECIO',x+w-6,yy,{align:'right'});
+    yy+=6;
+    for(const v of p.variants.slice(0,3)){
+      const tier=Number(opts.wholesaleTier||6),tierPrice=v.wholesale_tiers?.[`wholesale_${tier}_ars`];
+      const price=opts.mode==='reseller'?Number(tierPrice||v.wholesale_price_ars||v.price_ars||0):Number(v.price_ars||0);
+      const av=Number(v.stock?.available||0);
+      doc.setFont('helvetica','normal');doc.setFontSize(7.2);doc.setTextColor(244,244,244);
+      doc.text(String(v.variant_name||'Única').slice(0,24),x+6,yy);
+      doc.text(opts.exactStock?`${number(av)} u.`:(av>0?'Disponible':'Sin stock'),x+w*.57,yy);
+      doc.setFont('helvetica','bold');doc.text(price?money(price):'Consultar',x+w-6,yy,{align:'right'});
+      yy+=7;
+    }
+    if(p.variants.length>3){doc.setFontSize(7);doc.setTextColor(175,178,182);doc.text(`+${p.variants.length-3} variantes adicionales`,x+6,y+h-3);}
   }
 
   function pdfText(doc,text,x,y,size=10,style='normal',maxWidth=178){
@@ -1023,7 +1071,7 @@ El stock y el historial se conservan.`))return;
 
   function drawPdfCover(doc,opts,count,logo){
     doc.setFillColor(9,10,12);doc.rect(0,0,210,297,'F');
-    if(logo)addPdfLogo(doc,logo,105,30,82,42,{center:true});
+    if(opts.mode!=='reseller'&&logo)addPdfLogo(doc,logo,105,30,82,42,{center:true});
 
     doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(29);
     doc.text(opts.title||'CATÁLOGO IMPORTB2B',105,136,{align:'center'});
@@ -1032,7 +1080,7 @@ El stock y el historial se conservan.`))return;
     doc.text(opts.subtitle||'Stock disponible',105,164,{align:'center'});
     doc.setFontSize(9);doc.setTextColor(130,137,144);doc.text(`${count} productos seleccionados · ${new Date().toLocaleDateString('es-AR')}`,105,178,{align:'center'});
     doc.setDrawColor(55,60,66);doc.line(62,265,148,265);
-    doc.setTextColor(245,245,245);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text(opts.mode==='client'?'IMPORTB2B · STOCK ACTUALIZADO':`IMPORTB2B · MAYORISTA ${opts.wholesaleTier||6}+`,105,275,{align:'center'});
+    doc.setTextColor(245,245,245);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text(opts.mode==='client'?'IMPORTB2B · STOCK ACTUALIZADO':`CATÁLOGO MAYORISTA ${opts.wholesaleTier||6}+`,105,275,{align:'center'});
   }
 
   async function drawPdfProduct(doc,p,opts,index,total,logo){
