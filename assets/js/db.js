@@ -328,9 +328,17 @@
         db.from('importb2b_product_images').select('product_id,image_url,thumbnail_url,is_primary,sort_order').in('product_id',ids).order('is_primary',{ascending:false}).order('sort_order'),
         db.from('importb2b_wholesale_pricing').select('product_id,variant_id,wholesale_6_ars,wholesale_12_ars,wholesale_36_ars')
       ]);assert(ir);assert(wr);
-      const im=new Map();for(const x of (ir.data||[])){if(!im.has(x.product_id)&&x.image_url)im.set(x.product_id,x.image_url)}
+      const im=new Map();
+      for(const x of (ir.data||[])){
+        if(!x.image_url)continue;
+        if(!im.has(x.product_id))im.set(x.product_id,[]);
+        if(!im.get(x.product_id).includes(x.image_url))im.get(x.product_id).push(x.image_url);
+      }
       const wm=new Map((wr.data||[]).map(x=>[x.variant_id,x]));
-      return products.map(x=>({...x,pdf_image_url:x.primary_image_url||im.get(x.id)||null,variants:x.variants.map(v=>({...v,wholesale_tiers:wm.get(v.id)||null}))}));
+      return products.map(x=>{
+        const images=[...new Set([x.primary_image_url,...(im.get(x.id)||[])].filter(Boolean))];
+        return {...x,pdf_image_url:images[0]||null,pdf_image_urls:images,variants:x.variants.map(v=>({...v,wholesale_tiers:wm.get(v.id)||null}))};
+      });
     },
     async clubOverview(q=''){
       const u=await authUser();
