@@ -996,10 +996,17 @@ El stock y el historial se conservan.`))return;
     if(!window.jspdf?.jsPDF)return alert('No se pudo cargar el generador PDF.');
     const usable=products.map(p=>({...p,variants:p.variants.filter(v=>!pdfOnlyStock||Number(v.stock?.available||0)>0)})).filter(p=>p.variants.length);
     if(!usable.length)return alert('No hay variantes disponibles para exportar.');
-    const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
     const logo=opts.mode==='reseller'?null:await loadPdfLogo('./assets/img/logo-importb2b-transparent.png').catch(()=>null);
     drawPdfCover(doc,opts,usable.length,logo);
+    const pdfProgress=document.createElement('div');
+    pdfProgress.setAttribute('role','status');
+    pdfProgress.style.cssText='position:fixed;bottom:18px;left:12px;right:12px;z-index:99999;background:#17191d;color:white;padding:15px;border:1px solid #e11d36;border-radius:10px;text-align:center;font:600 14px sans-serif';
+    pdfProgress.textContent='Preparando catálogo PDF…';document.body.appendChild(pdfProgress);
+    try{
     for(let i=0;i<usable.length;i+=2){
+      pdfProgress.textContent=`Generando PDF: ${Math.min(i+2,usable.length)} de ${usable.length} productos`;
+      await new Promise(resolve=>setTimeout(resolve,0));
       doc.addPage();
       doc.setFillColor(13,15,18);doc.rect(0,0,210,297,'F');
       if(opts.mode!=='reseller'&&logo)addPdfLogo(doc,logo,12,5,30,10);
@@ -1012,7 +1019,11 @@ El stock y el historial se conservan.`))return;
       doc.text(String(Math.floor(i/2)+1)+' / '+String(Math.ceil(usable.length/2)),198,290,{align:'right'});
     }
     const date=new Date().toISOString().slice(0,10);
+    pdfProgress.textContent='Guardando PDF…';
+    await new Promise(resolve=>setTimeout(resolve,60));
     doc.save(`${opts.mode==='client'?'IMPORTB2B':opts.mode==='reseller'?'Catalogo-Lista-de-Precios':`IMPORTB2B-Mayorista-${opts.wholesaleTier||6}+`}-${date}.pdf`);
+    }catch(error){console.error('Error generando PDF',error);alert('No se pudo completar el PDF: '+(error?.message||'Error inesperado'));}
+    finally{pdfProgress.remove();}
   }
 
   async function drawPdfCompactProduct(doc,p,opts,x,y,w,h){
@@ -1031,7 +1042,7 @@ El stock y el historial se conservan.`))return;
         const bx=x+6+(k%cols)*(cw+gap),by=imageTop+Math.floor(k/cols)*(ch+gap);
         doc.setFillColor(22,24,28);doc.roundedRect(bx,by,cw,ch,1,1,'F');
         try{
-          const data=await imageToData(imgs[k],'#16181c',900,.8);
+          const data=await imageToData(imgs[k],'#16181c',460,.68);
           const props=doc.getImageProperties(data),scale=Math.min((cw-2)/props.width,(ch-2)/props.height);
           const iw=props.width*scale,ih=props.height*scale;
           doc.addImage(data,'JPEG',bx+(cw-iw)/2,by+(ch-ih)/2,iw,ih,undefined,'FAST');
