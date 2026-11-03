@@ -372,7 +372,7 @@
         const email=$('#checkoutEmail').value.trim();
         if(!email)throw new Error('El email es obligatorio para los envíos por correo.');
         if($('#checkoutPostalRecipient').value.trim().length<3)throw new Error('Completá el nombre del destinatario.');
-        if($('#checkoutPostalDocument').value.replace(/\\D/g,'').length<7)throw new Error('Ingresá un DNI o CUIT válido.');
+        if($('#checkoutPostalDocument').value.replace(/\D/g,'').length<7)throw new Error('Ingresá un DNI o CUIT válido.');
         if(!$('#checkoutPostalProvince').value)throw new Error('Seleccioná la provincia.');
         if($('#checkoutPostalCity').value.trim().length<2)throw new Error('Completá la localidad.');
         if(!$('#checkoutPostalCode').value.trim())throw new Error('Ingresá el código postal.');
@@ -410,7 +410,7 @@
       }
       let msg=Importb2bOrderUtils.summary({...j,customer_name:j.customer_name||args.p_customer_name,customer_phone:j.customer_phone||args.p_customer_phone,delivery_type:j.delivery_type||args.p_delivery_type,delivery_address:j.delivery_address||args.p_delivery_address,notes:args.p_notes},j.items||cart.map(i=>({...i,unit_price_ars:i.price})));
       if(j.shipping_quote_pending){
-        msg+='\\n\\n*ENVÍO POR CORREO · A COTIZAR*\\nEmpresa: '+shippingDetails.carrier+'\\nDestinatario: '+shippingDetails.recipient+'\\nDNI/CUIT: '+shippingDetails.document+'\\nLocalidad: '+shippingDetails.city+', '+shippingDetails.province+' · CP '+shippingDetails.postal_code+'\\nEntrega: '+(shippingDetails.delivery_mode==='door'?'Domicilio':'Sucursal')+(shippingDetails.delivery_mode==='door'?' · '+shippingDetails.street+' '+shippingDetails.number+' '+shippingDetails.apartment:' · '+shippingDetails.branch)+'\\nEl costo del correo se confirma por separado.';
+        msg+='\n\n*ENVÍO POR CORREO · A COTIZAR*\\nEmpresa: '+shippingDetails.carrier+'\\nDestinatario: '+shippingDetails.recipient+'\\nDNI/CUIT: '+shippingDetails.document+'\\nLocalidad: '+shippingDetails.city+', '+shippingDetails.province+' · CP '+shippingDetails.postal_code+'\\nEntrega: '+(shippingDetails.delivery_mode==='door'?'Domicilio':'Sucursal')+(shippingDetails.delivery_mode==='door'?' · '+shippingDetails.street+' '+shippingDetails.number+' '+shippingDetails.apartment:' · '+shippingDetails.branch)+'\\nEl costo del correo se confirma por separado.';
       }
       const wa=Importb2bOrderUtils.phone(j.whatsapp_number||data?.settings?.whatsapp_number||'543425575323');
       cart=[];renderCart();
