@@ -541,7 +541,7 @@
 
     async uploadCatalogDesignImage(file,slot='desktop'){
       const u=await authUser();
-      if(!file||!/^image\\/(jpeg|png|webp|avif)$/i.test(file.type||''))throw new Error('Elegí una imagen JPG, PNG, WebP o AVIF.');
+      if(!file||!/^image\/(jpeg|png|webp|avif)$/i.test(file.type||''))throw new Error('Elegí una imagen JPG, PNG, WebP o AVIF.');
       const prepared=await prepareCatalogImage(file);
       const path=`${u.id}/design/${String(slot).replace(/[^a-z0-9_-]/gi,'')}-${crypto.randomUUID()}.webp`;
       const uploaded=await db.storage.from('importb2b-catalog').upload(path,prepared.main.blob,{cacheControl:'31536000',upsert:false,contentType:prepared.main.blob.type||'image/webp'});
