@@ -549,7 +549,14 @@
       return db.storage.from('importb2b-catalog').getPublicUrl(path).data.publicUrl;
     },
     async catalogSettings(){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').select('*').eq('owner_id',companyOwnerId()).single();assert(r);return r.data; },
-    async saveCatalogSettings(payload){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').upsert({owner_id:companyOwnerId(),...payload},{onConflict:'owner_id'}).select().single();assert(r);return r.data; },
+    async saveCatalogSettings(payload){
+      await authUser();
+      const changes={...payload};
+      delete changes.owner_id;
+      if(changes.public_slug==null||String(changes.public_slug).trim()==='')delete changes.public_slug;
+      const r=await db.from('importb2b_catalog_settings').update(changes).eq('owner_id',companyOwnerId()).select().single();
+      assert(r);return r.data;
+    },
     async notifications(){const r=await db.from('notifications').select('id,type,title,body,data,created_at,read_at').order('created_at',{ascending:false}).limit(60);assert(r);return r.data||[];},
     async unreadNotificationsCount(){const r=await db.from('notifications').select('id',{count:'exact',head:true}).is('read_at',null);assert(r);return r.count||0;},
     async openWebOrderCount(){const r=await db.from('importb2b_web_orders').select('id',{count:'exact',head:true}).in('status',['pending','accepted']);assert(r);return r.count||0;},
