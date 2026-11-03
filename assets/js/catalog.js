@@ -92,7 +92,7 @@
     document.querySelectorAll('[data-cat]').forEach(b=>b.addEventListener('click',()=>chooseCategory(b.dataset.cat||'')));
     document.querySelectorAll('[data-share-cat]').forEach(b=>b.addEventListener('click',()=>shareCategory(b.dataset.shareCat)));
     const requested=new URLSearchParams(location.search).get('categoria');if(requested&&cats.includes(requested))chooseCategory(requested);
-    renderPromoCarousel();renderProducts();renderCart();bindCatalogActions();initHeaderNavigation();initFloatingSupport();
+    renderPromoCarousel();applyCatalogSectionOrder();renderProducts();renderCart();bindCatalogActions();initHeaderNavigation();initFloatingSupport();
   }
   const contactWa='5493425575323',contactIg='https://www.instagram.com/import.b2b/';
   const waUrl=message=>`https://wa.me/${contactWa}?text=${encodeURIComponent(message)}`;
@@ -168,8 +168,8 @@
     }
 
     const discounts=data.products.filter(p=>p.variants?.some(saleActive)).slice(0,6);
-    $('#catalogDiscountSection').classList.add('hidden');
-    $('#catalogDiscountGrid').innerHTML=(catalogBrowseOpen&&catalogMode==='discount')?discounts.map(p=>card(p,'OFERTA')).join(''):'';
+    $('#catalogDiscountSection').classList.toggle('hidden',!homeMode||!discounts.length);
+    $('#catalogDiscountGrid').innerHTML=homeMode?discounts.map(p=>card(p,'OFERTA')).join(''):'';
 
     const browse=$('.catalog-all-section'),grid=$('#catalogGrid'),title=$('#catalogBrowseTitle'),subbar=$('#catalogSubcategoryBar');
     const camisetaMode=catalogBrowseOpen&&String(cat||'').trim().toLowerCase()==='camisetas';
@@ -273,6 +273,21 @@
 
   function renderPromoCarousel(){
     const el=$('#catalogPromoCarousel');if(!el)return;
+    const hero=data?.settings?.design?.hero||{};
+    const targets=['new','featured','discount','wholesale','all'];
+    const target=targets.includes(hero.ctaTarget)?hero.ctaTarget:'featured';
+    if(hero.desktopImage||hero.mobileImage||hero.title){
+      const desktop=hero.desktopImage||hero.mobileImage||'';
+      const picture=(hero.mobileImage?'<source media="(max-width: 780px)" srcset="'+esc(hero.mobileImage)+'">':'')+(desktop?'<img src="'+esc(desktop)+'" alt="">':'');
+      el.innerHTML='<div class="catalog-promo-custom"><button type="button" class="catalog-promo-custom-action" data-promo="'+target+'"><picture>'+picture+'</picture><span class="catalog-promo-custom-copy"><small>'+esc(hero.eyebrow||'IMPORTB2B')+'</small><b>'+esc(hero.title||'Descubrí IMPORTB2B')+'</b><em>'+esc(hero.subtitle||'Explorá el catálogo y encontrá lo que buscás')+'</em><strong>'+esc(hero.ctaLabel||'Ver catálogo')+' →</strong></span></button></div>';
+      el.querySelector('[data-promo]')?.addEventListener('click',()=>{
+        if(target==='wholesale')return openWholesaleWhatsapp();
+        catalogMode=target==='all'?'all':target;cat='';q='';catalogBrowseOpen=true;$('#catalogSearch').value='';$('#catalogCategory').value='';
+        document.querySelectorAll('[data-cat],[data-home]').forEach(x=>x.classList.remove('active'));
+        renderProducts();document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth',block:'start'});
+      });
+      return;
+    }
     const slidesData=[
       ['NUEVOS INGRESOS','Lo último en IMPORTB2B.','new'],
       ['DESTACADOS','Elegidos para vos.','featured'],
@@ -297,6 +312,16 @@
     el.addEventListener('pointercancel',()=>{startX=startY=null;dragging=false;startAuto()});
     document.addEventListener('visibilitychange',()=>document.hidden?stop():startAuto());
     go(0);startAuto();
+  }
+  function applyCatalogSectionOrder(){
+    const main=$('#catalogMain'),before=$('#catalogWholesaleCta');
+    if(!main||!before)return;
+    const configured=data?.settings?.design?.sections;
+    const allowed=['new','featured','discount'];
+    const order=Array.isArray(configured)?configured.filter(x=>allowed.includes(x)):[];
+    allowed.forEach(x=>{if(!order.includes(x))order.push(x)});
+    const ids={new:'#catalogNewSection',featured:'#catalogFeaturedSection',discount:'#catalogDiscountSection'};
+    order.forEach(key=>{const node=$(ids[key]);if(node)main.insertBefore(node,before)});
   }
   function initFloatingSupport(){
     if($('#catalogFloatingSupport'))return;
