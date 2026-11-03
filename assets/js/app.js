@@ -1650,6 +1650,7 @@ El stock y el historial se conservan.`))return;
         </div>
         <div class="modal-actions"><button id="goWebOperations" class="btn ghost">Ver pedidos del catálogo</button><button id="saveCatalogSettings" class="btn primary">Guardar catálogo</button></div>
       </section>
+      <div id="bulkDiscountPanel"></div>
       <section class="card catalog-design-editor">
         <div class="section-title"><div><span class="eyebrow">DISEÑO DE LA TIENDA</span><h3>Editor de portada y secciones</h3><p class="muted">Guardá un borrador, revisá la vista previa y publicá cuando esté listo. Los cambios del borrador no se muestran al público.</p></div><span class="pill blue">Revisión ${Number(cfg.design_revision||0)}</span></div>
         <div class="catalog-design-grid">
@@ -1682,6 +1683,13 @@ El stock y el historial se conservan.`))return;
         <div class="modal-actions"><button id="saveCatalogDraft" class="btn ghost">Guardar borrador</button><button id="publishCatalogDesign" class="btn primary">Publicar diseño</button></div>
         <p class="muted">Última publicación: ${cfg.design_published_at?safeDate(cfg.design_published_at):'Todavía no se publicó un diseño personalizado.'}</p>
       </section>`;
+    window.Importb2bBulkDiscounts.mount($('#bulkDiscountPanel'),()=>{
+      $('#designCtaTarget').value='discount';
+      $('#designCtaLabel').value='Ver ofertas';
+      $('#designOrderDiscount').value='1';$('#designOrderNew').value='2';$('#designOrderFeatured').value='3';
+      $('#designCtaLabel').dispatchEvent(new Event('input'));
+      $('#designCtaTarget').scrollIntoView({behavior:'smooth',block:'center'});
+    });
     const preview=()=>{
       const image=$('#designDesktopUrl').value.trim()||$('#designMobileUrl').value.trim();
       $('#designPreviewImage').hidden=!image;

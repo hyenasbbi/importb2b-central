@@ -548,6 +548,25 @@
       assert(uploaded);
       return db.storage.from('importb2b-catalog').getPublicUrl(path).data.publicUrl;
     },
+    async bulkDiscountProducts(){
+      await authUser();
+      const paged=async(table,columns)=>{
+        const rows=[];
+        for(let offset=0;;offset+=500){
+          const r=await db.from(table).select(columns).eq('owner_id',companyOwnerId()).eq('active',true).order('id').range(offset,offset+499);assert(r);
+          rows.push(...(r.data||[]));if((r.data||[]).length<500)return rows;
+        }
+      };
+      const [products,variants]=await Promise.all([
+        paged('importb2b_products','id,name,sku,category,catalog_visible'),
+        paged('importb2b_product_variants','id,product_id,variant_name,price_ars,sale_price_ars')
+      ]);
+      const grouped=new Map();for(const v of variants){if(!grouped.has(v.product_id))grouped.set(v.product_id,[]);grouped.get(v.product_id).push(v);}
+      return products.map(p=>({...p,variants:grouped.get(p.id)||[]})).sort((a,b)=>a.name.localeCompare(b.name));
+    },
+    async applyBulkDiscount(productIds,percent,expected){
+      await authUser();const r=await db.rpc('importb2b_bulk_catalog_discount',{p_product_ids:productIds,p_percent:percent,p_expected:expected});assert(r);return r.data;
+    },
     async catalogSettings(){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').select('*').eq('owner_id',companyOwnerId()).single();assert(r);return r.data; },
     async saveCatalogSettings(payload){
       await authUser();
