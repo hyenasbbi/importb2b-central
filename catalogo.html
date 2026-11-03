@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#060708">
   <title>IMPORTB2B · Catálogo</title>
   <link rel="icon" href="./assets/img/app-icon-512.png">
-  <link rel="stylesheet" href="./assets/css/catalog.css?v=checkout-responsive-20261026">
+  <link rel="stylesheet" href="./assets/css/catalog.css?v=checkout-postal-responsive-20261103">
 <link rel="stylesheet" href="/assets/css/legal.css?v=legal-design-20261027"><meta name="referrer" content="no-referrer"></head>
 <body>
   <header class="store-header">
@@ -76,7 +76,40 @@
         <label>WhatsApp<input id="checkoutPhone" inputmode="tel" autocomplete="tel"></label>
         <label>Email (opcional)<input id="checkoutEmail" type="email" autocomplete="email"></label>
         <label class="wide checkout-section-label">2. Forma de entrega<select id="checkoutDelivery"></select></label>
-        <div id="addressLabel" class="wide hidden checkout-delivery-address"><label>Dirección<input id="checkoutAddress" autocomplete="street-address" placeholder="Calle, número, piso/depto si corresponde"></label><div class="checkout-city-pills"><button type="button" data-city="Santa Fe">Santa Fe</button><button type="button" data-city="Santo Tomé">Santo Tomé</button></div></div>
+        <div id="addressLabel" class="wide hidden checkout-delivery-address">
+          <div class="checkout-destination-switch" role="group" aria-label="Destino del envío">
+            <label><input type="radio" name="checkoutShippingZone" value="local" checked><span><b>Santa Fe / Santo Tomé</b><small>Entrega local</small></span></label>
+            <label><input type="radio" name="checkoutShippingZone" value="postal"><span><b>Otra localidad · Correo</b><small>Andreani o Vía Cargo</small></span></label>
+          </div>
+          <div id="localDeliveryFields" class="checkout-delivery-fields">
+            <label>Dirección<input id="checkoutAddress" autocomplete="street-address" placeholder="Calle, número, piso/depto si corresponde"></label>
+            <div class="checkout-city-pills"><button type="button" data-city="Santa Fe">Santa Fe</button><button type="button" data-city="Santo Tomé">Santo Tomé</button></div>
+          </div>
+          <div id="postalDeliveryFields" class="checkout-postal-fields hidden">
+            <p class="checkout-postal-note">Completá los datos del destinatario. El costo del correo se cotiza antes de confirmar la venta y no se suma hasta que lo aprobemos.</p>
+            <div class="checkout-postal-grid">
+              <label>Nombre del destinatario<input id="checkoutPostalRecipient" autocomplete="name" placeholder="Nombre y apellido"></label>
+              <label>DNI / CUIT<input id="checkoutPostalDocument" inputmode="numeric" placeholder="Sin puntos ni guiones"></label>
+              <label>Provincia<select id="checkoutPostalProvince"><option value="">Seleccionar provincia</option><option>Buenos Aires</option><option>Ciudad Autónoma de Buenos Aires</option><option>Catamarca</option><option>Chaco</option><option>Chubut</option><option>Córdoba</option><option>Corrientes</option><option>Entre Ríos</option><option>Formosa</option><option>Jujuy</option><option>La Pampa</option><option>La Rioja</option><option>Mendoza</option><option>Misiones</option><option>Neuquén</option><option>Río Negro</option><option>Salta</option><option>San Juan</option><option>San Luis</option><option>Santa Cruz</option><option>Santa Fe</option><option>Santiago del Estero</option><option>Tierra del Fuego</option><option>Tucumán</option></select></label>
+              <label>Localidad<input id="checkoutPostalCity" autocomplete="address-level2" placeholder="Ciudad o localidad"></label>
+              <label>Código postal<input id="checkoutPostalCode" autocomplete="postal-code" placeholder="Ej. 3000"></label>
+              <label>Empresa de correo<select id="checkoutPostalCarrier"><option value="Andreani">Andreani</option><option value="Vía Cargo">Vía Cargo</option></select></label>
+            </div>
+            <div class="checkout-postal-mode">
+              <span>¿Cómo querés recibirlo?</span>
+              <label><input type="radio" name="checkoutPostalMode" value="door" checked> En mi domicilio</label>
+              <label><input type="radio" name="checkoutPostalMode" value="branch"> Retiro en sucursal</label>
+            </div>
+            <div id="postalDoorFields" class="checkout-postal-grid">
+              <label>Calle<input id="checkoutPostalStreet" autocomplete="address-line1"></label>
+              <label>Número<input id="checkoutPostalNumber" inputmode="numeric"></label>
+              <label class="postal-apartment">Piso / departamento (opcional)<input id="checkoutPostalApartment" autocomplete="address-line2"></label>
+            </div>
+            <div id="postalBranchFields" class="hidden">
+              <label>Sucursal elegida<input id="checkoutPostalBranch" placeholder="Nombre y dirección de la sucursal"></label>
+            </div>
+          </div>
+        </div>
         <div class="wide"><h3>3. Elegí cómo pagar</h3><label class="checkout-payment-select">Forma de pago<select id="checkoutPayment"></select></label><div id="checkoutPaymentCards" class="checkout-payment-cards"></div><p id="checkoutPaymentHint" class="checkout-help" aria-live="polite"></p></div>
         <label class="wide">Observaciones<textarea id="checkoutNotes" rows="3"></textarea></label>
       <div class="wide privacy-notice"><label class="privacy-choice"><input id="checkoutPrivacy" type="checkbox"><span>Leí la <a href="/privacidad.html" target="_blank" rel="noopener noreferrer">política de privacidad</a> y acepto los <a href="/terminos.html" target="_blank" rel="noopener noreferrer">términos de venta</a>.</span></label><p>Usamos los datos necesarios para gestionar tu pedido. Al confirmar, se abrirá WhatsApp con el resumen y tus datos de contacto y entrega. Esta casilla no autoriza publicidad. <a href="/datos-personales.html">Ejercer mis derechos</a>.</p></div>
@@ -89,6 +122,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
   <script src="./assets/js/config.js?v=7.8.6"></script>
   <script src="./assets/js/order-utils.js?v=checkout-wa-20261021"></script>
-  <script src="./assets/js/catalog.js?v=checkout-responsive-20261026"></script>
+  <script src="./assets/js/catalog.js?v=checkout-postal-responsive-20261103"></script>
 </body>
 </html>
