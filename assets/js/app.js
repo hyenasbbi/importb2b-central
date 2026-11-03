@@ -1622,9 +1622,106 @@ El stock y el historial se conservan.`))return;
   /* -------------------- PUBLIC CATALOG / WEB ORDERS -------------------- */
   async function renderCatalogAdmin(){
     const cfg=await DB.catalogSettings();
-    const publicUrl=`${location.origin}/catalogo`;
-    content.innerHTML=`<section class="card catalog-settings-single"><div class="section-title"><div><span class="eyebrow">CATÁLOGO PÚBLICO</span><h3>Configuración</h3><p class="muted">Los pedidos que entren desde el catálogo se administran en <b>Operaciones → Pedidos del catálogo</b>.</p></div><a class="btn primary" href="${publicUrl}" target="_blank" rel="noopener">Abrir catálogo</a></div><div class="catalog-url-box"><small>URL pública</small><code>${esc(publicUrl)}</code></div><div class="form-grid" style="margin-top:14px"><label>Título<input id="catTitle" value="${esc(cfg.catalog_title||'IMPORTB2B')}"></label><label>Subtítulo<input id="catSubtitle" value="${esc(cfg.catalog_subtitle||'')}"></label><label>WhatsApp<input id="catWhatsapp" value="${esc(cfg.whatsapp_number||'')}" placeholder="549342..."></label><label>Pedido mínimo<input id="catMin" type="number" min="0" value="${Number(cfg.min_order_ars||0)}"></label><label>Costo de envío<input id="catShippingFee" type="number" min="0" value="${Number(cfg.shipping_fee_ars||0)}"></label><label>Nota de envío<input id="catShippingNote" value="${esc(cfg.shipping_note||'')}"></label></div><div class="catalog-toggle-grid"><label class="check"><input id="catPublic" type="checkbox" ${cfg.is_public?'checked':''}> Catálogo activo</label><label class="check"><input id="catExact" type="checkbox" ${cfg.show_exact_stock?'checked':''}> Mostrar cantidad exacta</label><label class="check"><input id="catOut" type="checkbox" ${cfg.show_out_of_stock?'checked':''}> Mostrar agotados</label><label class="check"><input id="catPickup" type="checkbox" ${cfg.allow_pickup?'checked':''}> Permitir retiro</label><label class="check"><input id="catShipping" type="checkbox" ${cfg.allow_shipping?'checked':''}> Permitir envío</label><label class="check"><input id="catPayLater" type="checkbox" ${cfg.allow_pay_later_public?'checked':''}> Cuenta corriente pública</label></div><div class="modal-actions"><button id="goWebOperations" class="btn ghost">Ver pedidos del catálogo</button><button id="saveCatalogSettings" class="btn primary">Guardar catálogo</button></div></section>`;
-    $('#saveCatalogSettings').addEventListener('click',async()=>{const b=$('#saveCatalogSettings');b.disabled=true;try{await DB.saveCatalogSettings({public_slug:cfg.public_slug||'importb2b',catalog_title:$('#catTitle').value.trim()||'IMPORTB2B',catalog_subtitle:$('#catSubtitle').value.trim()||null,whatsapp_number:$('#catWhatsapp').value.trim()||null,min_order_ars:Number($('#catMin').value||0),shipping_fee_ars:Number($('#catShippingFee').value||0),shipping_note:$('#catShippingNote').value.trim()||null,is_public:$('#catPublic').checked,show_exact_stock:$('#catExact').checked,show_out_of_stock:$('#catOut').checked,allow_pickup:$('#catPickup').checked,allow_shipping:$('#catShipping').checked,allow_pay_later_public:$('#catPayLater').checked,pickup_label:'Retiro',shipping_label:'Envío'});alert('Catálogo actualizado');await renderCatalogAdmin()}catch(e){alert(e.message)}finally{b.disabled=false}});
+    const publicUrl=location.origin+'/catalogo';
+    const draft=cfg.design_draft&&typeof cfg.design_draft==='object'?cfg.design_draft:{};
+    const hero=draft.hero&&typeof draft.hero==='object'?draft.hero:{};
+    const order=Array.isArray(draft.sections)?draft.sections:['new','featured','discount'];
+    const orderOptions=key=>[1,2,3].map(n=>'<option value="'+n+'" '+(order.indexOf(key)+1===n?'selected':'')+'>'+n+'</option>').join('');
+    const target=hero.ctaTarget||'featured';
+    content.innerHTML=`
+      <section class="card catalog-settings-single">
+        <div class="section-title"><div><span class="eyebrow">CATÁLOGO PÚBLICO</span><h3>Configuración</h3><p class="muted">Los pedidos que entren desde el catálogo se administran en <b>Operaciones → Pedidos del catálogo</b>.</p></div><a class="btn primary" href="${publicUrl}" target="_blank" rel="noopener">Abrir catálogo</a></div>
+        <div class="catalog-url-box"><small>URL pública</small><code>${esc(publicUrl)}</code></div>
+        <div class="form-grid" style="margin-top:14px">
+          <label>Título<input id="catTitle" value="${esc(cfg.catalog_title||'IMPORTB2B')}"></label>
+          <label>Subtítulo<input id="catSubtitle" value="${esc(cfg.catalog_subtitle||'')}"></label>
+          <label>WhatsApp<input id="catWhatsapp" value="${esc(cfg.whatsapp_number||'')}" placeholder="549342..."></label>
+          <label>Pedido mínimo<input id="catMin" type="number" min="0" value="${Number(cfg.min_order_ars||0)}"></label>
+          <label>Costo de envío local<input id="catShippingFee" type="number" min="0" value="${Number(cfg.shipping_fee_ars||0)}"></label>
+          <label>Nota de envío<input id="catShippingNote" value="${esc(cfg.shipping_note||'')}"></label>
+        </div>
+        <div class="catalog-toggle-grid">
+          <label class="check"><input id="catPublic" type="checkbox" ${cfg.is_public?'checked':''}> Catálogo activo</label>
+          <label class="check"><input id="catExact" type="checkbox" ${cfg.show_exact_stock?'checked':''}> Mostrar cantidad exacta</label>
+          <label class="check"><input id="catOut" type="checkbox" ${cfg.show_out_of_stock?'checked':''}> Mostrar agotados</label>
+          <label class="check"><input id="catPickup" type="checkbox" ${cfg.allow_pickup?'checked':''}> Permitir retiro</label>
+          <label class="check"><input id="catShipping" type="checkbox" ${cfg.allow_shipping?'checked':''}> Permitir envío</label>
+          <label class="check"><input id="catPayLater" type="checkbox" ${cfg.allow_pay_later_public?'checked':''}> Cuenta corriente pública</label>
+        </div>
+        <div class="modal-actions"><button id="goWebOperations" class="btn ghost">Ver pedidos del catálogo</button><button id="saveCatalogSettings" class="btn primary">Guardar catálogo</button></div>
+      </section>
+      <section class="card catalog-design-editor">
+        <div class="section-title"><div><span class="eyebrow">DISEÑO DE LA TIENDA</span><h3>Editor de portada y secciones</h3><p class="muted">Guardá un borrador, revisá la vista previa y publicá cuando esté listo. Los cambios del borrador no se muestran al público.</p></div><span class="pill blue">Revisión ${Number(cfg.design_revision||0)}</span></div>
+        <div class="catalog-design-grid">
+          <label>Texto superior<input id="designEyebrow" maxlength="60" value="${esc(hero.eyebrow||'IMPORTB2B · IMPORTADOS')}"></label>
+          <label>Titular<input id="designTitle" maxlength="100" value="${esc(hero.title||'')} " placeholder="Ej. Encontrá tus próximos favoritos"></label>
+          <label class="design-wide">Descripción<textarea id="designSubtitle" rows="2" maxlength="220" placeholder="Una frase breve para acompañar la portada">${esc(hero.subtitle||'')}</textarea></label>
+          <label>Texto del botón<input id="designCtaLabel" maxlength="40" value="${esc(hero.ctaLabel||'Ver catálogo')}"></label>
+          <label>Destino del botón<select id="designCtaTarget">
+            <option value="new" ${target==='new'?'selected':''}>Nuevos ingresos</option>
+            <option value="featured" ${target==='featured'?'selected':''}>Destacados</option>
+            <option value="discount" ${target==='discount'?'selected':''}>Descuentos</option>
+            <option value="wholesale" ${target==='wholesale'?'selected':''}>Consultar mayorista</option>
+            <option value="all" ${target==='all'?'selected':''}>Todo el catálogo</option>
+          </select></label>
+          <label>Imagen para computadora (URL)<input id="designDesktopUrl" value="${esc(hero.desktopImage||'')}" placeholder="Se completa al subir una imagen"></label>
+          <label>Subir portada para computadora<input id="designDesktopFile" type="file" accept="image/jpeg,image/png,image/webp,image/avif"></label>
+          <label>Imagen para celular (URL)<input id="designMobileUrl" value="${esc(hero.mobileImage||'')}" placeholder="Opcional: usa la de computadora si queda vacío"></label>
+          <label>Subir portada para celular<input id="designMobileFile" type="file" accept="image/jpeg,image/png,image/webp,image/avif"></label>
+        </div>
+        <div id="designUploadStatus" class="muted" aria-live="polite">Formatos admitidos: JPG, PNG, WebP y AVIF. Se optimizan al subir.</div>
+        <div class="catalog-design-preview-wrap"><span class="eyebrow">VISTA PREVIA DE PORTADA</span><div id="designPreview" class="catalog-design-preview">
+          <img id="designPreviewImage" src="${esc(hero.mobileImage||hero.desktopImage||'')}" alt="" ${hero.mobileImage||hero.desktopImage?'':'hidden'}>
+          <div><small id="designPreviewEyebrow">${esc(hero.eyebrow||'IMPORTB2B · IMPORTADOS')}</small><b id="designPreviewTitle">${esc(hero.title||'Tu próxima compra empieza acá')}</b><span id="designPreviewSubtitle">${esc(hero.subtitle||'La portada se actualiza con tu borrador')}</span><strong id="designPreviewCta">${esc(hero.ctaLabel||'Ver catálogo')} →</strong></div>
+        </div></div>
+        <div class="catalog-design-order"><div><span class="eyebrow">ORDEN DE SECCIONES</span><p class="muted">Elegí qué sección aparece primero, segunda y tercera.</p></div>
+          <label>Nuevos ingresos<select id="designOrderNew">${orderOptions('new')}</select></label>
+          <label>Destacados<select id="designOrderFeatured">${orderOptions('featured')}</select></label>
+          <label>Descuentos<select id="designOrderDiscount">${orderOptions('discount')}</select></label>
+        </div>
+        <div class="modal-actions"><button id="saveCatalogDraft" class="btn ghost">Guardar borrador</button><button id="publishCatalogDesign" class="btn primary">Publicar diseño</button></div>
+        <p class="muted">Última publicación: ${cfg.design_published_at?safeDate(cfg.design_published_at):'Todavía no se publicó un diseño personalizado.'}</p>
+      </section>`;
+    const preview=()=>{
+      const image=$('#designMobileUrl').value.trim()||$('#designDesktopUrl').value.trim();
+      $('#designPreviewImage').hidden=!image;
+      if(image)$('#designPreviewImage').src=image;
+      $('#designPreviewEyebrow').textContent=$('#designEyebrow').value||'IMPORTB2B';
+      $('#designPreviewTitle').textContent=$('#designTitle').value||'Tu próxima compra empieza acá';
+      $('#designPreviewSubtitle').textContent=$('#designSubtitle').value||'La portada se actualiza con tu borrador';
+      $('#designPreviewCta').textContent=($('#designCtaLabel').value||'Ver catálogo')+' →';
+    };
+    ['designEyebrow','designTitle','designSubtitle','designCtaLabel','designDesktopUrl','designMobileUrl'].forEach(id=>$('#'+id).addEventListener('input',preview));
+    const upload=async(inputId,slot,urlId)=>{
+      const file=$('#'+inputId).files?.[0];if(!file)return;
+      const status=$('#designUploadStatus');status.textContent='Subiendo y optimizando imagen...';
+      const input=$('#'+inputId);input.disabled=true;
+      try{const url=await DB.uploadCatalogDesignImage(file,slot);$('#'+urlId).value=url;preview();status.textContent='Imagen cargada correctamente. Guardá el borrador o publicá el diseño.'}
+      catch(e){status.textContent=e.message;alert(e.message)}
+      finally{input.disabled=false}
+    };
+    $('#designDesktopFile').addEventListener('change',()=>upload('designDesktopFile','desktop','designDesktopUrl'));
+    $('#designMobileFile').addEventListener('change',()=>upload('designMobileFile','mobile','designMobileUrl'));
+    const collectDesign=()=>{
+      const sections=[['new',Number($('#designOrderNew').value)],['featured',Number($('#designOrderFeatured').value)],['discount',Number($('#designOrderDiscount').value)]].sort((a,b)=>a[1]-b[1]).map(x=>x[0]);
+      if(new Set([Number($('#designOrderNew').value),Number($('#designOrderFeatured').value),Number($('#designOrderDiscount').value)]).size!==3)throw new Error('Asigná un orden diferente a cada sección.');
+      return {version:1,hero:{eyebrow:$('#designEyebrow').value.trim(),title:$('#designTitle').value.trim(),subtitle:$('#designSubtitle').value.trim(),ctaLabel:$('#designCtaLabel').value.trim()||'Ver catálogo',ctaTarget:$('#designCtaTarget').value,desktopImage:$('#designDesktopUrl').value.trim(),mobileImage:$('#designMobileUrl').value.trim()},sections};
+    };
+    $('#saveCatalogDraft').addEventListener('click',async()=>{
+      const b=$('#saveCatalogDraft');b.disabled=true;
+      try{const design=collectDesign();await DB.saveCatalogSettings({design_draft:design});alert('Borrador guardado. La tienda pública sigue mostrando el diseño publicado.');await renderCatalogAdmin()}
+      catch(e){alert(e.message)}finally{b.disabled=false}
+    });
+    $('#publishCatalogDesign').addEventListener('click',async()=>{
+      const b=$('#publishCatalogDesign');b.disabled=true;
+      try{const design=collectDesign();if(!confirm('¿Publicar este diseño en el catálogo público?'))return;await DB.saveCatalogSettings({design_draft:design,design_published:design,design_revision:Number(cfg.design_revision||0)+1,design_published_at:new Date().toISOString()});alert('Diseño publicado en el catálogo.');await renderCatalogAdmin()}
+      catch(e){alert(e.message)}finally{b.disabled=false}
+    });
+    $('#saveCatalogSettings').addEventListener('click',async()=>{
+      const b=$('#saveCatalogSettings');b.disabled=true;
+      try{await DB.saveCatalogSettings({public_slug:cfg.public_slug||'importb2b',catalog_title:$('#catTitle').value.trim()||'IMPORTB2B',catalog_subtitle:$('#catSubtitle').value.trim()||null,whatsapp_number:$('#catWhatsapp').value.trim()||null,min_order_ars:Number($('#catMin').value||0),shipping_fee_ars:Number($('#catShippingFee').value||0),shipping_note:$('#catShippingNote').value.trim()||null,is_public:$('#catPublic').checked,show_exact_stock:$('#catExact').checked,show_out_of_stock:$('#catOut').checked,allow_pickup:$('#catPickup').checked,allow_shipping:$('#catShipping').checked,allow_pay_later_public:$('#catPayLater').checked,pickup_label:'Retiro',shipping_label:'Envío'});alert('Catálogo actualizado');await renderCatalogAdmin()}
+      catch(e){alert(e.message)}finally{b.disabled=false}
+    });
     $('#goWebOperations').addEventListener('click',()=>{operationsTab='web';webOrderStatusFilter='pending';setView('orders')});
   }
   async function openWebOrder(id){
