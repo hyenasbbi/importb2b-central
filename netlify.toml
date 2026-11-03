@@ -1,5 +1,5 @@
 [build]
-  command = "node scripts/build-public.mjs"
+  command = "node --check assets/js/app.js && node --check assets/js/catalog.js && node --check assets/js/db.js && node --check assets/js/order-utils.js && node --check netlify/functions/web-order.mjs && node scripts/build-public.mjs"
   publish = "dist"
   functions = "netlify/functions"
 
