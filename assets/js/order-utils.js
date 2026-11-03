@@ -18,7 +18,7 @@
       ...(order.delivery_address?['Dirección: '+order.delivery_address]:[]),
       '', '*ENTREGA Y PAGO*','Entrega: '+(order.delivery_type==='shipping'?'Envío':'Retiro'),
       'Forma de pago: '+order.payment_method,'Productos: '+money(order.subtotal_ars),
-      'Envío: '+money(order.shipping_ars),'Ajuste de pago: '+money(order.adjustment_ars),
+      'Envío: '+(order.shipping_quote_pending?'A cotizar':money(order.shipping_ars)),'Ajuste de pago: '+money(order.adjustment_ars),
       '*Total: '+money(order.total_ars)+'*',
       ...(order.notes?['Observaciones: '+order.notes]:[]),
       '', 'Pedido registrado en el catálogo. Quedo atento/a para confirmar disponibilidad, pago y entrega.'
