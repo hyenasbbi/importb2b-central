@@ -558,11 +558,17 @@
         }
       };
       const [products,variants]=await Promise.all([
-        paged('importb2b_products','id,name,sku,category,catalog_visible'),
+        paged('importb2b_products','id,name,sku,category,catalog_visible,primary_image_url'),
         paged('importb2b_product_variants','id,product_id,variant_name,price_ars,sale_price_ars')
       ]);
       const grouped=new Map();for(const v of variants){if(!grouped.has(v.product_id))grouped.set(v.product_id,[]);grouped.get(v.product_id).push(v);}
-      return products.map(p=>({...p,variants:grouped.get(p.id)||[]})).sort((a,b)=>a.name.localeCompare(b.name));
+      const images=new Map();
+      for(let offset=0;offset<products.length;offset+=100){
+        const ids=products.slice(offset,offset+100).map(p=>p.id);
+        const r=await db.from('importb2b_product_images').select('product_id,image_url,thumbnail_url,is_primary,sort_order').in('product_id',ids).order('is_primary',{ascending:false}).order('sort_order');assert(r);
+        for(const img of r.data||[]){if(!images.has(img.product_id)&&(img.thumbnail_url||img.image_url))images.set(img.product_id,img.thumbnail_url||img.image_url);}
+      }
+      return products.map(p=>({...p,thumbnail_url:images.get(p.id)||p.primary_image_url||null,variants:grouped.get(p.id)||[]})).sort((a,b)=>a.name.localeCompare(b.name));
     },
     async applyBulkDiscount(productIds,percent,expected){
       await authUser();const r=await db.rpc('importb2b_bulk_catalog_discount',{p_product_ids:productIds,p_percent:percent,p_expected:expected});assert(r);return r.data;
