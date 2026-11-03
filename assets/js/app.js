@@ -1654,7 +1654,7 @@ El stock y el historial se conservan.`))return;
         <div class="section-title"><div><span class="eyebrow">DISEÑO DE LA TIENDA</span><h3>Editor de portada y secciones</h3><p class="muted">Guardá un borrador, revisá la vista previa y publicá cuando esté listo. Los cambios del borrador no se muestran al público.</p></div><span class="pill blue">Revisión ${Number(cfg.design_revision||0)}</span></div>
         <div class="catalog-design-grid">
           <label>Texto superior<input id="designEyebrow" maxlength="60" value="${esc(hero.eyebrow||'IMPORTB2B · IMPORTADOS')}"></label>
-          <label>Titular<input id="designTitle" maxlength="100" value="${esc(hero.title||'')} " placeholder="Ej. Encontrá tus próximos favoritos"></label>
+          <label>Titular<input id="designTitle" maxlength="100" value="${esc(hero.title||'')}" placeholder="Ej. Encontrá tus próximos favoritos"></label>
           <label class="design-wide">Descripción<textarea id="designSubtitle" rows="2" maxlength="220" placeholder="Una frase breve para acompañar la portada">${esc(hero.subtitle||'')}</textarea></label>
           <label>Texto del botón<input id="designCtaLabel" maxlength="40" value="${esc(hero.ctaLabel||'Ver catálogo')}"></label>
           <label>Destino del botón<select id="designCtaTarget">
@@ -1683,7 +1683,7 @@ El stock y el historial se conservan.`))return;
         <p class="muted">Última publicación: ${cfg.design_published_at?safeDate(cfg.design_published_at):'Todavía no se publicó un diseño personalizado.'}</p>
       </section>`;
     const preview=()=>{
-      const image=$('#designMobileUrl').value.trim()||$('#designDesktopUrl').value.trim();
+      const image=$('#designDesktopUrl').value.trim()||$('#designMobileUrl').value.trim();
       $('#designPreviewImage').hidden=!image;
       if(image)$('#designPreviewImage').src=image;
       $('#designPreviewEyebrow').textContent=$('#designEyebrow').value||'IMPORTB2B';
