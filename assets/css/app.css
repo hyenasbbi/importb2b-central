@@ -1058,3 +1058,39 @@ body{touch-action:pan-y pinch-zoom}
 .notification-item span{color:#c1c7cc;font-size:14px}
 .notification-item small{color:#929ca6;font-size:12px}
 @media(max-width:600px){.operational-inbox{font-size:12px;padding:8px}.topbar{gap:8px}.notification-item{padding:12px}}
+
+
+/* 2026-11-03 · Central catalog editor and postal quote workflow */
+.catalog-design-editor{max-width:1040px;margin:18px auto 0}
+.catalog-design-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-top:16px}
+.catalog-design-grid label,.postal-quote-panel label{display:grid;gap:7px;min-width:0;color:var(--text);font-size:13px;font-weight:750}
+.catalog-design-grid input,.catalog-design-grid select,.catalog-design-grid textarea,.postal-quote-panel input{width:100%;min-width:0;box-sizing:border-box}
+.catalog-design-grid .design-wide{grid-column:1/-1}
+.catalog-design-preview-wrap{display:grid;gap:9px;margin-top:18px}
+.catalog-design-preview{position:relative;display:flex;align-items:center;min-height:220px;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,#1b2027,#090b0d);padding:24px}
+.catalog-design-preview>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.catalog-design-preview:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(3,5,7,.93),rgba(3,5,7,.48))}
+.catalog-design-preview>div{position:relative;z-index:1;display:grid;gap:9px;width:min(620px,85%)}
+.catalog-design-preview small{color:#ff555b;font-weight:950;letter-spacing:.16em;font-size:10px}
+.catalog-design-preview b{font-size:clamp(24px,3vw,38px);line-height:1.02;color:#fff}
+.catalog-design-preview span{color:#d4dbe2;font-size:13px;line-height:1.45}
+.catalog-design-preview strong{justify-self:start;margin-top:4px;padding:10px 14px;border-radius:10px;background:#ff3138;color:#fff;font-size:12px}
+.catalog-design-order{display:grid;grid-template-columns:1.5fr repeat(3,minmax(110px,1fr));align-items:end;gap:12px;margin-top:18px;padding:15px;border:1px solid var(--line);border-radius:16px;background:#090b0d}
+.catalog-design-order label{display:grid;gap:7px;font-size:12px;font-weight:750}
+.catalog-design-order .muted{margin:5px 0 0;font-size:12px}
+#designUploadStatus{margin-top:10px;font-size:12px}
+.postal-order-details .eyebrow,.postal-quote-panel .eyebrow{display:block;margin-bottom:12px;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.16em}
+.postal-order-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.postal-order-grid>div{display:grid;gap:4px;min-width:0}
+.postal-order-grid small{color:var(--muted);font-size:11px}
+.postal-order-grid b{font-size:13px;overflow-wrap:anywhere}
+.postal-quote-panel p{margin:0 0 12px}
+@media(max-width:760px){
+ .catalog-design-grid{grid-template-columns:1fr}
+ .catalog-design-grid .design-wide{grid-column:auto}
+ .catalog-design-order{grid-template-columns:1fr 1fr}
+ .catalog-design-order>div{grid-column:1/-1}
+ .catalog-design-preview{min-height:190px;padding:18px}
+ .postal-order-grid{grid-template-columns:1fr}
+}
+@media(max-width:420px){.catalog-design-order{grid-template-columns:1fr}}
