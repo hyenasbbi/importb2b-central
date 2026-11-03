@@ -539,6 +539,15 @@
       }
     },
 
+    async uploadCatalogDesignImage(file,slot='desktop'){
+      const u=await authUser();
+      if(!file||!/^image\\/(jpeg|png|webp|avif)$/i.test(file.type||''))throw new Error('Elegí una imagen JPG, PNG, WebP o AVIF.');
+      const prepared=await prepareCatalogImage(file);
+      const path=`${u.id}/design/${String(slot).replace(/[^a-z0-9_-]/gi,'')}-${crypto.randomUUID()}.webp`;
+      const uploaded=await db.storage.from('importb2b-catalog').upload(path,prepared.main.blob,{cacheControl:'31536000',upsert:false,contentType:prepared.main.blob.type||'image/webp'});
+      assert(uploaded);
+      return db.storage.from('importb2b-catalog').getPublicUrl(path).data.publicUrl;
+    },
     async catalogSettings(){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').select('*').eq('owner_id',companyOwnerId()).single();assert(r);return r.data; },
     async saveCatalogSettings(payload){ const u=await authUser(); const r=await db.from('importb2b_catalog_settings').upsert({owner_id:companyOwnerId(),...payload},{onConflict:'owner_id'}).select().single();assert(r);return r.data; },
     async notifications(){const r=await db.from('notifications').select('id,type,title,body,data,created_at,read_at').order('created_at',{ascending:false}).limit(60);assert(r);return r.data||[];},
@@ -555,6 +564,10 @@
         db.from('importb2b_web_order_items').select('*').eq('order_id',id).order('created_at'),
         db.from('importb2b_payment_methods').select('id,name,code,finance_mode,finance_payment_method').eq('active',true)
       ]);[o,i,m].forEach(assert);const mm=new Map((m.data||[]).map(x=>[x.id,x]));return {...o.data,items:i.data||[],payment_method:mm.get(o.data.payment_method_id)||null};
+    },
+    async quoteWebOrderShipping(id,amount){
+      const r=await db.rpc('importb2b_quote_web_shipping',{p_order_id:id,p_shipping_ars:Number(amount)});
+      assert(r);return r.data;
     },
     async webOrderAction(id,action,reason='',holder=null){
       const fn={confirm:'importb2b_confirm_web_order',cancel:'importb2b_cancel_web_order',accept:'importb2b_accept_web_order',deliver:'importb2b_deliver_web_order'}[action];
