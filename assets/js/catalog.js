@@ -2,7 +2,7 @@
   const $=s=>document.querySelector(s),money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n||0)),esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const isImportedShorts=category=>/^(shorts|shores) importados$/i.test(String(category||'').trim());
   let subcategory='';
-  let data=null,cart=[],q='',cat='',sleeve='short',catalogMode='home',checkoutCity='',catalogBrowseOpen=false;
+  let data=null,cart=[],q='',cat='',sleeve='short',catalogMode='home',checkoutCity='',checkoutZone='local',catalogBrowseOpen=false;
   const cfg=window.IMPORTB2B_CONFIG||{};
   const publicDb=window.supabase?.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
   const slug=new URLSearchParams(location.search).get('slug')||'importb2b';
@@ -317,49 +317,104 @@
   function openWholesaleWhatsapp(){const wa=String(data?.settings?.whatsapp_number||'').replace(/\D/g,'');const msg='Hola! Quiero conocer precios mayoristas de ';if(!wa)return alert('WhatsApp mayorista todavía no está configurado.');window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`,'_blank')}
 
   function add(pid,vid){const p=data.products.find(x=>x.id===pid),v=p?.variants.find(x=>x.id===vid);if(!v||!v.in_stock)return;const x=cart.find(i=>i.variant_id===vid);const max=Math.max(0,Math.floor(Number(v.available||0)));if(max<1)return alert('Sin stock disponible para esta variante');if(x){if(x.quantity>=max)return alert('No hay más unidades disponibles');x.quantity++}else cart.push({product_id:pid,variant_id:vid,product_name:p.name,variant_name:v.name,price:effectivePrice(v),regular_price:Number(v.price_ars||0),sale_price:saleActive(v)?Number(v.sale_price_ars):null,quantity:1,max});renderCart()}
-  function totals(paymentCode=null,delivery='pickup'){const subtotal=cart.reduce((a,x)=>a+x.price*x.quantity,0),shipping=delivery==='shipping'?Number(data?.settings.shipping_fee_ars||0):0,method=(data?.payment_methods||[]).find(m=>m.code===paymentCode);let adj=0,base=subtotal+shipping;if(method?.adjustment_kind==='percent')adj=base*Number(method.adjustment_value||0)/100;else if(method?.adjustment_kind==='fixed')adj=Number(method.adjustment_value||0);if(method?.adjustment_direction==='discount')adj=-Math.abs(adj);else adj=Math.abs(adj);return{subtotal,shipping,adj,total:base+adj}}
+  function totals(paymentCode=null,delivery='pickup',zone=checkoutZone){const subtotal=cart.reduce((a,x)=>a+x.price*x.quantity,0),shipping=delivery==='shipping'&&zone!=='postal'?Number(data?.settings.shipping_fee_ars||0):0,method=(data?.payment_methods||[]).find(m=>m.code===paymentCode);let adj=0,base=subtotal+shipping;if(method?.adjustment_kind==='percent')adj=base*Number(method.adjustment_value||0)/100;else if(method?.adjustment_kind==='fixed')adj=Number(method.adjustment_value||0);if(method?.adjustment_direction==='discount')adj=-Math.abs(adj);else adj=Math.abs(adj);return{subtotal,shipping,adj,total:base+adj}}
   function renderCart(){const t=totals();$('#catalogCartCount').textContent=cart.reduce((a,x)=>a+x.quantity,0);const headerTotal=$('#catalogCartTotal');if(headerTotal)headerTotal.textContent=money(t.subtotal);$('#catalogCartItems').innerHTML=cart.map((x,i)=>`<div class="cart-line"><div><b>${esc(x.product_name)}</b><small>${esc(x.variant_name)} · ${x.sale_price?`<del class="cart-old-price">${money(x.regular_price)}</del> ${money(x.price)}`:money(x.price)}</small></div><div class="cart-line-actions"><button data-i="${i}" data-d="-1">−</button><b>${x.quantity}</b><button data-i="${i}" data-d="1">+</button><button class="remove" data-i="${i}" data-remove>×</button></div></div>`).join('')||'<div class="store-loading">Tu carrito está vacío.</div>';$('#catalogSummary').innerHTML=`<div><span>Subtotal</span><b>${money(t.subtotal)}</b></div><div class="grand"><span>Total estimado</span><b>${money(t.subtotal)}</b></div>`;$('#checkoutButton').disabled=!cart.length;document.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{const x=cart[Number(b.dataset.i)],d=Number(b.dataset.d);x.quantity=Math.max(1,Math.min(x.max,x.quantity+d));renderCart()}));document.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',()=>{cart.splice(Number(b.dataset.i),1);renderCart()}))}
   function openCart(open=true){if(open){$('#catalogCategoryDrawer')?.classList.remove('open');$('#catalogCategoryDrawer')?.setAttribute('aria-hidden','true');$('#catalogCategoryMenuButton')?.setAttribute('aria-expanded','false')}$('#catalogCartDrawer').classList.toggle('open',open);$('#catalogBackdrop').classList.toggle('open',open);$('#catalogCartDrawer').setAttribute('aria-hidden',String(!open))}
-  function openCheckout(){if(!cart.length)return;$('#checkoutPrivacy').checked=false;openCart(false);const d=$('#checkoutDelivery');d.innerHTML='';if(data.settings.allow_pickup)d.innerHTML+=`<option value="pickup">${esc(data.settings.pickup_label||'Retiro')}</option>`;if(data.settings.allow_shipping)d.innerHTML+=`<option value="shipping">${esc(data.settings.shipping_label||'Envío')}</option>`;$('#checkoutPayment').innerHTML=data.payment_methods.map(m=>`<option value="${esc(m.code)}">${esc(m.name)}${Number(m.adjustment_value)?` · ${m.adjustment_direction==='discount'?'-':'+'}${m.adjustment_value}${m.adjustment_kind==='percent'?'%':''}`:''}</option>`).join('');$('#checkoutModal').classList.remove('hidden');document.body.style.overflow='hidden';updateCheckout();$('#checkoutName').focus()}
+  function openCheckout(){if(!cart.length)return;$('#checkoutPrivacy').checked=false;openCart(false);checkoutZone='local';checkoutCity='';document.querySelectorAll('[name="checkoutShippingZone"]').forEach(x=>{x.checked=x.value==='local'});document.querySelectorAll('[name="checkoutPostalMode"]').forEach(x=>{x.checked=x.value==='door'});const d=$('#checkoutDelivery');d.innerHTML='';if(data.settings.allow_shipping)d.innerHTML+='<option value="shipping">'+esc(data.settings.shipping_label||'Envío')+'</option>';if(data.settings.allow_pickup)d.innerHTML+='<option value="pickup">'+esc(data.settings.pickup_label||'Retiro')+'</option>';d.value=data.settings.allow_shipping?'shipping':'pickup';$('#checkoutPayment').innerHTML=data.payment_methods.map(m=>'<option value="'+esc(m.code)+'">'+esc(m.name)+(Number(m.adjustment_value)?' · '+(m.adjustment_direction==='discount'?'-':'+')+m.adjustment_value+(m.adjustment_kind==='percent'?'%':''):'')+'</option>').join('');$('#checkoutPostalRecipient').value='';$('#checkoutPostalDocument').value='';$('#checkoutPostalProvince').value='';$('#checkoutPostalCity').value='';$('#checkoutPostalCode').value='';$('#checkoutPostalStreet').value='';$('#checkoutPostalNumber').value='';$('#checkoutPostalApartment').value='';$('#checkoutPostalBranch').value='';$('#checkoutAddress').value='';$('#checkoutModal').classList.remove('hidden');document.body.style.overflow='hidden';updateCheckout();$('#checkoutName').focus()}
   function renderCheckoutPayments(pay,delivery){
     const methods=data.payment_methods||[];
     $('#checkoutPaymentCards').innerHTML=methods.map((m,i)=>{
-      const t=totals(m.code,delivery),value=Number(m.adjustment_value||0);
+      const t=totals(m.code,delivery,checkoutZone),value=Number(m.adjustment_value||0);
       const adjustment=value?`${m.adjustment_direction==='discount'?'Descuento':'Recargo'} ${Math.abs(value)}${m.adjustment_kind==='percent'?'%':' ARS'} incluido`:'Sin recargo';
       return `<label class="checkout-payment-card ${m.code===pay?'selected':''}"><input type="radio" name="checkoutPaymentChoice" value="${i}" ${m.code===pay?'checked':''}><span><strong>${esc(m.name)}</strong><small>${esc(adjustment)}</small></span><b>${money(t.total)}</b></label>`;
     }).join('');
-    const method=methods.find(m=>m.code===pay),t=totals(pay,delivery);
-    $('#checkoutPaymentHint').textContent=method?.code==='go_cuotas'?`Go Cuotas: el total de ${money(t.total)} ya incluye el recargo configurado. La disponibilidad de cuotas se confirma al coordinar el pago.`:'El importe final corresponde a la forma de pago elegida.';
+    const method=methods.find(m=>m.code===pay),t=totals(pay,delivery,checkoutZone);
+    $('#checkoutPaymentHint').textContent=checkoutZone==='postal'&&delivery==='shipping'?'El envío por correo se cotiza por separado. El importe mostrado incluye productos y forma de pago, no el costo del correo.':method?.code==='go_cuotas'?`Go Cuotas: el total de ${money(t.total)} ya incluye el recargo configurado. La disponibilidad de cuotas se confirma al coordinar el pago.`:'El importe final corresponde a la forma de pago elegida.';
   }
-  function updateCheckout(){const delivery=$('#checkoutDelivery').value,pay=$('#checkoutPayment').value,t=totals(pay,delivery);renderCheckoutPayments(pay,delivery);$('#addressLabel').classList.toggle('hidden',delivery!=='shipping');if(delivery!=='shipping'){checkoutCity='';document.querySelectorAll('[data-city]').forEach(x=>x.classList.remove('active'))};$('#checkoutTotals').innerHTML=cart.map(x=>`<div><span>${x.quantity} × ${esc(x.product_name)} · ${esc(x.variant_name)}</span><b>${money(x.price*x.quantity)}</b></div>`).join('')+`<div><span>Productos</span><b>${money(t.subtotal)}</b></div><div><span>Envío</span><b>${money(t.shipping)}</b></div>${t.adj?`<div><span>${t.adj<0?'Descuento':'Recargo'} ${esc((data.payment_methods.find(m=>m.code===pay)||{}).name||'de pago')}</span><b>${money(t.adj)}</b></div>`:''}<div class="grand"><span>Total</span><b>${money(t.total)}</b></div>`}
+  function updateCheckout(){
+    const delivery=$('#checkoutDelivery').value,pay=$('#checkoutPayment').value,zone=checkoutZone,t=totals(pay,delivery,zone),shipping=delivery==='shipping';
+    renderCheckoutPayments(pay,delivery);
+    $('#addressLabel').classList.toggle('hidden',!shipping);
+    $('#localDeliveryFields').classList.toggle('hidden',!shipping||zone!=='local');
+    $('#postalDeliveryFields').classList.toggle('hidden',!shipping||zone!=='postal');
+    const postal=shipping&&zone==='postal';
+    $('#checkoutEmail').required=postal;
+    $('#checkoutPostalRecipient').required=postal;
+    $('#checkoutPostalDocument').required=postal;
+    $('#checkoutPostalProvince').required=postal;
+    $('#checkoutPostalCity').required=postal;
+    $('#checkoutPostalCode').required=postal;
+    const mode=document.querySelector('[name="checkoutPostalMode"]:checked')?.value||'door';
+    $('#postalDoorFields').classList.toggle('hidden',!postal||mode!=='door');
+    $('#postalBranchFields').classList.toggle('hidden',!postal||mode!=='branch');
+    $('#checkoutPostalStreet').required=postal&&mode==='door';
+    $('#checkoutPostalNumber').required=postal&&mode==='door';
+    $('#checkoutPostalBranch').required=postal&&mode==='branch';
+    if(!shipping){checkoutCity='';document.querySelectorAll('[data-city]').forEach(x=>x.classList.remove('active'))}
+    const lines=cart.map(x=>'<div><span>'+x.quantity+' × '+esc(x.product_name)+' · '+esc(x.variant_name)+'</span><b>'+money(x.price*x.quantity)+'</b></div>').join('');
+    const shippingLine='<div><span>Envío</span><b>'+(postal?'A cotizar':money(t.shipping))+'</b></div>';
+    const adjustment=t.adj?'<div><span>'+(t.adj<0?'Descuento':'Recargo')+' '+esc((data.payment_methods.find(m=>m.code===pay)||{}).name||'de pago')+'</span><b>'+money(t.adj)+'</b></div>':'';
+    $('#checkoutTotals').innerHTML=lines+'<div><span>Productos</span><b>'+money(t.subtotal)+'</b></div>'+shippingLine+adjustment+'<div class="grand"><span>Total'+(postal?' · sin correo':'')+'</span><b>'+money(t.total)+'</b></div>';
+  }
   async function placeOrder(){
     const btn=$('#placeOrderButton');btn.disabled=true;$('#checkoutError').textContent='';
     try{
       if(!$('#checkoutPrivacy').checked){$('#checkoutPrivacy').focus();throw new Error('Leé la política de privacidad y los términos de venta antes de confirmar.')}
+      const delivery=$('#checkoutDelivery').value,zone=checkoutZone,mode=document.querySelector('[name="checkoutPostalMode"]:checked')?.value||'door';
+      let shippingDetails={};
+      let deliveryAddress='';
+      if(delivery==='shipping'&&zone==='local'){
+        if(!checkoutCity)throw new Error('Elegí Santa Fe o Santo Tomé.');
+        if($('#checkoutAddress').value.trim().length<3)throw new Error('Ingresá la dirección de entrega.');
+        deliveryAddress=$('#checkoutAddress').value.trim()+' · '+checkoutCity;
+        shippingDetails={zone:'local',city:checkoutCity,street:$('#checkoutAddress').value.trim()};
+      }else if(delivery==='shipping'&&zone==='postal'){
+        const email=$('#checkoutEmail').value.trim();
+        if(!email)throw new Error('El email es obligatorio para los envíos por correo.');
+        if($('#checkoutPostalRecipient').value.trim().length<3)throw new Error('Completá el nombre del destinatario.');
+        if($('#checkoutPostalDocument').value.replace(/\\D/g,'').length<7)throw new Error('Ingresá un DNI o CUIT válido.');
+        if(!$('#checkoutPostalProvince').value)throw new Error('Seleccioná la provincia.');
+        if($('#checkoutPostalCity').value.trim().length<2)throw new Error('Completá la localidad.');
+        if(!$('#checkoutPostalCode').value.trim())throw new Error('Ingresá el código postal.');
+        if(mode==='door'&&($('#checkoutPostalStreet').value.trim().length<3||!$('#checkoutPostalNumber').value.trim()))throw new Error('Completá calle y número del domicilio.');
+        if(mode==='branch'&&$('#checkoutPostalBranch').value.trim().length<5)throw new Error('Indicá la sucursal donde querés retirar.');
+        shippingDetails={
+          zone:'postal',recipient:$('#checkoutPostalRecipient').value.trim(),
+          document:$('#checkoutPostalDocument').value.trim(),province:$('#checkoutPostalProvince').value,
+          city:$('#checkoutPostalCity').value.trim(),postal_code:$('#checkoutPostalCode').value.trim().toUpperCase(),
+          carrier:$('#checkoutPostalCarrier').value,delivery_mode:mode,
+          street:$('#checkoutPostalStreet').value.trim(),number:$('#checkoutPostalNumber').value.trim(),
+          apartment:$('#checkoutPostalApartment').value.trim(),branch:$('#checkoutPostalBranch').value.trim()
+        };
+      }
       const args={
         p_slug:slug,
         p_customer_name:$('#checkoutName').value,
         p_customer_phone:$('#checkoutPhone').value,
         p_customer_email:$('#checkoutEmail').value,
-        p_delivery_type:$('#checkoutDelivery').value,
-        p_delivery_address:[$('#checkoutAddress').value,checkoutCity].filter(Boolean).join(' · '),
+        p_delivery_type:delivery,
+        p_delivery_address:deliveryAddress,
+        p_shipping_details:shippingDetails,
         p_payment_code:$('#checkoutPayment').value,
         p_items:cart.map(x=>({variant_id:x.variant_id,quantity:x.quantity})),
         p_notes:$('#checkoutNotes').value||null
       };
       let j=null;
       if(publicDb){
-        const r=await publicDb.rpc('importb2b_create_web_order_safe',args);
-        if(r.error) throw r.error;
+        const r=await publicDb.rpc('importb2b_create_web_order_v2',args);
+        if(r.error)throw r.error;
         j=r.data;
       }else{
-        const r=await fetch('/api/web-order',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({slug,customer_name:args.p_customer_name,customer_phone:args.p_customer_phone,customer_email:args.p_customer_email,delivery_type:args.p_delivery_type,delivery_address:args.p_delivery_address,payment_code:args.p_payment_code,notes:args.p_notes,items:args.p_items})});
+        const r=await fetch('/api/web-order',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({slug,customer_name:args.p_customer_name,customer_phone:args.p_customer_phone,customer_email:args.p_customer_email,delivery_type:args.p_delivery_type,delivery_address:args.p_delivery_address,shipping_details:args.p_shipping_details,payment_code:args.p_payment_code,notes:args.p_notes,items:args.p_items})});
         j=await r.json();if(!r.ok)throw new Error(j.error||'No se pudo crear el pedido');
       }
-      const msg=Importb2bOrderUtils.summary({...j,customer_name:j.customer_name||args.p_customer_name,customer_phone:j.customer_phone||args.p_customer_phone,delivery_type:j.delivery_type||args.p_delivery_type,delivery_address:j.delivery_address||args.p_delivery_address,notes:args.p_notes},j.items||cart.map(i=>({...i,unit_price_ars:i.price})));
-      const wa=Importb2bOrderUtils.phone('543425575323');
+      let msg=Importb2bOrderUtils.summary({...j,customer_name:j.customer_name||args.p_customer_name,customer_phone:j.customer_phone||args.p_customer_phone,delivery_type:j.delivery_type||args.p_delivery_type,delivery_address:j.delivery_address||args.p_delivery_address,notes:args.p_notes},j.items||cart.map(i=>({...i,unit_price_ars:i.price})));
+      if(j.shipping_quote_pending){
+        msg+='\\n\\n*ENVÍO POR CORREO · A COTIZAR*\\nEmpresa: '+shippingDetails.carrier+'\\nDestinatario: '+shippingDetails.recipient+'\\nDNI/CUIT: '+shippingDetails.document+'\\nLocalidad: '+shippingDetails.city+', '+shippingDetails.province+' · CP '+shippingDetails.postal_code+'\\nEntrega: '+(shippingDetails.delivery_mode==='door'?'Domicilio':'Sucursal')+(shippingDetails.delivery_mode==='door'?' · '+shippingDetails.street+' '+shippingDetails.number+' '+shippingDetails.apartment:' · '+shippingDetails.branch)+'\\nEl costo del correo se confirma por separado.';
+      }
+      const wa=Importb2bOrderUtils.phone(j.whatsapp_number||data?.settings?.whatsapp_number||'543425575323');
       cart=[];renderCart();
-      $('#checkoutModal').querySelector('.store-modal-card').innerHTML=`<div class="order-success"><span>✓</span><b>${esc(j.order_code)}</b><h2>Pedido recibido</h2><p>Recibimos tu solicitud. IMPORTB2B debe confirmar el pedido para reservar stock y luego registrar la venta.</p>${wa?`<a class="store-primary" style="display:block;text-decoration:none" target="_blank" href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}">Continuar por WhatsApp</a>`:''}<button class="store-primary" onclick="location.reload()">Volver al catálogo</button></div>`;
+      $('#checkoutModal').querySelector('.store-modal-card').innerHTML='<div class="order-success"><span>✓</span><b>'+esc(j.order_code)+'</b><h2>Pedido recibido</h2><p>Recibimos tu solicitud. IMPORTB2B debe confirmar el pedido para reservar stock y coordinar el pago y la entrega.</p>'+(wa?'<a class="store-primary" style="display:block;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(msg)+'">Continuar por WhatsApp</a>':'')+'<button class="store-primary" onclick="location.reload()">Volver al catálogo</button></div>';
       location.assign(Importb2bOrderUtils.link(wa,msg));
     }catch(e){$('#checkoutError').textContent=e.message;btn.disabled=false}
   }
@@ -371,5 +426,5 @@
     if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
   });
-  $('#catalogSearch').addEventListener('input',e=>{q=e.target.value;cat='';catalogMode='search';catalogBrowseOpen=!!q.trim();document.querySelectorAll('[data-cat],[data-home]').forEach(x=>x.classList.remove('active'));if(!catalogBrowseOpen)document.querySelectorAll('[data-home]').forEach(x=>x.classList.add('active'));renderProducts();if(catalogBrowseOpen)document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth',block:'start'})});$('#catalogCategory').addEventListener('change',e=>e.target.value?chooseCategory(e.target.value):goHome());$('#catalogCartButton').addEventListener('click',()=>openCart(true));$('#catalogCartClose').addEventListener('click',()=>openCart(false));$('#catalogCategoryMenuButton').addEventListener('click',()=>openCategoryDrawer(!$('#catalogCategoryDrawer').classList.contains('open')));$('#catalogProductBackMain')?.addEventListener('click',()=>closeProductPage(true));$('#catalogCategoryDrawerClose').addEventListener('click',()=>openCategoryDrawer(false));$('#catalogBackdrop').addEventListener('click',()=>{openCart(false);openCategoryDrawer(false)});$('#checkoutButton').addEventListener('click',openCheckout);$('#checkoutClose').addEventListener('click',()=>{$('#checkoutModal').classList.add('hidden');document.body.style.overflow='';$('#catalogCartButton').focus()});$('#checkoutDelivery').addEventListener('change',updateCheckout);$('#checkoutPayment').addEventListener('change',updateCheckout);$('#checkoutPaymentCards').addEventListener('change',e=>{if(e.target.name!=='checkoutPaymentChoice')return;const method=data.payment_methods[Number(e.target.value)];if(method){$('#checkoutPayment').value=method.code;updateCheckout();$('#checkoutPaymentCards input:checked')?.focus()}});$('#placeOrderButton').addEventListener('click',placeOrder);load().catch(e=>$('#catalogGrid').innerHTML=`<div class="store-loading">${esc(e.message)}</div>`);
+  $('#catalogSearch').addEventListener('input',e=>{q=e.target.value;cat='';catalogMode='search';catalogBrowseOpen=!!q.trim();document.querySelectorAll('[data-cat],[data-home]').forEach(x=>x.classList.remove('active'));if(!catalogBrowseOpen)document.querySelectorAll('[data-home]').forEach(x=>x.classList.add('active'));renderProducts();if(catalogBrowseOpen)document.querySelector('.catalog-all-section')?.scrollIntoView({behavior:'smooth',block:'start'})});$('#catalogCategory').addEventListener('change',e=>e.target.value?chooseCategory(e.target.value):goHome());$('#catalogCartButton').addEventListener('click',()=>openCart(true));$('#catalogCartClose').addEventListener('click',()=>openCart(false));$('#catalogCategoryMenuButton').addEventListener('click',()=>openCategoryDrawer(!$('#catalogCategoryDrawer').classList.contains('open')));$('#catalogProductBackMain')?.addEventListener('click',()=>closeProductPage(true));$('#catalogCategoryDrawerClose').addEventListener('click',()=>openCategoryDrawer(false));$('#catalogBackdrop').addEventListener('click',()=>{openCart(false);openCategoryDrawer(false)});$('#checkoutButton').addEventListener('click',openCheckout);$('#checkoutClose').addEventListener('click',()=>{$('#checkoutModal').classList.add('hidden');document.body.style.overflow='';$('#catalogCartButton').focus()});$('#checkoutDelivery').addEventListener('change',updateCheckout);$('#checkoutPayment').addEventListener('change',updateCheckout);document.querySelectorAll('[name="checkoutShippingZone"]').forEach(x=>x.addEventListener('change',e=>{checkoutZone=e.target.value;updateCheckout()}));document.querySelectorAll('[name="checkoutPostalMode"]').forEach(x=>x.addEventListener('change',updateCheckout));$('#checkoutPaymentCards').addEventListener('change',e=>{if(e.target.name!=='checkoutPaymentChoice')return;const method=data.payment_methods[Number(e.target.value)];if(method){$('#checkoutPayment').value=method.code;updateCheckout();$('#checkoutPaymentCards input:checked')?.focus()}});$('#placeOrderButton').addEventListener('click',placeOrder);load().catch(e=>$('#catalogGrid').innerHTML=`<div class="store-loading">${esc(e.message)}</div>`);
 })();
