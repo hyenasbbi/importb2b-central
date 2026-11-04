@@ -1336,3 +1336,8 @@ body{
   .catalog-promo-custom-copy em { font-size: clamp(11px, 2.7vw, 15px); line-height: 1.2; }
   .catalog-promo-custom-copy strong { margin-top: 2px; padding: 7px 10px; font-size: 12px; }
 }
+
+.discount-category-filters { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:4px 2px 10px; margin-bottom:8px; }
+.discount-category-filters[hidden] { display:none; }
+.discount-category-filters button { flex:none; min-height:40px; padding:6px 15px; border-radius:999px; border:1px solid #343a40; background:#101316; color:#eee; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+.discount-category-filters button[aria-pressed="true"] { background:#32161a; border-color:#ff424a; color:white; }

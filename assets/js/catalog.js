@@ -145,6 +145,32 @@
       const io=new IntersectionObserver(entries=>entries.forEach(e=>e.isIntersecting?start():stop()),{threshold:.35});io.observe(g);
     });
   }
+  let discountCategory = '';
+
+  function showDiscountFilters(bar, categories, visible) {
+    bar.hidden = !visible || !categories.length;
+    if (bar.hidden) return;
+    const values = ['', ...categories];
+    const key = JSON.stringify(values);
+    if (bar.dataset.categories !== key) {
+      bar.dataset.categories = key;
+      bar.replaceChildren(...values.map(value => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.value = value;
+        button.textContent = value || 'Todas';
+        button.onclick = () => {
+          discountCategory = value;
+          renderProducts();
+        };
+        return button;
+      }));
+    }
+    for (const button of bar.children) {
+      button.setAttribute('aria-pressed', String(button.dataset.value === discountCategory));
+    }
+  }
+
   function renderProducts(){
     if(!data)return;
     const homeMode=!catalogBrowseOpen;
@@ -167,9 +193,15 @@
       $('#catalogFeaturedGrid').innerHTML='';
     }
 
-    const discounts=data.products.filter(p=>p.variants?.some(saleActive)).slice(0,6);
+    const offers = data.products.filter(p => p.variants?.some(saleActive));
+    const categories = [...new Set(offers.map(p => p.category).filter(Boolean))]
+      .sort((a,b) => (categoryOrder.get(a) ?? 9999) - (categoryOrder.get(b) ?? 9999) || a.localeCompare(b,'es'));
+    if (!categories.includes(discountCategory)) discountCategory = '';
+    showDiscountFilters($('#discountHomeFilters'), categories, homeMode);
+    showDiscountFilters($('#discountBrowseFilters'), categories, !homeMode && catalogMode === 'discount');
+    const discounts = discountCategory ? offers.filter(p => p.category === discountCategory) : offers;
     $('#catalogDiscountSection').classList.toggle('hidden',!homeMode||!discounts.length);
-    $('#catalogDiscountGrid').innerHTML=homeMode?discounts.map(p=>card(p,'OFERTA')).join(''):'';
+    $('#catalogDiscountGrid').innerHTML=homeMode?discounts.slice(0,6).map(p=>card(p,'OFERTA')).join(''):'';
 
     const browse=$('.catalog-all-section'),grid=$('#catalogGrid'),title=$('#catalogBrowseTitle'),subbar=$('#catalogSubcategoryBar');
     const camisetaMode=catalogBrowseOpen&&String(cat||'').trim().toLowerCase()==='camisetas';
@@ -190,7 +222,7 @@
       let products=filteredProducts().sort(storeRank);
       if(catalogMode==='new')products=products.filter(p=>p.new_arrival).sort(rank);
       else if(catalogMode==='featured')products=products.filter(p=>p.featured).sort(rank);
-      else if(catalogMode==='discount')products=products.filter(p=>p.variants?.some(saleActive));
+      else if(catalogMode==='discount')products=discounts.slice().sort(storeRank);
       if(title)title.textContent=cat?cat:(catalogMode==='new'?'Nuevos ingresos':catalogMode==='featured'?'Destacados':catalogMode==='discount'?'Descuentos':q.trim()?('Resultados para “'+q.trim()+'”'):'Productos');
       if(title&&cat){const share=document.createElement('button');share.type='button';share.className='catalog-share-active-btn';share.textContent='↗ Compartir categoría';share.addEventListener('click',()=>shareCategory(cat));title.append(' ',share)}
       grid.innerHTML=products.map(p=>card(p,catalogMode==='new'?'NUEVO':catalogMode==='discount'?'OFERTA':'')).join('')||'<div class="store-loading">No hay productos seleccionados para esta sección.</div>';
