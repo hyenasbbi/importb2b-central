@@ -1311,3 +1311,33 @@ body{
  #checkoutModal .checkout-payment-card{grid-template-columns:18px minmax(0,1fr) auto}
  #checkoutModal .checkout-payment-card b{font-size:13px}
 }
+
+/* Keep campaign lettering inside the banner at every viewport width. */
+.catalog-promo-custom picture img {
+  object-fit: contain;
+  object-position: right center;
+}
+@media (max-width: 780px) {
+  .catalog-promo-custom-action:has(picture img) {
+    display: grid;
+    min-height: 0;
+    padding: 0;
+  }
+  .catalog-promo-custom picture:has(img),
+  .catalog-promo-custom picture img {
+    position: static;
+    height: auto;
+  }
+  .catalog-promo-custom picture img {
+    max-height: 56svh;
+    object-position: center;
+  }
+  .catalog-promo-custom-action:has(picture img)::after {
+    display: none;
+  }
+  .catalog-promo-custom-action:has(picture img) .catalog-promo-custom-copy {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 18px 22px 22px;
+  }
+}
