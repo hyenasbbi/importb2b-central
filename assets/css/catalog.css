@@ -1318,26 +1318,21 @@ body{
   object-position: right center;
 }
 @media (max-width: 780px) {
+  .catalog-promo-custom:has(picture img) { min-height: 0; background: #090909; }
   .catalog-promo-custom-action:has(picture img) {
-    display: grid;
     min-height: 0;
-    padding: 0;
-  }
-  .catalog-promo-custom picture:has(img),
-  .catalog-promo-custom picture img {
-    position: static;
-    height: auto;
-  }
-  .catalog-promo-custom picture img {
-    max-height: 56svh;
-    object-position: center;
-  }
-  .catalog-promo-custom-action:has(picture img)::after {
-    display: none;
-  }
-  .catalog-promo-custom-action:has(picture img) .catalog-promo-custom-copy {
+    aspect-ratio: 2.6;
+    padding: clamp(10px, 3vw, 20px);
     box-sizing: border-box;
-    width: 100%;
-    padding: 18px 22px 22px;
   }
+  .catalog-promo-custom-action:has(picture img)::after { display: none; }
+  .catalog-promo-custom-action:has(picture img) .catalog-promo-custom-copy {
+    width: 49%;
+    gap: 4px;
+    overflow-wrap: anywhere;
+  }
+  .catalog-promo-custom-copy small { font-size: clamp(8px, 2vw, 11px); letter-spacing: .1em; }
+  .catalog-promo-custom-copy b { font-size: clamp(17px, 4.5vw, 31px); }
+  .catalog-promo-custom-copy em { font-size: clamp(11px, 2.7vw, 15px); line-height: 1.2; }
+  .catalog-promo-custom-copy strong { margin-top: 2px; padding: 7px 10px; font-size: 12px; }
 }
