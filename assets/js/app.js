@@ -905,11 +905,11 @@ El stock y el historial se conservan.`))return;
         <div>
           <span class="eyebrow">GENERADOR AUTOMÁTICO · 6.5</span>
           <h3>PDF desde Stock Central</h3>
-          <p class="muted">El PDF incluye solamente los productos que marques. Podés filtrar, seleccionar por categoría y exportar sin tocar el stock real.</p>
+          <p class="muted">La lista mayorista sin fotos incluye los productos marcados o, si no marcás ninguno, todos los visibles. Los catálogos con fotos requieren una selección. Podés filtrar, seleccionar por categoría y exportar sin tocar el stock real.</p>
         </div>
         <div class="pdf-head-actions">
           <button id="pdfClient" class="btn primary" ${selectedTotal?'':'disabled'}>PDF Clientes · ${selectedTotal}</button>
-          <button id="pdfReseller" class="btn ghost" ${selectedTotal?'':'disabled'}>PDF Revendedores · ${selectedTotal}</button><button id="pdfWholesale" class="btn ghost" ${selectedTotal?'':'disabled'}>PDF Mayorista · ${selectedTotal}</button><button id="resellerWeb" class="btn primary">Crear enlace web · 7 días</button><button id="resellerManage" class="btn ghost">Administrar enlaces</button>
+          <button id="pdfReseller" class="btn ghost" ${selectedTotal?'':'disabled'}>PDF Revendedores · ${selectedTotal}</button><button id="pdfWholesaleList" class="btn primary" ${rows.length?'':'disabled'}>Compartir lista sin fotos · ${selectedTotal||rows.length}</button><button id="pdfWholesale" class="btn ghost" ${selectedTotal?'':'disabled'}>Mayorista con fotos · ${selectedTotal}</button><button id="resellerWeb" class="btn primary">Crear enlace web · 7 días</button><button id="resellerManage" class="btn ghost">Administrar enlaces</button>
         </div>
       </div>
       <div class="pdf-builder-grid">
@@ -963,6 +963,7 @@ El stock y el historial se conservan.`))return;
       $('#pdfSelectedMeta').textContent=`${visible} visibles de ${rows.length} · ${total} total`;
       $('#pdfClient').disabled=!total;
       $('#pdfReseller').disabled=!total;
+      $('#pdfWholesaleList').textContent=`Compartir lista sin fotos · ${total||rows.length}`;
       $('#pdfWholesale').disabled=!total;
       $('#pdfClient').textContent=`PDF Clientes · ${total}`;
       $('#pdfReseller').textContent=`PDF Revendedores · ${total}`;
@@ -989,8 +990,62 @@ El stock y el historial se conservan.`))return;
     $('#resellerManage').addEventListener('click',async()=>{const {data,error}=await window.db.rpc('reseller_link_list');if(error)return alert(error.message);const active=(data||[]).filter(x=>!x.revoked_at&&new Date(x.expires_at)>new Date());if(!active.length)return alert('No hay enlaces activos.');const msg=active.map((x,i)=>[i+1,x.categories.join(' + '),'Vence '+new Date(x.expires_at).toLocaleString('es-AR')].join(' · ')).join('\n');const n=prompt('Enlaces activos:\n'+msg+'\n\nIngresá el número para desactivar uno, o cancelá.');if(!n)return;const item=active[Number(n)-1];if(!item)return alert('Número inválido');if(!confirm('¿Desactivar este enlace ahora?'))return;const result=await window.db.rpc('reseller_link_revoke',{p_id:item.id});alert(result.error?'Error: '+result.error.message:'Enlace desactivado')});
     $('#pdfClient').addEventListener('click',()=>generateStockPdf(rows.filter(x=>pdfSelected.has(x.id)),{mode:'client',exactStock:$('#pdfExactStock').checked,title:$('#pdfTitle').value.trim()||'CATÁLOGO IMPORTB2B',subtitle:$('#pdfSubtitle').value.trim()}));
     $('#pdfReseller').addEventListener('click',()=>generateStockPdf(rows.filter(x=>pdfSelected.has(x.id)),{mode:'reseller',exactStock:$('#pdfExactStock').checked,title:'CATÁLOGO · LISTA DE PRECIOS',subtitle:'Productos disponibles · Precios de venta'}));
+    $('#pdfWholesaleList').addEventListener('click', async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const marked = rows.filter(product => pdfSelected.has(product.id));
+        const settings = await DB.catalogSettings();
+        await shareWholesaleList(marked.length ? marked : rows, pdfWholesaleTier, settings.whatsapp_number);
+      } catch (error) {
+        if (error.name !== 'AbortError') alert(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    });
     $('#pdfWholesale').addEventListener('click',()=>generateStockPdf(rows.filter(x=>pdfSelected.has(x.id)),{mode:'wholesale',wholesaleTier:pdfWholesaleTier,exactStock:$('#pdfExactStock').checked,title:'CATÁLOGO MAYORISTA',subtitle:`Mayorista ${pdfWholesaleTier}+ · ${$('#pdfSubtitle').value.trim()}`}));
 
+  }
+
+  async function shareWholesaleList(products, tier, whatsapp) {
+    if (!window.jspdf?.jsPDF) throw new Error('Recargá la página para cargar el generador PDF.');
+    const digits = String(whatsapp || '').replace(/\D/g, '');
+    if (!digits) throw new Error('Cargá el WhatsApp de la tienda en Catálogo / Web.');
+    const doc = new window.jspdf.jsPDF({ compress: true });
+    let y;
+    function header() {
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(15);
+      doc.text('IMPORTB2B | Lista de precios mayoristas',14,18);
+      doc.setFontSize(10);
+      doc.text('Desde '+tier+' unidades · Precios en pesos argentinos',14,26);
+      doc.setFont('helvetica','normal');
+      doc.textWithLink('Pedí el catálogo con fotos por WhatsApp: '+whatsapp,14,34,{
+        url:'https://wa.me/'+digits+'?text='+encodeURIComponent('Hola, quiero la lista mayorista con fotos.')
+      });
+      y=46;
+    }
+    header();
+    for (const product of products) {
+      for (const variant of product.variants) {
+        const price = Number(variant.wholesale_tiers?.['wholesale_'+tier+'_ars']) || Number(variant.wholesale_price_ars);
+        const label = [product.name,variant.variant_name].filter(Boolean).join(' · ');
+        const lines = doc.splitTextToSize(label,135);
+        if (y + lines.length*5 > 280) { doc.addPage(); header(); }
+        doc.text(lines,14,y);
+        doc.text(price>0 ? money(price) : 'Consultar',196,y,{align:'right'});
+        y += lines.length*5 + 3;
+      }
+    }
+    const filename = 'IMPORTB2B-Mayorista-'+tier+'-sin-fotos.pdf';
+    if (navigator.canShare && typeof File !== 'undefined') {
+      const file = new File([doc.output('blob')],filename,{type:'application/pdf'});
+      if (navigator.canShare({files:[file]})) {
+        try { await navigator.share({files:[file]}); return; }
+        catch(error) { if (error.name==='AbortError') throw error; }
+      }
+    }
+    doc.save(filename);
   }
 
   async function generateStockPdf(products,opts){
