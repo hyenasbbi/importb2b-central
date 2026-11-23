@@ -178,7 +178,7 @@
       const pr=await req.limit(1200); assert(pr);
       const products=pr.data||[], ids=products.map(x=>x.id); if(!ids.length) return [];
       const [vr,sr,ir]=await Promise.all([
-        db.from('importb2b_product_variants').select('id,product_id,sku,variant_name,price_ars,sale_price_ars,wholesale_price_ars,cost_ars,stock_min,active,attributes').in('product_id',ids).eq('active',true).order('variant_name'),
+        db.from('importb2b_product_variants').select('id,product_id,sku,variant_name,price_ars,sale_price_ars,wholesale_price_ars,cost_ars,stock_min,active,attributes,source,updated_at').in('product_id',ids).eq('active',true).order('variant_name'),
         db.from('importb2b_stock_summary').select('*').in('product_id',ids),
         db.from('importb2b_product_images').select('product_id,image_url,thumbnail_url,is_primary,sort_order').in('product_id',ids).order('is_primary',{ascending:false}).order('sort_order')
       ]); assert(vr); assert(sr); assert(ir);
@@ -274,6 +274,9 @@
       return orders.map(o=>({...o,items:imap.get(o.id)||[],shipment:smap.get(o.id)||null}));
     },
     async orderProductOptions(){ return this.products('','','all'); },
+    async correctPurchaseProduct(itemId,variant,payload){
+      const r=await db.rpc('importb2b_correct_purchase_product',{p_item_id:Number(itemId),p_expected_variant_id:variant.id,p_expected_updated_at:variant.updated_at,p_name:payload.name,p_variant_name:payload.variant_name,p_category:payload.category,p_sleeve_type:payload.sleeve_type||null});assert(r);return r.data;
+    },
     async saveOrderAllocation(itemId,variantId,quantity){ const r=await db.rpc('importb2b_save_order_allocation',{p_item_id:Number(itemId),p_variant_id:variantId,p_ordered_quantity:Number(quantity)}); assert(r); return r.data; },
     async deleteOrderAllocation(allocationId){ const r=await db.rpc('importb2b_delete_order_allocation',{p_allocation_id:allocationId}); assert(r); },
     async receiveOrderAllocation(allocationId,quantity,note=''){ const r=await db.rpc('importb2b_receive_order_allocation',{p_allocation_id:allocationId,p_receive_quantity:Number(quantity),p_note:note||null}); assert(r); return r.data; },
