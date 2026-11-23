@@ -1094,3 +1094,15 @@ body{touch-action:pan-y pinch-zoom}
  .postal-order-grid{grid-template-columns:1fr}
 }
 @media(max-width:420px){.catalog-design-order{grid-template-columns:1fr}}
+
+/* Quick catalog merchandising filters in stock management. */
+.stock-merch-filters{margin:0 0 18px;padding:16px;border:1px solid var(--line,#293138);border-radius:18px;background:#0d1114}
+.stock-merch-heading{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;margin-bottom:12px}
+.stock-merch-heading small{color:#9ba7b5}
+.stock-merch-chips{display:flex;flex-wrap:wrap;gap:8px}
+.stock-merch-chip{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:42px;padding:9px 14px;border:1px solid #343e48;border-radius:999px;background:#11171c;color:#e9edf2;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.stock-merch-chip span{padding:2px 7px;border-radius:999px;background:#ffffff12;font-variant-numeric:tabular-nums}
+.stock-merch-chip.active{border-color:#ff3040;background:#33151b;color:#fff}
+.stock-merch-chip:hover{border-color:#ff6873}
+.stock-merch-chip:focus-visible{outline:2px solid #fff;outline-offset:3px}
+@media(max-width:600px){.stock-merch-filters{padding:12px}.stock-merch-heading{display:grid}.stock-merch-chip{flex:1 1 auto;min-height:44px;padding:9px 11px}}
