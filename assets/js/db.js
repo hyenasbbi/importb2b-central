@@ -502,6 +502,9 @@
     },
     async cancelSale(id,reason=''){ const r=await db.rpc('importb2b_cancel_sale',{p_sale_id:id,p_reason:reason||null}); assert(r); return r.data; },
 
+    async receiptProductImage(productId){
+      const [p,i]=await Promise.all([db.from('importb2b_products').select('primary_image_url').eq('id',productId).single(),db.from('importb2b_product_images').select('image_url').eq('product_id',productId).order('is_primary',{ascending:false}).order('sort_order').limit(1)]);assert(p);assert(i);return p.data.primary_image_url||i.data?.[0]?.image_url||null;
+    },
     async uploadProductImage(productId,file,isPrimary=false){
       const u=await authUser();
       const prepared=await prepareCatalogImage(file);
