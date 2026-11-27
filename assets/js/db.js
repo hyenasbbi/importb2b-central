@@ -279,6 +279,7 @@
     },
     async saveOrderAllocation(itemId,variantId,quantity){ const r=await db.rpc('importb2b_save_order_allocation',{p_item_id:Number(itemId),p_variant_id:variantId,p_ordered_quantity:Number(quantity)}); assert(r); return r.data; },
     async deleteOrderAllocation(allocationId){ const r=await db.rpc('importb2b_delete_order_allocation',{p_allocation_id:allocationId}); assert(r); },
+    async receiveWithPrice(id,quantity,price,note){const r=await db.rpc('importb2b_receive_with_price',{p_allocation_id:id,p_quantity:quantity,p_price:price,p_note:note});assert(r);return r.data;},
     async receiveOrderAllocation(allocationId,quantity,note=''){ const r=await db.rpc('importb2b_receive_order_allocation',{p_allocation_id:allocationId,p_receive_quantity:Number(quantity),p_note:note||null}); assert(r); return r.data; },
     async setOrderItemStockMode(itemId,active){ const r=await db.rpc('importb2b_set_order_item_stock_mode',{p_item_id:Number(itemId),p_active:Boolean(active)}); assert(r); return r.data; },
 

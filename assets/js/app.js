@@ -1344,16 +1344,28 @@ El stock y el historial se conservan.`))return;
     root.querySelectorAll('.receive-allocation').forEach(button=>button.addEventListener('click',async()=>{
       if(button.disabled)return;
       const remaining=Number(button.dataset.remaining);
-      const qty=prompt(`Quedan ${remaining} unidades por recibir. ¿Cuántas llegaron?`,String(remaining));
-      if(qty===null)return;
-      const n=Number(qty);if(!Number.isFinite(n)||n<=0||n>remaining)return alert('Cantidad inválida');
-      const note=prompt('Nota de recepción:','Recepción de mercadería');if(note===null)return;
       const order=orders.find(o=>o.items.some(i=>i.allocations?.some(a=>a.id===button.dataset.id)));
       const item=order?.items.find(i=>i.allocations?.some(a=>a.id===button.dataset.id));
       const allocation=item?.allocations.find(a=>a.id===button.dataset.id);if(!allocation)return;
+      button.disabled=true;
+      let pricing;
+      try{pricing=await DB.wholesaleData();}catch(e){button.disabled=false;openModal(`<h3>No se pudo cargar el precio</h3><p>${esc(e.message)}</p><button class="btn ghost modal-close">Cerrar</button>`);return;}
+      button.disabled=false;
+      const current=pricing.rows.find(v=>v.variant_id===allocation.variant_id);
+      const cost=Number(allocation.unit_cost_ars??item.cost_ars??0);
+      const margin=pricing.margins.find(m=>canonicalPurchaseCategory(m.category).toLowerCase()===canonicalPurchaseCategory(current?.category||item.category).toLowerCase());
+      const suggested=margin?Math.ceil(cost*(1+Number(margin.retail||0)/100)/500)*500:null;
+      openModal(`<div class="section-title"><div><span class="eyebrow">RECIBIR MERCADERÍA</span><h3>${esc(item.product)}</h3><p class="muted">${esc(allocation.variant?.variant_name||item.detail||'')}</p></div><button class="modal-close">×</button></div><form id="receiptPriceForm"><div class="form-grid"><label>Unidades recibidas<input id="rpQty" type="number" min="1" max="${remaining}" step="1" value="${remaining}" required></label><label>Precio de venta por unidad<input id="rpPrice" type="number" min="0.01" step="0.01" value="${Number(current?.retail_price_ars)||suggested||''}" required></label></div><div class="receipt-price-grid"><div class="card"><small>Costo puesto por unidad</small><strong>${money(cost)}</strong><small>Incluye el envío del pedido</small></div><div class="card"><small>Venta por unidad</small><strong id="rpSale"></strong></div><div class="card"><small>Ganancia bruta por unidad</small><strong id="rpProfit"></strong><small id="rpMargin"></small></div><div class="card"><small>Ganancia bruta del lote recibido</small><strong id="rpTotal"></strong></div><div class="card"><small>Precio sugerido</small><strong>${suggested===null?'Sin configurar':money(suggested)}</strong><small>${margin?`Costo + ${Number(margin.retail||0)}%, redondeado a $500`:'Configurá el porcentaje minorista en Mayorista'}</small>${suggested>0?'<button type="button" class="btn ghost tiny" id="rpUseSuggested">Usar sugerido</button>':''}</div></div><p class="muted">Proyección antes de comisiones, impuestos y otros gastos. El precio se aplica a esta variante y su stock actual. Las ofertas existentes se conservan.</p><label>Nota<input id="rpNote" value="Recepción de mercadería"></label><p id="rpError" role="alert" class="error"></p><div class="modal-actions"><button type="button" class="btn ghost modal-close">Cancelar</button><button id="rpConfirm" class="btn primary" type="submit">Confirmar recepción y precio</button></div></form>`);
+      const update=()=>{const price=Number($('#rpPrice').value),qty=Number($('#rpQty').value),profit=price-cost;$('#rpSale').textContent=money(price);$('#rpProfit').textContent=money(profit);$('#rpTotal').textContent=money(profit*qty);$('#rpMargin').textContent=price>0?`Margen bruto: ${(profit/price*100).toFixed(1)}%`:'';$('#rpProfit').style.color=profit<0?'#ff5b68':'#75e3a7';};
+      $('#rpPrice').addEventListener('input',update);$('#rpQty').addEventListener('input',update);$('#rpUseSuggested')?.addEventListener('click',()=>{$('#rpPrice').value=suggested;update()});update();
+      $('#receiptPriceForm').addEventListener('submit',async event=>{
+      event.preventDefault();const n=Number($('#rpQty').value),price=Number($('#rpPrice').value),note=$('#rpNote').value,save=$('#rpConfirm'),error=$('#rpError');
+      if(save.disabled)return;
+      if(!Number.isInteger(n)||n<=0||n>remaining||!Number.isFinite(price)||price<=0){error.textContent='Revisá cantidad y precio.';return;}
+      save.disabled=true;error.textContent='';
       button.disabled=true;const label=button.textContent;button.textContent='Guardando…';let received=false;
       try{
-        const result=await DB.receiveOrderAllocation(allocation.id,n,note);received=true;
+        const result=await DB.receiveWithPrice(allocation.id,n,price,note);received=true;closeModal();
         allocation.received_quantity=Number(allocation.received_quantity)+Number(result.received);
         item.received_quantity=Number(result.item_received_total);item.stock_link_status=result.item_status;order.purchase_status=result.order_status;
         const row=button.closest('.allocation-row'),card=button.closest('[data-purchase-id]'),itemNode=button.closest('.order-item');
@@ -1365,7 +1377,8 @@ El stock y el historial se conservan.`))return;
         card.querySelector('[data-received-total]').textContent=`${number(result.order_received_total)} / ${number(result.order_total)}`;
         card.querySelector('.operation-progress i').style.width=(Number(result.order_total)>0?Math.min(100,Number(result.order_received_total)/Number(result.order_total)*100):0)+'%';
         card.querySelector('.operation-summary-side > .pill').outerHTML=purchaseStatusPill(result.order_status);
-      }catch(e){if(received){button.disabled=true;button.textContent='Recibido';alert('La recepción se guardó. Actualizá la vista para ver los totales.');}else{button.disabled=false;button.textContent=label;alert(e.message);}}
+      }catch(e){if(received){button.disabled=true;button.textContent='Recibido';alert('La recepción se guardó. Actualizá la vista para ver los totales.');}else{button.disabled=false;button.textContent=label;error.textContent=e.message;save.disabled=false;}}
+      });
     }));
   }
 
