@@ -1688,7 +1688,6 @@ El stock y el historial se conservan.`))return;
     $('#financeSearch')?.addEventListener('input',e=>{financeSearch=e.target.value;clearTimeout(timer);timer=setTimeout(renderFinance,130)});
     $('#financeKind')?.addEventListener('change',e=>{financeKind=e.target.value;renderFinance()});
     $('#financeMethod')?.addEventListener('change',e=>{financeMethod=e.target.value;renderFinance()});
-    if(operationsTab==='purchases'&&opened){const card=content.querySelector(`[data-purchase-id="${opened}"]`);if(card){card.open=true;window.scrollTo({top:scrollY,behavior:'instant'});}}
     bindOperationAccordions();
     document.querySelectorAll('.edit-finance').forEach(b=>b.addEventListener('click',()=>openFinanceEditor(f.movements.find(x=>x.id===b.dataset.id))));
     document.querySelectorAll('.delete-finance').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Eliminar este movimiento manual? El saldo se recalculará.'))return;try{await DB.deleteManualMovement(b.dataset.id);await renderFinance()}catch(e){alert(e.message)}}));
